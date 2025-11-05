@@ -3,11 +3,11 @@
   "main": "expo-router/entry",
   "version": "1.0.0",
   "scripts": {
-    "start": "expo start",
+    "start": "EXPO_ROUTER_APP_ROOT=src/app expo start",
     "reset-project": "node ./scripts/reset-project.js",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
-    "web": "expo start --web",
+    "android": "EXPO_ROUTER_APP_ROOT=src/app expo start --android",
+    "ios": "EXPO_ROUTER_APP_ROOT=src/app expo start --ios",
+    "web": "EXPO_ROUTER_APP_ROOT=src/app expo start --web",
     "lint": "expo lint"
   },
   "dependencies": {
