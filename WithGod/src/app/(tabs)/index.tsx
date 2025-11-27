@@ -1,90 +1,270 @@
-import { Image } from 'expo-image';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Platform, StyleSheet, Text, View } from 'react-native';
+import { Image } from "expo-image";
+import {
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
+
+const LOGO_IMAGE = require("../../shared/assets/images/Logo.png");
+const LINK_ICON = require("../../shared/assets/images/chevron-right.png");
+const SEND_ICON = require("../../shared/assets/images/send.png");
+
+const baseFontFamily = Platform.select({
+  ios: "System",
+  android: "Roboto",
+  web: "sans-serif",
+  default: "sans-serif",
+});
 
 export default function HomeScreen() {
   return (
-    <View style={styles.container}>
-      <LinearGradient
-        colors={['#4A90E2', '#4FA3EE', '#5EB2F8']}
-        locations={[0, 0.55, 1]}
-        start={{ x: 0.2, y: 0 }}
-        end={{ x: 0.8, y: 1 }}
-        style={StyleSheet.absoluteFill}
-      />
-      <LinearGradient
-        colors={['rgba(255, 255, 255, 0.25)', 'rgba(94, 178, 248, 0)']}
-        locations={[0, 1]}
-        start={{ x: 0.5, y: 0.15 }}
-        end={{ x: 0.5, y: 0.9 }}
-        pointerEvents="none"
-        style={styles.highlight}
-      />
-      <View style={styles.content}>
-        <View style={styles.logoGroup}>
-          <View style={styles.logoWrapper}>
+    <SafeAreaView style={styles.safeArea}>
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <View style={styles.headerLogoWrapper}>
             <Image
-              source={require('@/shared/assets/images/Logo.png')}
-              style={styles.logo}
+              source={LOGO_IMAGE}
+              style={styles.headerLogo}
               contentFit="contain"
-              accessibilityLabel="WithGod 앱 로고"
+              accessibilityLabel="신과함께 로고"
             />
           </View>
-          <Text style={styles.title}>WithGod</Text>
+          <Text style={styles.headerTitle}>신과함께</Text>
+        </View>
+
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.todayCard}>
+            <View style={styles.todayHeader}>
+              <View style={styles.todayAccent} />
+              <Text style={styles.todayTitle}>오늘의 말씀</Text>
+            </View>
+
+            <View style={styles.verseCard}>
+              <Text style={styles.verseText}>
+                수고하고 무거운 짐 진 자들아 다 내게로 오라 내가 너희를 쉬게
+                하리라
+              </Text>
+              <View style={styles.verseFooter}>
+                <Text style={styles.verseReference}>마태복음 11:28</Text>
+                <TouchableOpacity style={styles.link} activeOpacity={0.7}>
+                  <Text style={styles.linkLabel}>자세히 보기</Text>
+                  <Image
+                    source={LINK_ICON}
+                    style={styles.linkIcon}
+                    contentFit="contain"
+                    accessibilityLabel="자세히 보기 아이콘"
+                  />
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+
+          <View style={styles.shareSection}>
+            <Text style={styles.shareTitle}>마음을 나누어 주세요</Text>
+            <Text style={styles.shareDescription}>
+              고민이나 걱정이 있으시다면 편하게 말씀해 주세요{"\n"}
+              성경의 위로가 되는 말씀을 전해드릴게요
+            </Text>
+          </View>
+        </ScrollView>
+
+        <View style={styles.inputBar}>
+          <View style={styles.inputPlaceholder}>
+            <Text style={styles.inputPlaceholderText}>
+              지금 마음이나 고민을 들려주세요
+            </Text>
+          </View>
+          <TouchableOpacity style={styles.sendButton} activeOpacity={0.7}>
+            <Image
+              source={SEND_ICON}
+              style={styles.sendIcon}
+              contentFit="contain"
+              accessibilityLabel="마음 전송 아이콘"
+            />
+          </TouchableOpacity>
         </View>
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: "#F9FAFB",
+  },
   container: {
     flex: 1,
-    backgroundColor: '#4A90E2',
+    backgroundColor: "#F9FAFB",
   },
-  highlight: {
-    ...StyleSheet.absoluteFillObject,
-    opacity: 0.4,
+  header: {
+    backgroundColor: "#FFFFFF",
+    borderBottomColor: "#E5E7EB",
+    borderBottomWidth: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 24,
+    paddingTop: 12,
+    paddingBottom: 16,
   },
-  content: {
+  headerLogoWrapper: {
+    height: 40,
+    width: 40,
+    borderRadius: 20,
+    backgroundColor: "#E7F0FF",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 12,
+  },
+  headerLogo: {
+    height: 28,
+    width: 28,
+  },
+  headerTitle: {
+    fontSize: 24,
+    lineHeight: 32,
+    fontWeight: "600",
+    color: "#101828",
+    fontFamily: baseFontFamily,
+  },
+  scrollContent: {
+    paddingHorizontal: 24,
+    paddingTop: 32,
+    paddingBottom: 120,
+  },
+  todayCard: {
+    backgroundColor: "rgba(245, 243, 240, 0.3)",
+    borderColor: "rgba(139, 115, 85, 0.1)",
+    borderWidth: 1,
+    borderRadius: 16,
+    paddingHorizontal: 25,
+    paddingVertical: 25,
+    marginBottom: 48,
+  },
+  todayHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  todayAccent: {
+    height: 24,
+    width: 4,
+    borderRadius: 999,
+    backgroundColor: "#4A90E2",
+    marginRight: 8,
+  },
+  todayTitle: {
+    fontSize: 20,
+    lineHeight: 28,
+    fontWeight: "600",
+    color: "#101828",
+    fontFamily: baseFontFamily,
+  },
+  verseCard: {
+    backgroundColor: "#FFFFFF",
+    borderColor: "rgba(229, 231, 235, 0.6)",
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingHorizontal: 25,
+    paddingVertical: 25,
+  },
+  verseText: {
+    fontSize: 18,
+    lineHeight: 29,
+    color: "#1E2939",
+    marginBottom: 16,
+    letterSpacing: -0.2,
+    fontFamily: baseFontFamily,
+  },
+  verseFooter: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  verseReference: {
+    fontSize: 16,
+    lineHeight: 24,
+    fontWeight: "600",
+    color: "#4A90E2",
+    letterSpacing: -0.2,
+    fontFamily: baseFontFamily,
+  },
+  link: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  linkLabel: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: "#8B7355",
+    marginRight: 6,
+    fontFamily: baseFontFamily,
+  },
+  linkIcon: {
+    height: 12,
+    width: 12,
+  },
+  shareSection: {
+    alignItems: "center",
+  },
+  shareTitle: {
+    fontSize: 20,
+    lineHeight: 28,
+    fontWeight: "500",
+    color: "#1E2939",
+    textAlign: "center",
+    marginBottom: 12,
+    fontFamily: baseFontFamily,
+  },
+  shareDescription: {
+    fontSize: 18,
+    lineHeight: 29,
+    color: "#4A5565",
+    textAlign: "center",
+    fontFamily: baseFontFamily,
+  },
+  inputBar: {
+    backgroundColor: "rgba(255, 255, 255, 0.95)",
+    borderTopColor: "#E5E7EB",
+    borderTopWidth: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+  },
+  inputPlaceholder: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "#F3F3F5",
+    borderColor: "#D1D5DC",
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 11,
   },
-  logoGroup: {
-    alignItems: 'center',
+  inputPlaceholderText: {
+    fontSize: 16,
+    lineHeight: 22,
+    color: "#6A7282",
+    fontFamily: baseFontFamily,
   },
-  logoWrapper: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 32,
-    height: 128,
-    width: 128,
-    paddingTop: 6,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.12,
-    shadowRadius: 40,
-    elevation: 12,
+  sendButton: {
+    height: 44,
+    width: 44,
+    borderRadius: 14,
+    backgroundColor: "rgba(74, 144, 226, 0.5)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginLeft: 12,
   },
-  logo: {
-    height: '100%',
-    width: '100%',
-  },
-  title: {
-    marginTop: 32,
-    fontSize: 36,
-    fontWeight: '800',
-    lineHeight: 40,
-    letterSpacing: 5.4,
-    color: '#FFFFFF',
-    textTransform: 'none',
-    textAlign: 'center',
-    fontFamily: Platform.select({
-      ios: 'System',
-      android: 'Roboto',
-      default: 'sans-serif',
-    }),
+  sendIcon: {
+    height: 16,
+    width: 16,
   },
 });
