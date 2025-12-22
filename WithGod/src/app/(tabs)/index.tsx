@@ -1,10 +1,14 @@
 import { Image } from "expo-image";
+import { useEffect, useState } from "react";
 import {
+  Keyboard,
+  KeyboardAvoidingView,
   Platform,
   ScrollView,
   StatusBar,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -23,14 +27,33 @@ const baseFontFamily = Platform.select({
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
+  const [message, setMessage] = useState("");
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+
+  useEffect(() => {
+    if (Platform.OS === "ios") {
+      const showSub = Keyboard.addListener("keyboardWillShow", () => {
+        setIsKeyboardVisible(true);
+      });
+      const hideSub = Keyboard.addListener("keyboardWillHide", () => {
+        setIsKeyboardVisible(false);
+      });
+      return () => {
+        showSub.remove();
+        hideSub.remove();
+      };
+    }
+  }, []);
 
   const headerPaddingTop = Platform.OS === "android"
     ? (StatusBar.currentHeight ?? 0) + 12
     : insets.top + 12;
 
-  const inputBarPaddingBottom = Platform.OS === "ios" ? insets.bottom + 8 : 16;
+  const inputBarPaddingBottom = Platform.OS === "ios"
+    ? (isKeyboardVisible ? 16 : insets.bottom + 16)
+    : Math.max(insets.bottom, 16);
 
-  return (
+  const content = (
     <View style={styles.container}>
         <View style={[styles.header, { paddingTop: headerPaddingTop }]}>
           <View style={styles.headerLogoWrapper}>
@@ -84,11 +107,14 @@ export default function HomeScreen() {
         </ScrollView>
 
         <View style={[styles.inputBar, { paddingBottom: inputBarPaddingBottom }]}>
-          <View style={styles.inputPlaceholder}>
-            <Text style={styles.inputPlaceholderText}>
-              지금 마음이나 고민을 들려주세요
-            </Text>
-          </View>
+          <TextInput
+            style={styles.textInput}
+            placeholder="지금 마음이나 고민을 들려주세요"
+            placeholderTextColor="#6A7282"
+            value={message}
+            onChangeText={setMessage}
+            multiline
+          />
           <TouchableOpacity style={styles.sendButton} activeOpacity={0.7}>
             <Image
               source={SEND_ICON}
@@ -100,9 +126,25 @@ export default function HomeScreen() {
         </View>
     </View>
   );
+
+  if (Platform.OS === "ios") {
+    return (
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior="padding"
+      >
+        {content}
+      </KeyboardAvoidingView>
+    );
+  }
+
+  return content;
 }
 
 const styles = StyleSheet.create({
+  flex: {
+    flex: 1,
+  },
   container: {
     flex: 1,
     backgroundColor: "#F9FAFB",
@@ -241,7 +283,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingVertical: 16,
   },
-  inputPlaceholder: {
+  textInput: {
     flex: 1,
     backgroundColor: "#F3F3F5",
     borderColor: "#D1D5DC",
@@ -249,12 +291,10 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     paddingHorizontal: 16,
     paddingVertical: 11,
-  },
-  inputPlaceholderText: {
     fontSize: 16,
-    lineHeight: 22,
-    color: "#6A7282",
+    color: "#1E2939",
     fontFamily: baseFontFamily,
+    maxHeight: 100,
   },
   sendButton: {
     height: 44,
