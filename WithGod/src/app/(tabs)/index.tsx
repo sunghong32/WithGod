@@ -1,6 +1,7 @@
 import { Image } from "expo-image";
 import { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Keyboard,
   KeyboardAvoidingView,
   Platform,
@@ -13,6 +14,8 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useQuery } from "@tanstack/react-query";
+import { verseApi } from "@/features/verse";
 
 const LOGO_IMAGE = require("../../shared/assets/images/Logo.png");
 const LINK_ICON = require("../../shared/assets/images/chevron-right.png");
@@ -29,6 +32,12 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const [message, setMessage] = useState("");
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+
+  // 랜덤 말씀 API 호출
+  const { data: randomVerse, isLoading, isError, refetch } = useQuery({
+    queryKey: ["verse", "random"],
+    queryFn: verseApi.getRandomVerse,
+  });
 
   useEffect(() => {
     if (Platform.OS === "ios") {
@@ -78,22 +87,31 @@ export default function HomeScreen() {
             </View>
 
             <View style={styles.verseCard}>
-              <Text style={styles.verseText}>
-                수고하고 무거운 짐 진 자들아 다 내게로 오라 내가 너희를 쉬게
-                하리라
-              </Text>
-              <View style={styles.verseFooter}>
-                <Text style={styles.verseReference}>마태복음 11:28</Text>
-                <TouchableOpacity style={styles.link} activeOpacity={0.7}>
-                  <Text style={styles.linkLabel}>자세히 보기</Text>
-                  <Image
-                    source={LINK_ICON}
-                    style={styles.linkIcon}
-                    contentFit="contain"
-                    accessibilityLabel="자세히 보기 아이콘"
-                  />
+              {isLoading ? (
+                <ActivityIndicator size="small" color="#4A90E2" style={styles.loader} />
+              ) : isError ? (
+                <TouchableOpacity onPress={() => refetch()}>
+                  <Text style={styles.errorText}>말씀을 불러오지 못했어요. 탭하여 다시 시도</Text>
                 </TouchableOpacity>
-              </View>
+              ) : (
+                <>
+                  <Text style={styles.verseText}>
+                    {randomVerse?.text ?? "말씀을 불러오는 중..."}
+                  </Text>
+                  <View style={styles.verseFooter}>
+                    <Text style={styles.verseReference}>{randomVerse?.ref ?? ""}</Text>
+                    <TouchableOpacity style={styles.link} activeOpacity={0.7} onPress={() => refetch()}>
+                      <Text style={styles.linkLabel}>다른 말씀</Text>
+                      <Image
+                        source={LINK_ICON}
+                        style={styles.linkIcon}
+                        contentFit="contain"
+                        accessibilityLabel="다른 말씀 보기 아이콘"
+                      />
+                    </TouchableOpacity>
+                  </View>
+                </>
+              )}
             </View>
           </View>
 
@@ -218,6 +236,18 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     paddingHorizontal: 25,
     paddingVertical: 25,
+    minHeight: 120,
+  },
+  loader: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  errorText: {
+    fontSize: 16,
+    color: "#6A7282",
+    textAlign: "center",
+    fontFamily: baseFontFamily,
   },
   verseText: {
     fontSize: 18,
