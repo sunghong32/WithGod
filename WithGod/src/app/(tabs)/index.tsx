@@ -1,5 +1,5 @@
 import { Image } from "expo-image";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import {
   ActivityIndicator,
   Keyboard,
@@ -15,6 +15,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery } from "@tanstack/react-query";
+import { useRouter } from "expo-router";
 import { verseApi } from "@/features/verse";
 
 const LOGO_IMAGE = require("../../shared/assets/images/Logo.png");
@@ -32,6 +33,7 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const [message, setMessage] = useState("");
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+  const router = useRouter();
 
   // 랜덤 말씀 API 호출
   const { data: randomVerse, isLoading, isError, refetch } = useQuery({
@@ -40,27 +42,50 @@ export default function HomeScreen() {
   });
 
   useEffect(() => {
-    if (Platform.OS === "ios") {
-      const showSub = Keyboard.addListener("keyboardWillShow", () => {
-        setIsKeyboardVisible(true);
-      });
-      const hideSub = Keyboard.addListener("keyboardWillHide", () => {
-        setIsKeyboardVisible(false);
-      });
-      return () => {
-        showSub.remove();
-        hideSub.remove();
-      };
-    }
+    const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
+    const hideEvent = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
+
+    const showSub = Keyboard.addListener(showEvent, () => {
+      setIsKeyboardVisible(true);
+    });
+    const hideSub = Keyboard.addListener(hideEvent, () => {
+      setIsKeyboardVisible(false);
+    });
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
   }, []);
 
-  const headerPaddingTop = Platform.OS === "android"
-    ? (StatusBar.currentHeight ?? 0) + 12
-    : insets.top + 12;
+  const headerPaddingTop = useMemo(() => {
+    return Platform.OS === "android"
+      ? (StatusBar.currentHeight ?? 0) + 12
+      : insets.top + 12;
+  }, [insets.top]);
 
-  const inputBarPaddingBottom = Platform.OS === "ios"
-    ? (isKeyboardVisible ? 16 : insets.bottom + 16)
-    : Math.max(insets.bottom, 16);
+  const inputBarPaddingTop = 16;
+  const inputBarPaddingBottom = useMemo(() => {
+    if (Platform.OS === "ios") {
+      return isKeyboardVisible ? 16 : insets.bottom + 16;
+    }
+    // AOS: resize 모드에서는 키보드가 올라와도 항상 동일한 패딩 유지
+    return Math.max(insets.bottom, 16);
+  }, [insets.bottom, isKeyboardVisible]);
+
+  const trimmedMessage = useMemo(() => message.trim(), [message]);
+
+  const handleSend = useCallback(() => {
+    if (!trimmedMessage) {
+      return;
+    }
+
+    Keyboard.dismiss();
+    router.push({
+      pathname: "/result",
+      params: { mood: trimmedMessage },
+    });
+    setMessage("");
+  }, [router, trimmedMessage]);
 
   const content = (
     <View style={styles.container}>
@@ -124,7 +149,7 @@ export default function HomeScreen() {
           </View>
         </ScrollView>
 
-        <View style={[styles.inputBar, { paddingBottom: inputBarPaddingBottom }]}>
+        <View style={[styles.inputBar, { paddingTop: inputBarPaddingTop, paddingBottom: inputBarPaddingBottom }]}>
           <TextInput
             style={styles.textInput}
             placeholder="지금 마음이나 고민을 들려주세요"
@@ -132,8 +157,21 @@ export default function HomeScreen() {
             value={message}
             onChangeText={setMessage}
             multiline
+            returnKeyType="send"
+            onSubmitEditing={handleSend}
+            blurOnSubmit={false}
           />
-          <TouchableOpacity style={styles.sendButton} activeOpacity={0.7}>
+          <TouchableOpacity
+            style={[
+              styles.sendButton,
+              trimmedMessage.length > 0 && styles.sendButtonActive,
+            ]}
+            activeOpacity={0.7}
+            onPress={handleSend}
+            disabled={!trimmedMessage}
+            accessibilityRole="button"
+            accessibilityLabel="마음 전송 버튼"
+          >
             <Image
               source={SEND_ICON}
               style={styles.sendIcon}
@@ -338,5 +376,8 @@ const styles = StyleSheet.create({
   sendIcon: {
     height: 16,
     width: 16,
+  },
+  sendButtonActive: {
+    backgroundColor: "#4A90E2",
   },
 });
