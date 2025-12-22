@@ -1,13 +1,14 @@
 import { Image } from "expo-image";
 import {
   Platform,
-  SafeAreaView,
   ScrollView,
+  StatusBar,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const LOGO_IMAGE = require("../../shared/assets/images/Logo.png");
 const LINK_ICON = require("../../shared/assets/images/chevron-right.png");
@@ -21,10 +22,17 @@ const baseFontFamily = Platform.select({
 });
 
 export default function HomeScreen() {
+  const insets = useSafeAreaInsets();
+
+  const headerPaddingTop = Platform.OS === "android"
+    ? (StatusBar.currentHeight ?? 0) + 12
+    : insets.top + 12;
+
+  const inputBarPaddingBottom = Platform.OS === "ios" ? insets.bottom + 8 : 16;
+
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <View style={styles.container}>
-        <View style={styles.header}>
+    <View style={styles.container}>
+        <View style={[styles.header, { paddingTop: headerPaddingTop }]}>
           <View style={styles.headerLogoWrapper}>
             <Image
               source={LOGO_IMAGE}
@@ -75,7 +83,7 @@ export default function HomeScreen() {
           </View>
         </ScrollView>
 
-        <View style={styles.inputBar}>
+        <View style={[styles.inputBar, { paddingBottom: inputBarPaddingBottom }]}>
           <View style={styles.inputPlaceholder}>
             <Text style={styles.inputPlaceholderText}>
               지금 마음이나 고민을 들려주세요
@@ -90,16 +98,11 @@ export default function HomeScreen() {
             />
           </TouchableOpacity>
         </View>
-      </View>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: "#F9FAFB",
-  },
   container: {
     flex: 1,
     backgroundColor: "#F9FAFB",
@@ -111,7 +114,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 24,
-    paddingTop: 12,
     paddingBottom: 16,
   },
   headerLogoWrapper: {
@@ -201,15 +203,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   linkLabel: {
-    fontSize: 14,
+    fontSize: 16,
     lineHeight: 20,
     color: "#8B7355",
     marginRight: 6,
     fontFamily: baseFontFamily,
   },
   linkIcon: {
-    height: 12,
-    width: 12,
+    height: 10,
+    width: 4,
   },
   shareSection: {
     alignItems: "center",

@@ -3,7 +3,8 @@ import { useEffect } from 'react';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import { Platform, SafeAreaView, StyleSheet, Text, View } from 'react-native';
+import { Platform, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const baseFontFamily = Platform.select({
   ios: 'System',
@@ -14,6 +15,7 @@ const baseFontFamily = Platform.select({
 
 export default function SplashScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {
@@ -24,24 +26,33 @@ export default function SplashScreen() {
   }, [router]);
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <View style={styles.container}>
-        <LinearGradient
-          colors={['#4A90E2', '#4FA3EE', '#5EB2F8']}
-          locations={[0, 0.55, 1]}
-          start={{ x: 0.2, y: 0 }}
-          end={{ x: 0.8, y: 1 }}
-          style={StyleSheet.absoluteFill}
-        />
-        <LinearGradient
-          colors={['rgba(255, 255, 255, 0.25)', 'rgba(94, 178, 248, 0)']}
-          locations={[0, 1]}
-          start={{ x: 0.5, y: 0.15 }}
-          end={{ x: 0.5, y: 0.9 }}
-          pointerEvents="none"
-          style={styles.highlight}
-        />
-        <View style={styles.content}>
+    <View style={styles.root}>
+      <LinearGradient
+        colors={['#4A90E2', '#4FA3EE', '#5EB2F8']}
+        locations={[0, 0.55, 1]}
+        start={{ x: 0.2, y: 0 }}
+        end={{ x: 0.8, y: 1 }}
+        style={StyleSheet.absoluteFill}
+      />
+      <LinearGradient
+        colors={['rgba(255, 255, 255, 0.25)', 'rgba(94, 178, 248, 0)']}
+        locations={[0, 1]}
+        start={{ x: 0.5, y: 0.15 }}
+        end={{ x: 0.5, y: 0.9 }}
+        pointerEvents="none"
+        style={styles.highlight}
+      />
+      <SafeAreaView
+        style={[
+          styles.safeArea,
+          {
+            paddingTop: insets.top,
+            paddingBottom: insets.bottom,
+          },
+        ]}
+        edges={['left', 'right']}
+      >
+        <View style={styles.container}>
           <View style={styles.logoWrapper}>
             <Image
               source={require('@/shared/assets/images/Logo.png')}
@@ -53,29 +64,28 @@ export default function SplashScreen() {
           <Text style={styles.title}>신과함께</Text>
           <Text style={styles.subtitle}>당신의 마음에 위로를 전해요</Text>
         </View>
-      </View>
-    </SafeAreaView>
+      </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: '#4A90E2',
+  },
   safeArea: {
     flex: 1,
-    backgroundColor: '#4A90E2',
   },
   container: {
-    flex: 1,
-    backgroundColor: '#4A90E2',
-  },
-  highlight: {
-    ...StyleSheet.absoluteFillObject,
-    opacity: 0.4,
-  },
-  content: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 32,
+  },
+  highlight: {
+    ...StyleSheet.absoluteFillObject,
+    opacity: 0.4,
   },
   logoWrapper: {
     backgroundColor: '#FFFFFF',
