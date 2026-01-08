@@ -1,76 +1,45 @@
+import { useRandomVerse } from "@/features/verse/hooks/useRandomVerse";
+import { useKeyboardVisible, useSafeAreaPadding } from "@/shared/hooks";
+import { baseFontFamily } from "@/shared/styles";
 import { Image } from "expo-image";
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useRouter } from "expo-router";
+import { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Keyboard,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  StatusBar,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useQuery } from "@tanstack/react-query";
-import { useRouter } from "expo-router";
-import { verseApi } from "@/features/verse";
 
 const LOGO_IMAGE = require("../../shared/assets/images/Logo.png");
-const LINK_ICON = require("../../shared/assets/images/chevron-right.png");
 const SEND_ICON = require("../../shared/assets/images/send.png");
 
-const baseFontFamily = Platform.select({
-  ios: "System",
-  android: "Roboto",
-  web: "sans-serif",
-  default: "sans-serif",
-});
-
 export default function HomeScreen() {
-  const insets = useSafeAreaInsets();
   const [message, setMessage] = useState("");
-  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+  const isKeyboardVisible = useKeyboardVisible();
+  const { headerPaddingTop, getInputBarPaddingBottom } = useSafeAreaPadding();
   const router = useRouter();
 
-  // 랜덤 말씀 API 호출
-  const { data: randomVerse, isLoading, isError, refetch } = useQuery({
-    queryKey: ["verse", "random"],
-    queryFn: verseApi.getRandomVerse,
-  });
-
-  useEffect(() => {
-    const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
-    const hideEvent = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
-
-    const showSub = Keyboard.addListener(showEvent, () => {
-      setIsKeyboardVisible(true);
-    });
-    const hideSub = Keyboard.addListener(hideEvent, () => {
-      setIsKeyboardVisible(false);
-    });
-    return () => {
-      showSub.remove();
-      hideSub.remove();
-    };
-  }, []);
-
-  const headerPaddingTop = useMemo(() => {
-    return Platform.OS === "android"
-      ? (StatusBar.currentHeight ?? 0) + 12
-      : insets.top + 12;
-  }, [insets.top]);
+  // 랜덤 말씀 API 호출 (향상된 에러 핸들링 포함)
+  const {
+    data: randomVerse,
+    isLoading,
+    isError,
+    isFetching,
+    refetch,
+    errorMessage,
+  } = useRandomVerse();
 
   const inputBarPaddingTop = 16;
   const inputBarPaddingBottom = useMemo(() => {
-    if (Platform.OS === "ios") {
-      return isKeyboardVisible ? 16 : insets.bottom + 16;
-    }
-    // AOS: resize 모드에서는 키보드가 올라와도 항상 동일한 패딩 유지
-    return Math.max(insets.bottom, 16);
-  }, [insets.bottom, isKeyboardVisible]);
+    return getInputBarPaddingBottom(isKeyboardVisible);
+  }, [getInputBarPaddingBottom, isKeyboardVisible]);
 
   const trimmedMessage = useMemo(() => message.trim(), [message]);
 
@@ -86,6 +55,15 @@ export default function HomeScreen() {
     });
     setMessage("");
   }, [router, trimmedMessage]);
+
+  const handleKeyPress = useCallback(
+    (e: { nativeEvent: { key: string } }) => {
+      if (e.nativeEvent.key === "Enter" && trimmedMessage) {
+        handleSend();
+      }
+    },
+    [handleSend, trimmedMessage]
+  );
 
   const content = (
     <View style={styles.container}>
@@ -112,29 +90,19 @@ export default function HomeScreen() {
             </View>
 
             <View style={styles.verseCard}>
-              {isLoading ? (
+              {isLoading || isFetching ? (
                 <ActivityIndicator size="small" color="#4A90E2" style={styles.loader} />
               ) : isError ? (
-                <TouchableOpacity onPress={() => refetch()}>
-                  <Text style={styles.errorText}>말씀을 불러오지 못했어요. 탭하여 다시 시도</Text>
+                <TouchableOpacity onPress={() => refetch()} activeOpacity={0.7}>
+                  <Text style={styles.errorText}>{errorMessage}</Text>
+                  <Text style={styles.retryText}>탭하여 다시 시도</Text>
                 </TouchableOpacity>
               ) : (
                 <>
                   <Text style={styles.verseText}>
                     {randomVerse?.text ?? "말씀을 불러오는 중..."}
                   </Text>
-                  <View style={styles.verseFooter}>
-                    <Text style={styles.verseReference}>{randomVerse?.ref ?? ""}</Text>
-                    <TouchableOpacity style={styles.link} activeOpacity={0.7} onPress={() => refetch()}>
-                      <Text style={styles.linkLabel}>다른 말씀</Text>
-                      <Image
-                        source={LINK_ICON}
-                        style={styles.linkIcon}
-                        contentFit="contain"
-                        accessibilityLabel="다른 말씀 보기 아이콘"
-                      />
-                    </TouchableOpacity>
-                  </View>
+                  <Text style={styles.verseReference}>{randomVerse?.ref ?? ""}</Text>
                 </>
               )}
             </View>
@@ -159,7 +127,8 @@ export default function HomeScreen() {
             multiline
             returnKeyType="send"
             onSubmitEditing={handleSend}
-            blurOnSubmit={false}
+            onKeyPress={handleKeyPress}
+            blurOnSubmit={true}
           />
           <TouchableOpacity
             style={[
@@ -183,12 +152,11 @@ export default function HomeScreen() {
     </View>
   );
 
+  // iOS: KeyboardAvoidingView behavior="padding"
+  // Android: app.json의 softwareKeyboardLayoutMode: "resize"가 자동으로 처리
   if (Platform.OS === "ios") {
     return (
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior="padding"
-      >
+      <KeyboardAvoidingView style={styles.flex} behavior="padding">
         {content}
       </KeyboardAvoidingView>
     );
@@ -286,6 +254,14 @@ const styles = StyleSheet.create({
     color: "#6A7282",
     textAlign: "center",
     fontFamily: baseFontFamily,
+    marginBottom: 8,
+  },
+  retryText: {
+    fontSize: 14,
+    color: "#4A90E2",
+    textAlign: "center",
+    fontFamily: baseFontFamily,
+    fontWeight: "500",
   },
   verseText: {
     fontSize: 18,
@@ -294,11 +270,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     letterSpacing: -0.2,
     fontFamily: baseFontFamily,
-  },
-  verseFooter: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+    textAlign: "left",
   },
   verseReference: {
     fontSize: 16,
@@ -307,21 +279,7 @@ const styles = StyleSheet.create({
     color: "#4A90E2",
     letterSpacing: -0.2,
     fontFamily: baseFontFamily,
-  },
-  link: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  linkLabel: {
-    fontSize: 16,
-    lineHeight: 20,
-    color: "#8B7355",
-    marginRight: 6,
-    fontFamily: baseFontFamily,
-  },
-  linkIcon: {
-    height: 10,
-    width: 4,
+    alignSelf: "flex-end",
   },
   shareSection: {
     alignItems: "center",

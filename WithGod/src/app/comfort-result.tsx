@@ -1,27 +1,44 @@
+import { useRecommend, type RecommendItem } from "@/features/verse";
+import { useSafeAreaPadding } from "@/shared/hooks";
+import { Ionicons } from "@expo/vector-icons";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
-  View,
   TouchableOpacity,
-  Platform,
+  View,
 } from "react-native";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
-import { useLocalSearchParams, useRouter } from "expo-router";
-
-import { useRecommend, type RecommendItem } from "@/features/verse";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 type SearchParams = {
   message?: string | string[];
 };
 
+const MOCK_RECOMMEND_RESULTS: RecommendItem[] = [
+  {
+    ref: "시편 23:1",
+    text: "여호와는 나의 목자시니 내게 부족함이 없으리로다.",
+    comment:
+      "지금은 불안을 혼자 견디지 말고, 하루를 맡기며 한 걸음씩 가도 괜찮습니다.",
+    tag: "두려움",
+  },
+  {
+    ref: "빌립보서 4:6",
+    text: "아무것도 염려하지 말고 다만 모든 일에 기도와 간구로 너희 구할 것을 감사함으로 하나님께 아뢰라.",
+    comment:
+      "걱정이 올라올 때마다 한 문장 기도로 바꿔보면 마음의 소음이 조금씩 잦아듭니다.",
+    tag: "걱정",
+  },
+];
+
 export default function ComfortResultScreen() {
   const params = useLocalSearchParams<SearchParams>();
   const router = useRouter();
-  const insets = useSafeAreaInsets();
+  const { insets } = useSafeAreaPadding();
   const [hasRequested, setHasRequested] = useState(false);
   const { mutate, data, isPending, isError, reset } = useRecommend();
 
@@ -51,10 +68,19 @@ export default function ComfortResultScreen() {
   };
 
   const handleSearchAgain = () => {
-    router.replace("/(tabs)");
+    const mood = userMessage.trim();
+    if (!mood) {
+      return;
+    }
+
+    setHasRequested(true);
+    reset();
+    mutate({ mood });
   };
 
   const resultItems = data?.results ?? [];
+  const shouldUseMockResults = !isPending && (isError || resultItems.length === 0);
+  const displayedItems = shouldUseMockResults ? MOCK_RECOMMEND_RESULTS : resultItems;
 
   return (
     <View style={styles.root}>
@@ -99,24 +125,26 @@ export default function ComfortResultScreen() {
                 <ActivityIndicator size="large" color="#4A90E2" />
                 <Text style={styles.loadingText}>말씀을 준비하고 있어요...</Text>
               </View>
-            ) : isError ? (
-              <View style={styles.errorContainer}>
-                <Text style={styles.errorTitle}>말씀을 불러오지 못했어요</Text>
-                <Text style={styles.errorDescription}>
-                  네트워크 상태를 확인한 뒤 다시 시도해 주세요.
-                </Text>
-                <TouchableOpacity
-                  style={styles.retryButton}
-                  onPress={handleRetry}
-                  accessibilityRole="button"
-                >
-                  <Text style={styles.retryButtonText}>다시 시도하기</Text>
-                </TouchableOpacity>
-              </View>
             ) : (
-              resultItems.map((item) => (
-                <ResultCard key={item.ref} item={item} />
-              ))
+              <>
+                {shouldUseMockResults && (
+                  <View style={styles.errorContainer}>
+                    <Text style={styles.errorTitle}>말씀을 불러오지 못했어요</Text>
+                    <Text style={styles.errorDescription}>다시 시도해주세요.</Text>
+                    <Text style={styles.mockNoticeText}>예시 데이터를 대신 보여드리고 있어요.</Text>
+                    <TouchableOpacity
+                      style={styles.retryButton}
+                      onPress={handleRetry}
+                      accessibilityRole="button"
+                    >
+                      <Text style={styles.retryButtonText}>다시 시도하기</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+                {displayedItems.map((item) => (
+                  <ResultCard key={item.ref} item={item} />
+                ))}
+              </>
             )}
           </View>
         </ScrollView>
@@ -256,6 +284,12 @@ const styles = StyleSheet.create({
     color: "#4A5565",
     textAlign: "center",
     lineHeight: 22,
+  },
+  mockNoticeText: {
+    fontSize: 14,
+    color: "#4A5565",
+    textAlign: "center",
+    lineHeight: 21,
   },
   retryButton: {
     marginTop: 8,

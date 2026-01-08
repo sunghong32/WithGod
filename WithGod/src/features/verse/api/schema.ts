@@ -41,7 +41,7 @@ export const RecommendOutSchema = z.object({
   style: z.string().optional(),
   results: z.array(RecommendItemSchema),
   error: z.string().nullable().optional(),
-  candidates: z.array(VerseCandidateSchema).optional(),
+  candidates: z.array(VerseCandidateSchema).nullable().optional(),
 });
 
 export const RecommendErrorSchema = z.object({

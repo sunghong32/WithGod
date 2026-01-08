@@ -1,17 +1,10 @@
-import { useEffect } from 'react';
-
+import { baseFontFamily } from '@/shared/styles';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import { Platform, StyleSheet, Text, View } from 'react-native';
+import { useEffect } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-
-const baseFontFamily = Platform.select({
-  ios: 'System',
-  android: 'Roboto',
-  web: 'sans-serif',
-  default: 'sans-serif',
-});
 
 export default function SplashScreen() {
   const router = useRouter();

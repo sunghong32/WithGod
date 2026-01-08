@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { verseApi } from "../api";
+import { verseApi, ApiError } from "../api";
 
 export const verseKeys = {
   all: ["verse"] as const,
@@ -8,10 +8,28 @@ export const verseKeys = {
 };
 
 export function useRandomVerse() {
-  return useQuery({
+  const query = useQuery({
     queryKey: verseKeys.random(),
     queryFn: verseApi.getRandomVerse,
-    // 컴포넌트 마운트시 자동 fetch 하지 않음 (버튼 클릭시 수동 fetch)
-    enabled: false,
+    retry: (failureCount, error) => {
+      // ApiError인 경우 retryable 체크
+      if (error instanceof ApiError) {
+        return error.isRetryable && failureCount < 2;
+      }
+      // 그 외 에러는 2회까지 재시도
+      return failureCount < 2;
+    },
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000),
   });
+
+  // 에러 메시지 추출 헬퍼
+  const errorMessage =
+    query.error instanceof ApiError
+      ? query.error.userMessage
+      : "알 수 없는 오류가 발생했어요";
+
+  return {
+    ...query,
+    errorMessage,
+  };
 }
