@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "WithGod",
+    "name": "신과함께",
     "slug": "WithGod",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -8,15 +8,24 @@
     "scheme": "withgod",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/89ef64a4-7131-472f-89aa-7de04f4256fe"
+    },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": false,
+      "bundleIdentifier": "kr.co.mincha.withgod",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
+      "package": "kr.co.mincha.withgod",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./src/shared/assets/images/android-icon-foreground.png",
-        "backgroundImage": "./src/shared/assets/images/android-icon-background.png",
-        "monochromeImage": "./src/shared/assets/images/android-icon-monochrome.png"
+        "backgroundColor": "#FFFFFF",
+        "foregroundImage": "./src/shared/assets/AppIcons/android/mipmap-xxxhdpi/ic_launcher.png"
       },
       "splash": {
         "backgroundColor": "#4A90E2",
@@ -36,8 +45,8 @@
       [
         "expo-splash-screen",
         {
-          "image": "./src/shared/assets/images/splash-icon.png",
-          "imageWidth": 200,
+          "image": "./src/shared/assets/images/icon.png",
+          "imageWidth": 1,
           "resizeMode": "contain",
           "backgroundColor": "#4A90E2",
           "dark": {
@@ -49,6 +58,13 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "89ef64a4-7131-472f-89aa-7de04f4256fe"
+      }
+    },
+    "owner": "sunghong32"
   }
 }

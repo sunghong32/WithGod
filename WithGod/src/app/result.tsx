@@ -293,7 +293,6 @@ const styles = StyleSheet.create({
   commentBubble: {
     backgroundColor: "rgba(245, 243, 240, 0.8)",
     borderRadius: 12,
-    borderTopLeftRadius: 4,
     borderWidth: 1,
     borderColor: "rgba(139, 115, 85, 0.08)",
     padding: 14,

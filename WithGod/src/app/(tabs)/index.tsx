@@ -110,9 +110,21 @@ export default function HomeScreen() {
 
           <View style={styles.shareSection}>
             <Text style={styles.shareTitle}>마음을 나누어 주세요</Text>
-            <Text style={styles.shareDescription}>
-              고민이나 걱정이 있으시다면 편하게 말씀해 주세요{"\n"}
-              성경의 위로가 되는 말씀을 전해드릴게요
+            <Text
+              style={styles.shareDescription}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.8}
+            >
+              고민이나 걱정이 있으시다면 편하게 말씀해 주세요
+            </Text>
+            <Text
+              style={styles.shareDescription}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.8}
+            >
+              위로가 되는 성경 말씀을 전해드릴게요
             </Text>
           </View>
         </ScrollView>
@@ -316,11 +328,22 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 14,
     paddingHorizontal: 16,
-    paddingVertical: 11,
     fontSize: 16,
     color: "#1E2939",
     fontFamily: baseFontFamily,
+    minHeight: 44,
     maxHeight: 100,
+    ...Platform.select({
+      ios: {
+        paddingTop: 12,
+        paddingBottom: 12,
+      },
+      android: {
+        paddingTop: 0,
+        paddingBottom: 0,
+        textAlignVertical: "center",
+      },
+    }),
   },
   sendButton: {
     height: 44,
