@@ -62,43 +62,42 @@ export default function ResultScreen() {
         <Text style={styles.headerTitle}>위로의 말씀</Text>
       </View>
 
-      {showLoading ? (
-        // 로딩 중: 인디케이터와 텍스트만 표시
-        <View style={styles.loadingWrapper}>
-          <ActivityIndicator size="large" color="#4A90E2" />
-          <Text style={styles.loadingText}>말씀을 찾고 있어요...</Text>
-        </View>
-      ) : (
-        // 결과 또는 에러: 전체 콘텐츠 표시
-        <ScrollView
-          contentContainerStyle={[
-            styles.scrollContent,
-            { paddingBottom: insets.bottom + 32 },
-          ]}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* 유저 입력 말풍선 - 오른쪽 정렬 */}
-          <View style={styles.userMessageContainer}>
-            <View style={styles.userMessageBubble}>
-              <Text style={styles.userMessageText}>{mood}</Text>
-            </View>
+      <ScrollView
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingBottom: insets.bottom + 32 },
+        ]}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* 유저 입력 말풍선 - 오른쪽 정렬 */}
+        <View style={styles.userMessageContainer}>
+          <View style={styles.userMessageBubble}>
+            <Text style={styles.userMessageText}>{mood}</Text>
           </View>
+        </View>
 
-          {/* 당신을 위한 말씀 섹션 */}
-          <Text style={styles.sectionTitle}>당신을 위한 말씀</Text>
+        {/* 당신을 위한 말씀 섹션 */}
+        <Text style={styles.sectionTitle}>당신을 위한 말씀</Text>
 
-          {hasError ? (
-            <TouchableOpacity
-              style={styles.errorContainer}
-              onPress={() => refetch()}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.errorTitle}>{errorMessage}</Text>
-              <Text style={styles.errorDescription}>
-                탭하여 다시 시도해주세요
-              </Text>
-            </TouchableOpacity>
-          ) : (
+        {showLoading ? (
+          // 로딩 중: 유저 메시지 아래에 로딩 표시
+          <View style={styles.loadingCard}>
+            <ActivityIndicator size="small" color="#4A90E2" style={styles.loadingIndicator} />
+            <Text style={styles.loadingCardText}>말씀을 찾고 있어요...</Text>
+          </View>
+        ) : hasError ? (
+          <TouchableOpacity
+            style={styles.errorContainer}
+            onPress={() => refetch()}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.errorTitle}>{errorMessage}</Text>
+            <Text style={styles.errorDescription}>
+              탭하여 다시 시도해주세요
+            </Text>
+          </TouchableOpacity>
+        ) : (
+          <>
             <View style={styles.resultsContainer}>
               {results.map((result, index) => (
                 <View key={`${result.ref}-${index}`} style={styles.verseCard}>
@@ -124,18 +123,18 @@ export default function ResultScreen() {
                 </View>
               ))}
             </View>
-          )}
 
-          {/* 다시 검색하기 버튼 */}
-          <TouchableOpacity
-            style={styles.searchAgainButton}
-            onPress={() => refetch()}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.searchAgainButtonText}>다시 검색하기</Text>
-          </TouchableOpacity>
-        </ScrollView>
-      )}
+            {/* 다시 검색하기 버튼 */}
+            <TouchableOpacity
+              style={styles.searchAgainButton}
+              onPress={() => refetch()}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.searchAgainButtonText}>다시 검색하기</Text>
+            </TouchableOpacity>
+          </>
+        )}
+      </ScrollView>
     </View>
   );
 }
@@ -205,14 +204,25 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     fontFamily: baseFontFamily,
   },
-  // 로딩
-  loadingWrapper: {
-    flex: 1,
-    justifyContent: "center",
+  // 로딩 카드
+  loadingCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "rgba(139, 115, 85, 0.1)",
+    padding: 20,
+    flexDirection: "row",
     alignItems: "center",
+    shadowColor: "#8B7355",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
   },
-  loadingText: {
-    marginTop: 16,
+  loadingIndicator: {
+    marginRight: 12,
+  },
+  loadingCardText: {
     fontSize: 16,
     color: "#6A7282",
     fontFamily: baseFontFamily,
