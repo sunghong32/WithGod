@@ -17,12 +17,14 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "kr.co.mincha.withgod",
+      "googleServicesFile": "./GoogleService-Info.plist",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
       "package": "kr.co.mincha.withgod",
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#FFFFFF",
         "foregroundImage": "./src/shared/assets/AppIcons/android/mipmap-xxxhdpi/ic_launcher.png"
@@ -52,6 +54,12 @@
           "dark": {
             "backgroundColor": "#4A90E2"
           }
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "defaultChannel": "default"
         }
       ]
     ],

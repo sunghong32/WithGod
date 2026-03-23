@@ -1,6 +1,6 @@
 import { useRandomVerse } from "@/features/verse/hooks/useRandomVerse";
 import { useKeyboardVisible, useSafeAreaPadding } from "@/shared/hooks";
-import { baseFontFamily } from "@/shared/styles";
+import { baseFontFamily, scaleFont } from "@/shared/styles";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
@@ -208,8 +208,8 @@ const styles = StyleSheet.create({
     width: 28,
   },
   headerTitle: {
-    fontSize: 24,
-    lineHeight: 32,
+    fontSize: scaleFont(24),
+    lineHeight: scaleFont(32),
     fontWeight: "600",
     color: "#101828",
     fontFamily: baseFontFamily,
@@ -241,8 +241,8 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   todayTitle: {
-    fontSize: 20,
-    lineHeight: 28,
+    fontSize: scaleFont(20),
+    lineHeight: scaleFont(28),
     fontWeight: "600",
     color: "#101828",
     fontFamily: baseFontFamily,
@@ -262,22 +262,22 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   errorText: {
-    fontSize: 16,
+    fontSize: scaleFont(16),
     color: "#6A7282",
     textAlign: "center",
     fontFamily: baseFontFamily,
     marginBottom: 8,
   },
   retryText: {
-    fontSize: 14,
+    fontSize: scaleFont(14),
     color: "#4A90E2",
     textAlign: "center",
     fontFamily: baseFontFamily,
     fontWeight: "500",
   },
   verseText: {
-    fontSize: 18,
-    lineHeight: 29,
+    fontSize: scaleFont(18),
+    lineHeight: scaleFont(29),
     color: "#1E2939",
     marginBottom: 16,
     letterSpacing: -0.2,
@@ -285,8 +285,8 @@ const styles = StyleSheet.create({
     textAlign: "left",
   },
   verseReference: {
-    fontSize: 16,
-    lineHeight: 24,
+    fontSize: scaleFont(16),
+    lineHeight: scaleFont(24),
     fontWeight: "600",
     color: "#4A90E2",
     letterSpacing: -0.2,
@@ -297,8 +297,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   shareTitle: {
-    fontSize: 20,
-    lineHeight: 28,
+    fontSize: scaleFont(20),
+    lineHeight: scaleFont(28),
     fontWeight: "500",
     color: "#1E2939",
     textAlign: "center",
@@ -306,8 +306,8 @@ const styles = StyleSheet.create({
     fontFamily: baseFontFamily,
   },
   shareDescription: {
-    fontSize: 18,
-    lineHeight: 29,
+    fontSize: scaleFont(18),
+    lineHeight: scaleFont(29),
     color: "#4A5565",
     textAlign: "center",
     fontFamily: baseFontFamily,
@@ -328,7 +328,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 14,
     paddingHorizontal: 16,
-    fontSize: 16,
+    fontSize: scaleFont(16),
     color: "#1E2939",
     fontFamily: baseFontFamily,
     minHeight: 44,

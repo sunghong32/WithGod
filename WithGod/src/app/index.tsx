@@ -1,4 +1,4 @@
-import { baseFontFamily } from '@/shared/styles';
+import { baseFontFamily, scaleFont } from '@/shared/styles';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
@@ -100,9 +100,9 @@ const styles = StyleSheet.create({
   },
   title: {
     marginTop: 32,
-    fontSize: 36,
+    fontSize: scaleFont(36),
     fontWeight: '800',
-    lineHeight: 40,
+    lineHeight: scaleFont(40),
     letterSpacing: 5.4,
     color: '#FFFFFF',
     textAlign: 'center',
@@ -110,11 +110,10 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     marginTop: 12,
-    fontSize: 16,
-    lineHeight: 24,
+    fontSize: scaleFont(16),
+    lineHeight: scaleFont(24),
     color: 'rgba(255, 255, 255, 0.9)',
     textAlign: 'center',
     fontFamily: baseFontFamily,
   },
 });
-

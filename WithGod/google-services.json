@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "523468693046",
+    "project_id": "withgod-b36b6",
+    "storage_bucket": "withgod-b36b6.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:523468693046:android:2b578559255f4e7bf88297",
+        "android_client_info": {
+          "package_name": "kr.co.mincha.withgod"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCNpFHEEpwNdB4gVJyg4WslkSf-KVnAGT8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

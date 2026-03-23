@@ -1,1 +1,1 @@
-export { baseFontFamily } from "./fonts";
+export { baseFontFamily, scaleFont } from "./fonts";
