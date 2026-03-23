@@ -32,11 +32,22 @@ export interface RecommendStreamHandlers {
   onVerse?: (event: RecommendStreamVerseEvent) => void;
   onToken?: (content: string, index?: number) => void;
   onDone?: (results: RecommendItem[] | unknown) => void;
-  onError?: (message: string) => void;
+  onError?: (message: string, context?: RecommendStreamErrorContext) => void;
 }
 
 export interface RecommendStreamController {
   close: () => void;
+}
+
+export interface RecommendStreamErrorContext {
+  source: "event" | "parse" | "http" | "network";
+  eventName?: string | null;
+  payload?: string;
+  url?: string;
+  status?: number;
+  readyState?: number;
+  responseText?: string;
+  parseErrorMessage?: string;
 }
 
 const drainSseBuffer = (
@@ -106,13 +117,17 @@ const handleSsePayload = (
       const index = typeof data?.index === "number" ? data.index : undefined;
       handlers.onToken?.(content, index);
     } else if (eventType === "done") {
-      handlers.onDone?.(data?.results ?? []);
+      handlers.onDone?.(data);
     } else if (eventType === "error") {
       const message =
         typeof data?.message === "string"
           ? data.message
           : "서버 오류가 발생했어요";
-      handlers.onError?.(message);
+      handlers.onError?.(message, {
+        source: "event",
+        eventName,
+        payload: trimmed,
+      });
     }
   } catch (error) {
     if (__DEV__) {
@@ -130,7 +145,12 @@ const handleSsePayload = (
         // fall through
       }
     }
-    handlers.onError?.("응답을 해석하지 못했어요");
+    handlers.onError?.("응답을 해석하지 못했어요", {
+      source: "parse",
+      eventName,
+      payload: trimmed,
+      parseErrorMessage: error instanceof Error ? error.message : String(error),
+    });
   }
 };
 
@@ -205,7 +225,13 @@ export const verseApi = {
     xhr.onload = () => {
       if (closed) return;
       if (xhr.status >= 400) {
-        handlers.onError?.(`서버 오류가 발생했어요 (${xhr.status})`);
+        handlers.onError?.(`서버 오류가 발생했어요 (${xhr.status})`, {
+          source: "http",
+          status: xhr.status,
+          readyState: xhr.readyState,
+          responseText: xhr.responseText?.slice(-500),
+          url,
+        });
         return;
       }
       if (buffer.trim()) {
@@ -216,13 +242,29 @@ export const verseApi = {
 
     xhr.onerror = () => {
       if (closed) return;
-      handlers.onError?.("인터넷 연결을 확인해주세요");
+      handlers.onError?.("인터넷 연결을 확인해주세요", {
+        source: "network",
+        status: xhr.status,
+        readyState: xhr.readyState,
+        responseText: xhr.responseText?.slice(-500),
+        url,
+      });
     };
 
-    xhr.open("POST", url);
-    xhr.setRequestHeader("Content-Type", "application/json");
-    xhr.setRequestHeader("Accept", "text/event-stream");
-    xhr.send(JSON.stringify(input));
+    try {
+      xhr.open("POST", url);
+      xhr.setRequestHeader("Content-Type", "application/json");
+      xhr.setRequestHeader("Accept", "text/event-stream");
+      xhr.send(JSON.stringify(input));
+    } catch (error) {
+      handlers.onError?.("요청을 시작하지 못했어요", {
+        source: "network",
+        readyState: xhr.readyState,
+        status: xhr.status,
+        url,
+        parseErrorMessage: error instanceof Error ? error.message : String(error),
+      });
+    }
 
     return { close };
   },

@@ -151,8 +151,16 @@ export function logError(error: ApiError, context?: string): void {
     console.log("User Message:", error.userMessage);
     console.log("Status Code:", error.statusCode);
     console.log("Retryable:", error.isRetryable);
+    console.log("Stack:", error.stack);
     if (error.originalError) {
       console.log("Original Error:", error.originalError);
+      if (error.originalError instanceof AxiosError) {
+        const axiosError = error.originalError;
+        console.log("Axios URL:", axiosError.config?.url);
+        console.log("Axios Method:", axiosError.config?.method?.toUpperCase());
+        console.log("Axios Status:", axiosError.response?.status);
+        console.log("Axios Response Data:", axiosError.response?.data);
+      }
     }
     console.groupEnd();
   }

@@ -13,6 +13,9 @@ import * as Sharing from "expo-sharing";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  type LayoutChangeEvent,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
   Platform,
   ScrollView,
   StyleSheet,
@@ -32,6 +35,7 @@ const TYPING_TICK_MS = 30;
 const TYPING_CHARS_PER_TICK = 2;
 const VERSE_TYPING_TICK_MS = 24;
 const VERSE_TYPING_CHARS_PER_TICK = 1;
+const AUTO_SCROLL_BOTTOM_THRESHOLD = 80;
 
 type VerseTypingKey = "text" | "ref";
 
@@ -425,6 +429,7 @@ export default function ResultScreen() {
   const [isVerseTyping, setIsVerseTyping] = useState(false);
 
   const streamRef = useRef<RecommendStreamController | null>(null);
+  const scrollViewRef = useRef<ScrollView | null>(null);
   const draftRef = useRef<RecommendItem[]>([]);
   const isMountedRef = useRef(true);
   const flushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -456,6 +461,59 @@ export default function ResultScreen() {
     firstTokenAt: 0,
   });
   const commentLoggedIndicesRef = useRef<Set<number>>(new Set());
+  const autoScrollEnabledRef = useRef(true);
+  const scrollMetricsRef = useRef({
+    contentHeight: 0,
+    layoutHeight: 0,
+    offsetY: 0,
+  });
+
+  const updateAutoScrollEnabled = useCallback(() => {
+    const { contentHeight, layoutHeight, offsetY } = scrollMetricsRef.current;
+    const distanceToBottom = contentHeight - (offsetY + layoutHeight);
+    autoScrollEnabledRef.current =
+      distanceToBottom <= AUTO_SCROLL_BOTTOM_THRESHOLD;
+  }, []);
+
+  const scrollToBottom = useCallback((animated = false) => {
+    scrollViewRef.current?.scrollToEnd({ animated });
+  }, []);
+
+  const handleScroll = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      const { contentOffset, contentSize, layoutMeasurement } =
+        event.nativeEvent;
+      scrollMetricsRef.current = {
+        contentHeight: contentSize.height,
+        layoutHeight: layoutMeasurement.height,
+        offsetY: contentOffset.y,
+      };
+      updateAutoScrollEnabled();
+    },
+    [updateAutoScrollEnabled],
+  );
+
+  const handleScrollLayout = useCallback(
+    (event: LayoutChangeEvent) => {
+      scrollMetricsRef.current.layoutHeight = event.nativeEvent.layout.height;
+      updateAutoScrollEnabled();
+    },
+    [updateAutoScrollEnabled],
+  );
+
+  const handleContentSizeChange = useCallback(
+    (_: number, contentHeight: number) => {
+      const wasAutoScrollEnabled = autoScrollEnabledRef.current;
+      scrollMetricsRef.current.contentHeight = contentHeight;
+      if (isStreaming && wasAutoScrollEnabled) {
+        autoScrollEnabledRef.current = true;
+        requestAnimationFrame(() => scrollToBottom(false));
+        return;
+      }
+      updateAutoScrollEnabled();
+    },
+    [isStreaming, scrollToBottom, updateAutoScrollEnabled],
+  );
 
   const scheduleFlush = useCallback(() => {
     if (flushTimerRef.current) return;
@@ -758,8 +816,66 @@ export default function ResultScreen() {
   const finalizeFromPayload = useCallback(
     (payload: unknown) => {
       const extracted = extractResults(payload);
+      const fallback = draftRef.current
+        .map((item) => ({
+          ref: item?.ref ?? "",
+          text: item?.text ?? "",
+          comment: item?.comment ?? "",
+          tag: item?.tag ?? "",
+        }))
+        .filter(
+          (item) =>
+            item.ref.length > 0 ||
+            item.text.length > 0 ||
+            item.comment.length > 0 ||
+            item.tag.length > 0,
+        );
 
       if (!extracted) {
+        // done 이벤트에 결과 payload가 없는 경우, 스트리밍 중 누적된 draft를 최종 결과로 사용
+        if (fallback.length > 0) {
+          if (__DEV__) {
+            console.log(
+              `[SSE] done payload empty -> finalize from draft (${fallback.length} items)`,
+            );
+          }
+          finalizeResults(fallback);
+          setIsStreaming(false);
+          return;
+        }
+
+        if (__DEV__) {
+          console.group("[SSE Finalize Error]");
+          console.log("Reason: no extractable payload and no draft fallback");
+          console.log("Done payload:", payload);
+          console.log("Current draft:", draftRef.current);
+          console.groupEnd();
+        }
+        setStreamError("말씀을 불러오지 못했어요");
+        setIsStreaming(false);
+        return;
+      }
+
+      // done payload가 빈 배열([])로 오는 경우, 이미 타이핑된 draft를 우선 사용
+      if (Array.isArray(extracted) && extracted.length === 0) {
+        if (fallback.length > 0) {
+          if (__DEV__) {
+            console.log(
+              `[SSE] done payload [] -> finalize from draft (${fallback.length} items)`,
+            );
+          }
+          finalizeResults(fallback);
+          setIsStreaming(false);
+          return;
+        }
+
+        if (__DEV__) {
+          console.group("[SSE Finalize Error]");
+          console.log("Reason: extracted empty array and no draft fallback");
+          console.log("Done payload:", payload);
+          console.log("Current draft:", draftRef.current);
+          console.groupEnd();
+        }
         setStreamError("말씀을 불러오지 못했어요");
         setIsStreaming(false);
         return;
@@ -1046,7 +1162,7 @@ export default function ResultScreen() {
           enqueueTokens(content);
         },
         onDone: handleStreamDone,
-        onError: (message) => {
+        onError: (message, context) => {
           if (!isMountedRef.current) return;
           setStreamError(message || "말씀을 불러오지 못했어요");
           setIsStreaming(false);
@@ -1056,6 +1172,19 @@ export default function ResultScreen() {
               ? now - timingRef.current.startAt
               : 0;
             console.log(`[SSE Timing] error after ${total}ms`);
+            console.group("[SSE Error]");
+            console.log("Message:", message);
+            console.log("Context:", context);
+            if (context?.status) {
+              console.log("HTTP Status:", context.status);
+            }
+            if (context?.url) {
+              console.log("URL:", context.url);
+            }
+            if (context?.responseText) {
+              console.log("Response Text (tail):", context.responseText);
+            }
+            console.groupEnd();
           }
           stopTyping();
           stopStream();
@@ -1113,6 +1242,12 @@ export default function ResultScreen() {
     const timer = setInterval(() => setCursorVisible((prev) => !prev), 500);
     return () => clearInterval(timer);
   }, [isStreaming]);
+
+  useEffect(() => {
+    if (!isStreaming) return;
+    autoScrollEnabledRef.current = true;
+    requestAnimationFrame(() => scrollToBottom(false));
+  }, [isStreaming, scrollToBottom]);
 
   const hasVisibleResultContent = useCallback((item: RecommendItem) => {
     const text = item.text ?? "";
@@ -1224,11 +1359,16 @@ export default function ResultScreen() {
       </View>
 
       <ScrollView
+        ref={scrollViewRef}
         contentContainerStyle={[
           styles.scrollContentContainer,
           { paddingBottom: insets.bottom + 32 },
         ]}
         showsVerticalScrollIndicator={false}
+        onLayout={handleScrollLayout}
+        onScroll={handleScroll}
+        onContentSizeChange={handleContentSizeChange}
+        scrollEventThrottle={16}
       >
         <View
           ref={contentRef}
