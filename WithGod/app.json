@@ -43,6 +43,17 @@
       "favicon": "./src/shared/assets/images/favicon.png"
     },
     "plugins": [
+      "@react-native-firebase/app",
+      "@react-native-firebase/messaging",
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "useFrameworks": "static"
+          }
+        }
+      ],
+      "./plugins/with-rnfirebase-static-framework",
       "expo-router",
       [
         "expo-splash-screen",
@@ -54,12 +65,6 @@
           "dark": {
             "backgroundColor": "#4A90E2"
           }
-        }
-      ],
-      [
-        "expo-notifications",
-        {
-          "defaultChannel": "default"
         }
       ]
     ],
