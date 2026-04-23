@@ -3,17 +3,20 @@ const { createRunOncePlugin, withPodfile } = require('expo/config-plugins');
 const PLUGIN_NAME = 'with-rnfirebase-static-framework';
 const STATIC_FRAMEWORK_FLAG = '$RNFirebaseAsStaticFramework = true';
 
-const POST_INSTALL_MARKER = '# with-rnfirebase-static-framework: allow non-modular includes';
-const POST_INSTALL_BLOCK = `
-post_install do |installer|
-  ${POST_INSTALL_MARKER}
-  installer.pods_project.targets.each do |target|
-    if target.name.start_with?('RNFB') || target.name.start_with?('RNFirebase')
-      target.build_configurations.each do |config|
-        config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
+const POST_INSTALL_MARKER =
+  '# with-rnfirebase-static-framework: allow non-modular includes';
+const POST_INSTALL_SNIPPET = `    ${POST_INSTALL_MARKER}
+    installer.pods_project.targets.each do |t|
+      if t.name.start_with?('RNFB') || t.name.start_with?('RNFirebase')
+        t.build_configurations.each do |c|
+          c.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
+        end
       end
-    end
-  end
+    end`;
+
+const STANDALONE_POST_INSTALL = `
+post_install do |installer|
+${POST_INSTALL_SNIPPET}
 end
 `;
 
@@ -38,11 +41,24 @@ function injectStaticFrameworkFlag(src) {
   return src;
 }
 
-function injectPostInstallHook(src) {
+function mergePostInstallHook(src) {
   if (src.includes(POST_INSTALL_MARKER)) {
     return src;
   }
-  return `${src.trimEnd()}\n${POST_INSTALL_BLOCK}`;
+
+  const existingHookPattern = /(post_install\s+do\s*\|\s*installer\s*\|\s*\n)/m;
+  if (existingHookPattern.test(src)) {
+    return src.replace(existingHookPattern, `$1${POST_INSTALL_SNIPPET}\n`);
+  }
+
+  return `${src.trimEnd()}\n${STANDALONE_POST_INSTALL}`;
+}
+
+function removeLegacyAppendedBlock(src) {
+  return src.replace(
+    /\n?post_install do \|installer\|\n\s*# with-rnfirebase-static-framework: allow non-modular includes\n(?:.*\n)*?end\s*$/m,
+    ''
+  );
 }
 
 function removeLegacyModularHeadersFlag(src) {
@@ -52,8 +68,9 @@ function removeLegacyModularHeadersFlag(src) {
 function patchPodfile(src) {
   let next = src;
   next = removeLegacyModularHeadersFlag(next);
+  next = removeLegacyAppendedBlock(next);
   next = injectStaticFrameworkFlag(next);
-  next = injectPostInstallHook(next);
+  next = mergePostInstallHook(next);
   return next;
 }
 
