@@ -92,3 +92,20 @@ firebase-debug.log
 functions/lib/
 functions/node_modules/
 tmp/
+
+# -------------------------------------------------
+# 🐍 Backend / Python
+# -------------------------------------------------
+backend/.env
+backend/.env.*
+backend/.venv/
+backend/venv/
+backend/env/
+backend/__pycache__/
+backend/**/*.py[cod]
+backend/.pytest_cache/
+backend/.mypy_cache/
+backend/.ruff_cache/
+backend/data/device_store.json
+backend/data/daily_random.sqlite3
+backend/secrets/*.json

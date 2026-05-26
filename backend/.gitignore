@@ -1,0 +1,30 @@
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Environment variables
+.env
+.env.*
+
+# OS / Editor
+.DS_Store
+.vscode/
+.idea/
+
+# Logs
+*.log
+
+# Local generated data
+data/device_store.json
+data/daily_random.sqlite3
+
+# Local tooling
+.claude/
+
+# Secrets
+secrets/*.json
