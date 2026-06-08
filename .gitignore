@@ -109,3 +109,8 @@ backend/.ruff_cache/
 backend/data/device_store.json
 backend/data/daily_random.sqlite3
 backend/secrets/*.json
+
+# -------------------------------------------------
+# 🤖 Claude Code
+# -------------------------------------------------
+.claude/worktrees/
