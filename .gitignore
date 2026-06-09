@@ -114,3 +114,6 @@ backend/secrets/*.json
 # 🤖 Claude Code
 # -------------------------------------------------
 .claude/worktrees/
+
+# Telegram → Claude Code bridge (로컬 전용: 로그/inbox)
+.tg-bridge/
