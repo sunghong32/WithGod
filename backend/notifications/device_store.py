@@ -31,14 +31,17 @@ class DeviceStore:
         app_version: str = "",
         os_version: str = "",
         enabled: bool = True,
+        schedule_hour: int | None = None,
+        schedule_minute: int | None = None,
     ) -> tuple[DeviceRegistration, bool]:
         with self._lock:
             devices = self._read_all()
             now = datetime.now(dt_timezone.utc).isoformat()
-            for index, device in enumerate(devices):
-                if device.token != token:
-                    continue
-                devices[index] = DeviceRegistration(
+            # device_id 가 오면 device_id 기준으로 식별, 없으면 기존대로 token 기준.
+            match_index = self._find_index(devices, token=token, device_id=device_id)
+            if match_index is not None:
+                existing = devices[match_index]
+                devices[match_index] = DeviceRegistration(
                     token=token,
                     platform=platform,
                     timezone=timezone,
@@ -46,12 +49,14 @@ class DeviceStore:
                     app_version=app_version,
                     os_version=os_version,
                     enabled=enabled,
-                    created_at=device.created_at or now,
+                    schedule_hour=schedule_hour,
+                    schedule_minute=schedule_minute,
+                    created_at=existing.created_at or now,
                     updated_at=now,
-                    last_daily_sent_on=device.last_daily_sent_on,
+                    last_daily_sent_on=existing.last_daily_sent_on,
                 )
                 self._write_all(devices)
-                return devices[index], False
+                return devices[match_index], False
 
             created = DeviceRegistration(
                 token=token,
@@ -61,12 +66,30 @@ class DeviceStore:
                 app_version=app_version,
                 os_version=os_version,
                 enabled=enabled,
+                schedule_hour=schedule_hour,
+                schedule_minute=schedule_minute,
                 created_at=now,
                 updated_at=now,
             )
             devices.append(created)
             self._write_all(devices)
             return created, True
+
+    @staticmethod
+    def _find_index(
+        devices: list[DeviceRegistration],
+        token: str,
+        device_id: str = "",
+    ) -> int | None:
+        # device_id 가 주어지면 우선적으로 device_id 로 매칭(설치 단위 갱신).
+        if device_id:
+            for index, device in enumerate(devices):
+                if device.device_id == device_id:
+                    return index
+        for index, device in enumerate(devices):
+            if device.token == token:
+                return index
+        return None
 
     def delete(self, token: str) -> bool:
         with self._lock:
@@ -92,6 +115,8 @@ class DeviceStore:
                     app_version=device.app_version,
                     os_version=device.os_version,
                     enabled=device.enabled,
+                    schedule_hour=device.schedule_hour,
+                    schedule_minute=device.schedule_minute,
                     created_at=device.created_at,
                     updated_at=datetime.now(dt_timezone.utc).isoformat(),
                     last_daily_sent_on=local_date,
@@ -120,6 +145,8 @@ class DeviceStore:
                     app_version=device.app_version,
                     os_version=device.os_version,
                     enabled=False,
+                    schedule_hour=device.schedule_hour,
+                    schedule_minute=device.schedule_minute,
                     created_at=device.created_at,
                     updated_at=now,
                     last_daily_sent_on=device.last_daily_sent_on,
@@ -141,12 +168,21 @@ class DeviceStore:
                 app_version=str(item.get("app_version", "")),
                 os_version=str(item.get("os_version", "")),
                 enabled=bool(item.get("enabled", True)),
+                schedule_hour=self._optional_int(item.get("schedule_hour")),
+                schedule_minute=self._optional_int(item.get("schedule_minute")),
                 created_at=str(item.get("created_at", "")),
                 updated_at=str(item.get("updated_at", "")),
                 last_daily_sent_on=str(item.get("last_daily_sent_on", "")),
             )
             for item in raw
         ]
+
+    @staticmethod
+    def _optional_int(value: object) -> int | None:
+        # 하위호환: 기존 항목에는 schedule_* 가 없으므로 None 으로 둔다.
+        if value is None:
+            return None
+        return int(value)
 
     def _write_all(self, devices: list[DeviceRegistration]) -> None:
         self.path.write_text(

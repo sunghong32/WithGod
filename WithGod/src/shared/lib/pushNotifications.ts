@@ -4,7 +4,15 @@ import { Alert, PermissionsAndroid, Platform } from 'react-native';
 
 import { pushApi } from '@/shared/api';
 
+import {
+  getNotificationSettings,
+  getOrCreateDeviceId,
+  type NotificationSettings,
+} from './notificationSettings';
+
 type OpenRoute = (href: Href) => void;
+
+export type PushPermissionStatus = 'granted' | 'denied' | 'undetermined';
 
 export interface SetupPushNotificationsOptions {
   openRoute: OpenRoute;
@@ -64,6 +72,42 @@ export const requestPushPermissionAsync = async (): Promise<boolean> => {
   }
 };
 
+/**
+ * 현재 알림 권한 상태를 확인한다(요청은 하지 않음).
+ * 설정 화면에서 "권한 거부" 안내/시스템 설정 이동 버튼 노출 여부를 판단할 때 사용.
+ */
+export const getPushPermissionStatusAsync =
+  async (): Promise<PushPermissionStatus> => {
+    if (!isNativePlatform) return 'denied';
+
+    try {
+      if (Platform.OS === 'android') {
+        if (Platform.Version < 33) return 'granted';
+        const granted = await PermissionsAndroid.check(
+          PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS,
+        );
+        return granted ? 'granted' : 'denied';
+      }
+
+      const status = await messaging().hasPermission();
+      if (
+        status === messaging.AuthorizationStatus.AUTHORIZED ||
+        status === messaging.AuthorizationStatus.PROVISIONAL
+      ) {
+        return 'granted';
+      }
+      if (status === messaging.AuthorizationStatus.NOT_DETERMINED) {
+        return 'undetermined';
+      }
+      return 'denied';
+    } catch (error) {
+      if (__DEV__) {
+        console.warn('[Push] Failed to read permission status', error);
+      }
+      return 'denied';
+    }
+  };
+
 export const getFcmTokenAsync = async (): Promise<string | null> => {
   if (!isNativePlatform) return null;
 
@@ -79,17 +123,47 @@ export const getFcmTokenAsync = async (): Promise<string | null> => {
   }
 };
 
-const registerDeviceTokenAsync = async (token: string): Promise<void> => {
+const registerDeviceTokenAsync = async (
+  token: string,
+  settings?: NotificationSettings,
+): Promise<void> => {
   try {
-    await pushApi.registerDevice({ token });
+    const deviceId = await getOrCreateDeviceId();
+    const resolved = settings ?? (await getNotificationSettings());
+    await pushApi.registerDevice({
+      token,
+      deviceId,
+      enabled: resolved.enabled,
+      scheduleHour: resolved.scheduleHour,
+      scheduleMinute: resolved.scheduleMinute,
+    });
     if (__DEV__) {
-      console.log('[Push] Registered FCM token on server');
+      console.log(
+        `[Push] Registered device on server (enabled=${resolved.enabled}, ` +
+          `${resolved.scheduleHour}:${String(resolved.scheduleMinute).padStart(2, '0')})`,
+      );
     }
   } catch (error) {
     if (__DEV__) {
       console.warn('[Push] Failed to register FCM token on server', error);
     }
   }
+};
+
+/**
+ * 설정 화면에서 토글/시각을 바꾼 뒤 호출하여 백엔드에 즉시 반영한다.
+ * 토큰을 다시 받아 device_id 와 함께 enabled/schedule 을 전송한다.
+ *
+ * @returns 서버 반영 성공 여부(토큰을 못 받으면 false)
+ */
+export const syncNotificationSettingsAsync = async (
+  settings: NotificationSettings,
+): Promise<boolean> => {
+  if (!isNativePlatform) return false;
+  const token = await getFcmTokenAsync();
+  if (!token) return false;
+  await registerDeviceTokenAsync(token, settings);
+  return true;
 };
 
 const buildVerseDetailHref = (
@@ -197,13 +271,17 @@ export const setupPushNotificationsAsync = async ({
   try {
     const permissionGranted = await requestPushPermissionAsync();
 
+    // 저장된 사용자 설정(알림 on/off, 시각)을 함께 보내서
+    // 앱 재시작 시 OFF 가 기본값 true 로 덮어써지지 않도록 한다.
+    const savedSettings = await getNotificationSettings();
+
     if (permissionGranted) {
       const token = await getFcmTokenAsync();
       if (token) {
         if (__DEV__) {
           console.log('[Push] FCM token:', token);
         }
-        await registerDeviceTokenAsync(token);
+        await registerDeviceTokenAsync(token, savedSettings);
       } else if (__DEV__) {
         console.log('[Push] FCM token unavailable');
       }

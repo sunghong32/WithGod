@@ -11,7 +11,7 @@
 
 from fastapi import FastAPI, Request, Query
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, Field
+from pydantic import AliasChoices, BaseModel, Field
 import pandas as pd
 import faiss
 from sentence_transformers import SentenceTransformer
@@ -459,9 +459,26 @@ class DeviceRegisterIn(BaseModel):
     token: str = Field(..., examples=["fcm-registration-token"])
     platform: Literal["android", "ios"] = Field(..., examples=["ios"])
     timezone: Optional[str] = Field("Asia/Seoul", examples=["Asia/Seoul"])
-    deviceId: Optional[str] = Field(default=None, examples=["iphone-15-pro-max"])
-    appVersion: Optional[str] = Field(default=None, examples=["1.0.3"])
-    osVersion: Optional[str] = Field(default=None, examples=["17.4.1"])
+    # 공유 API 규약은 snake_case(device_id), 기존 클라이언트는 camelCase(deviceId)를
+    # 보내므로 두 키를 모두 허용한다(하위호환).
+    device_id: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("device_id", "deviceId"),
+        examples=["iphone-15-pro-max"],
+    )
+    schedule_hour: Optional[int] = Field(default=None, ge=0, le=23, examples=[9])
+    schedule_minute: Optional[int] = Field(default=None, ge=0, le=59, examples=[0])
+    # device_id 와 마찬가지로 snake_case(공유 규약)/camelCase(기존 클라이언트) 둘 다 허용.
+    appVersion: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("app_version", "appVersion"),
+        examples=["1.0.3"],
+    )
+    osVersion: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("os_version", "osVersion"),
+        examples=["17.4.1"],
+    )
     enabled: bool = Field(True, examples=[True])
 
 
@@ -560,10 +577,12 @@ def register_push_device(inp: DeviceRegisterIn):
             token=inp.token,
             platform=inp.platform,
             timezone=inp.timezone,
-            device_id=inp.deviceId or "",
+            device_id=inp.device_id or "",
             app_version=inp.appVersion or "",
             os_version=inp.osVersion or "",
             enabled=inp.enabled,
+            schedule_hour=inp.schedule_hour,
+            schedule_minute=inp.schedule_minute,
         )
     except ValueError as exc:
         return {"error": str(exc)}

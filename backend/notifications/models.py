@@ -26,6 +26,8 @@ class DeviceRegistration:
     app_version: str = ""
     os_version: str = ""
     enabled: bool = True
+    schedule_hour: int | None = None
+    schedule_minute: int | None = None
     created_at: str = ""
     updated_at: str = ""
     last_daily_sent_on: str = ""

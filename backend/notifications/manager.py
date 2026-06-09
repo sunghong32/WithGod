@@ -39,6 +39,8 @@ class DailyVerseNotificationManager:
         app_version: str = "",
         os_version: str = "",
         enabled: bool = True,
+        schedule_hour: int | None = None,
+        schedule_minute: int | None = None,
     ) -> dict[str, object]:
         clean_token = token.strip()
         if not clean_token:
@@ -47,6 +49,11 @@ class DailyVerseNotificationManager:
             mobile_platform = MobilePlatform(platform.strip().lower())
         except ValueError as exc:
             raise ValueError("platform must be android or ios") from exc
+
+        if schedule_hour is not None and not 0 <= schedule_hour <= 23:
+            raise ValueError("schedule_hour must be between 0 and 23")
+        if schedule_minute is not None and not 0 <= schedule_minute <= 59:
+            raise ValueError("schedule_minute must be between 0 and 59")
 
         tz_name = (timezone or self.settings.push_default_timezone).strip()
         self._resolve_timezone(tz_name)
@@ -58,6 +65,8 @@ class DailyVerseNotificationManager:
             app_version=app_version.strip(),
             os_version=os_version.strip(),
             enabled=enabled,
+            schedule_hour=schedule_hour,
+            schedule_minute=schedule_minute,
         )
         return {
             "device": asdict(device),
@@ -89,9 +98,20 @@ class DailyVerseNotificationManager:
             local_date = local_now.date().isoformat()
             if device.last_daily_sent_on == local_date:
                 continue
-            if local_now.hour != self.settings.push_schedule_hour:
+            # 기기별 개인 알림 시각이 있으면 사용, 없으면 전역 기본값으로 폴백.
+            target_hour = (
+                device.schedule_hour
+                if device.schedule_hour is not None
+                else self.settings.push_schedule_hour
+            )
+            target_minute = (
+                device.schedule_minute
+                if device.schedule_minute is not None
+                else self.settings.push_schedule_minute
+            )
+            if local_now.hour != target_hour:
                 continue
-            if local_now.minute != self.settings.push_schedule_minute:
+            if local_now.minute != target_minute:
                 continue
             due_devices.append(device)
             sent_dates[device.token] = local_date

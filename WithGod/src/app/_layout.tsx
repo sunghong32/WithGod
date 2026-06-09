@@ -58,6 +58,7 @@ export default function RootLayout() {
             <Stack.Screen name="index" />
             <Stack.Screen name="(tabs)" />
             <Stack.Screen name="result" />
+            <Stack.Screen name="settings" />
             <Stack.Screen name="verse-detail" />
             <Stack.Screen name="modal" options={{ presentation: 'modal', headerShown: true, title: 'Modal' }} />
           </Stack>

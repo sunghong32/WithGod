@@ -1,6 +1,7 @@
 import { useRandomVerse } from "@/features/verse/hooks/useRandomVerse";
 import { useKeyboardVisible, useSafeAreaPadding } from "@/shared/hooks";
 import { baseFontFamily, scaleFont } from "@/shared/styles";
+import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
@@ -77,6 +78,15 @@ export default function HomeScreen() {
             />
           </View>
           <Text style={styles.headerTitle}>신과함께</Text>
+          <TouchableOpacity
+            style={styles.settingsButton}
+            onPress={() => router.push("/settings")}
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel="알림 설정"
+          >
+            <Ionicons name="settings-outline" size={24} color="#1E2939" />
+          </TouchableOpacity>
         </View>
 
         <ScrollView
@@ -208,11 +218,20 @@ const styles = StyleSheet.create({
     width: 28,
   },
   headerTitle: {
+    flex: 1,
     fontSize: scaleFont(24),
     lineHeight: scaleFont(32),
     fontWeight: "600",
     color: "#101828",
     fontFamily: baseFontFamily,
+  },
+  settingsButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    marginLeft: 12,
   },
   scrollContent: {
     paddingHorizontal: 24,
