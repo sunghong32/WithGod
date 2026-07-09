@@ -3,7 +3,9 @@ import { parseError, logError, ApiError } from "@/shared/api/errors";
 import {
   RandomOutSchema,
   RecommendOutSchema,
+  DailyVerseResponseSchema,
   type RandomOut,
+  type DailyVerse,
   type RecommendIn,
   type RecommendOut,
   type RecommendItem,
@@ -163,6 +165,19 @@ export const verseApi = {
     } catch (error) {
       const apiError = parseError(error);
       logError(apiError, "getRandomVerse");
+      throw apiError;
+    }
+  },
+
+  // 오늘의 말씀 조회 (풀이 interpretation 포함)
+  getDailyVerse: async (): Promise<DailyVerse> => {
+    try {
+      const { data } = await apiClient.get("/daily-verse");
+      const { daily_verse } = DailyVerseResponseSchema.parse(data);
+      return daily_verse;
+    } catch (error) {
+      const apiError = parseError(error);
+      logError(apiError, "getDailyVerse");
       throw apiError;
     }
   },

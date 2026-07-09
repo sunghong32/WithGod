@@ -22,6 +22,7 @@ __pycache__/
 # Local generated data
 data/device_store.json
 data/daily_random.sqlite3
+data/verse_interpretations.json
 
 # Local tooling
 .claude/

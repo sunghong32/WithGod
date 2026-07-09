@@ -26,6 +26,7 @@ import os, re, json, time, logging, asyncio
 from notifications.jobs import build_notification_manager
 from notifications.manager import DailyVerseNotificationManager
 from notifications.scheduler import DailyVerseScheduler
+from notifications.verse_provider import VerseInterpretationStore, VerseInterpreter
 from settings import AppSettings, load_dotenv
 
 # ---------- FastAPI ----------
@@ -375,6 +376,61 @@ def _call_openai_as_json(system: str, user: str, max_tokens: int) -> str:
         ],
     )
     return resp.choices[0].message.content.strip()
+
+
+def _call_openai_as_text(system: str, user: str, max_tokens: int) -> str:
+    """_call_openai_as_json 과 동형이지만 JSON 강제 없이 평문(풀이 본문)만 받는 헬퍼."""
+    client = OpenAI(api_key=OPENAI_API_KEY)
+    resp = client.chat.completions.create(
+        model=OPENAI_MODEL,
+        temperature=0.5,
+        max_tokens=max_tokens,
+        messages=[
+            {"role": "system", "content": system},
+            {"role": "user",   "content": user}
+        ],
+    )
+    return resp.choices[0].message.content.strip()
+
+
+# ---------- 오늘의 말씀 '풀이'(LLM) ----------
+# 구절을 일상어로 부드럽게 풀어 주는 한국어 '풀이'를 생성한다.
+# verse_id 기준 파일 캐시(VerseInterpreter)와 결합되어 말씀당 최대 1회만 호출된다.
+_VERSE_INTERPRETATION_SYSTEM = """당신은 따뜻한 신앙 동반자입니다. 성경 구절을 일상어로 부드럽게 풀어 설명합니다.
+
+규칙:
+- 반드시 한국어로만 씁니다.
+- 2문장 이내로 짧고 담백하게 풉니다.
+- '~말씀이에요', '~해도 괜찮아요' 처럼 부드럽고 다정한 종결로 건넵니다.
+- 제목, 따옴표, 구절 재인용 없이 '풀이 본문'만 출력합니다.
+- 훈계하듯 가르치지 말고, 곁에서 조용히 다독이듯 말합니다.
+
+예시 톤:
+지친 하루의 짐을 혼자 지지 말라는 말씀이에요. 무거운 마음 그대로, 쉼을 주시는 분께 가져가면 돼요."""
+
+
+def _build_verse_interpretation_user_prompt(reference: str, text: str) -> str:
+    return f"""다음 성경 구절을 위 규칙대로 부드럽게 풀어 설명해 주세요.
+
+구절: {reference}
+본문: {text}
+
+풀이(2문장 이내, 제목·따옴표·구절 재인용 없이 본문만):""".strip()
+
+
+def _generate_verse_interpretation(reference: str, text: str) -> str:
+    """구절(reference, text)을 받아 한국어 '풀이'를 생성한다.
+
+    키가 없거나 호출이 실패하면 예외를 올려 상위(VerseInterpreter)가 reflection 으로 폴백한다.
+    """
+    if not OPENAI_API_KEY:
+        raise RuntimeError("OPENAI_API_KEY is not configured")
+    interpretation = _call_openai_as_text(
+        _VERSE_INTERPRETATION_SYSTEM,
+        _build_verse_interpretation_user_prompt(reference, text),
+        max_tokens=200,
+    )
+    return _keep_korean_only(interpretation)
 
 
 async def _stream_openai(system: str, user: str, max_tokens: int) -> AsyncGenerator[str, None]:
@@ -1015,6 +1071,12 @@ async def comment_stream(inp: CommentStreamIn):
 @app.on_event("startup")
 async def startup_notifications() -> None:
     manager = build_notification_manager(APP_SETTINGS)
+    # /daily-verse 응답의 interpretation 을 위해 LLM 풀이 생성기를 주입한다.
+    # 푸시 배치 경로(jobs.run_daily_verse_batch)는 interpreter 없이 동작하므로 풀이를 생성하지 않는다.
+    manager.verse_interpreter = VerseInterpreter(
+        store=VerseInterpretationStore(APP_SETTINGS.verse_interpretation_store_path),
+        generate_fn=_generate_verse_interpretation,
+    )
     scheduler = DailyVerseScheduler(
         manager=manager,
         poll_seconds=APP_SETTINGS.scheduler_poll_seconds,

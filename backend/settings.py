@@ -26,6 +26,7 @@ class AppSettings:
     firebase_service_account_path: str
     device_store_path: str
     daily_verse_store_path: str
+    verse_interpretation_store_path: str
     push_schedule_hour: int
     push_schedule_minute: int
     push_default_timezone: str
@@ -48,6 +49,10 @@ class AppSettings:
             daily_verse_store_path=os.getenv(
                 "DAILY_VERSE_STORE_PATH",
                 str(notifications_dir / "daily_verses.json"),
+            ),
+            verse_interpretation_store_path=os.getenv(
+                "VERSE_INTERPRETATION_STORE_PATH",
+                str(data_dir / "verse_interpretations.json"),
             ),
             push_schedule_hour=int(os.getenv("PUSH_SCHEDULE_HOUR", "9")),
             push_schedule_minute=int(os.getenv("PUSH_SCHEDULE_MINUTE", "0")),

@@ -7,7 +7,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from notifications.device_store import DeviceStore
 from notifications.models import DeviceRegistration, MobilePlatform, PushDispatchResult, PushPayload
 from notifications.push_service import PushGateway
-from notifications.verse_provider import DailyVerseProvider
+from notifications.verse_provider import DailyVerseProvider, VerseInterpreter
 from settings import AppSettings
 
 
@@ -18,14 +18,20 @@ class DailyVerseNotificationManager:
         device_store: DeviceStore,
         verse_provider: DailyVerseProvider,
         push_gateway: PushGateway,
+        verse_interpreter: VerseInterpreter | None = None,
     ) -> None:
         self.settings = settings
         self.device_store = device_store
         self.verse_provider = verse_provider
         self.push_gateway = push_gateway
+        # None 이면 interpretation 은 빈 문자열로 남는다(푸시 배치 경로 등 풀이가 필요 없는 경우).
+        self.verse_interpreter = verse_interpreter
 
     def get_daily_verse(self, now: datetime | None = None) -> dict[str, str]:
-        return asdict(self.verse_provider.get_daily_verse(now=now))
+        verse = self.verse_provider.get_daily_verse(now=now)
+        if self.verse_interpreter is not None:
+            verse.interpretation = self.verse_interpreter.interpret(verse)
+        return asdict(verse)
 
     def list_devices(self) -> list[dict[str, str | bool]]:
         return [asdict(device) for device in self.device_store.list_devices()]

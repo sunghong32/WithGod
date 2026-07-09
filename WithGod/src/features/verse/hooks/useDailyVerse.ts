@@ -1,17 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { verseApi, ApiError } from "../api";
+import { verseKeys } from "./useRandomVerse";
 
-export const verseKeys = {
-  all: ["verse"] as const,
-  random: () => [...verseKeys.all, "random"] as const,
-  daily: () => [...verseKeys.all, "daily"] as const,
-  recommend: (mood: string) => [...verseKeys.all, "recommend", mood] as const,
-};
-
-export function useRandomVerse() {
+export function useDailyVerse() {
   const query = useQuery({
-    queryKey: verseKeys.random(),
-    queryFn: verseApi.getRandomVerse,
+    queryKey: verseKeys.daily(),
+    queryFn: verseApi.getDailyVerse,
     retry: (failureCount, error) => {
       // ApiError인 경우 retryable 체크
       if (error instanceof ApiError) {

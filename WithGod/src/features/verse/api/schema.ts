@@ -16,6 +16,27 @@ export const RandomResponseSchema = z.union([RandomOutSchema, RandomErrorSchema]
 export type RandomOut = z.infer<typeof RandomOutSchema>;
 export type RandomResponse = z.infer<typeof RandomResponseSchema>;
 
+// ==================== Daily Verse ====================
+
+// GET /daily-verse 응답의 내부 객체
+// interpretation = LLM이 생성한 "풀이"(구절당 최대 1회 호출, 파일 캐시).
+//   실패 시 reflection → 빈 문자열 순으로 폴백될 수 있음.
+// reflection = 푸시 알림에서 사용하는 기존 필드(그대로 유지).
+export const DailyVerseSchema = z.object({
+  verse_id: z.string().optional().default(""),
+  reference: z.string(),
+  text: z.string(),
+  reflection: z.string().optional().default(""),
+  interpretation: z.string().optional().default(""),
+});
+
+export const DailyVerseResponseSchema = z.object({
+  daily_verse: DailyVerseSchema,
+});
+
+export type DailyVerse = z.infer<typeof DailyVerseSchema>;
+export type DailyVerseResponse = z.infer<typeof DailyVerseResponseSchema>;
+
 // ==================== Recommend ====================
 
 export const RecommendInSchema = z.object({

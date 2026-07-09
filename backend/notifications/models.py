@@ -15,6 +15,9 @@ class DailyVerse:
     reference: str
     text: str
     reflection: str = ""
+    # LLM(gpt-4o-mini)이 생성한 "풀이"(구절을 일상어로 부드럽게 2문장 이내).
+    # verse_id 기준 파일 캐시라 말씀당 최대 1회만 생성한다. 생성 실패 시 reflection 으로 폴백.
+    interpretation: str = ""
 
 
 @dataclass(slots=True)

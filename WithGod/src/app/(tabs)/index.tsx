@@ -1,4 +1,4 @@
-import { useRandomVerse } from "@/features/verse/hooks/useRandomVerse";
+import { useDailyVerse } from "@/features/verse/hooks/useDailyVerse";
 import { useKeyboardVisible, useSafeAreaPadding } from "@/shared/hooks";
 import { baseFontFamily, scaleFont } from "@/shared/styles";
 import { Ionicons } from "@expo/vector-icons";
@@ -27,15 +27,15 @@ export default function HomeScreen() {
   const { headerPaddingTop, getInputBarPaddingBottom } = useSafeAreaPadding();
   const router = useRouter();
 
-  // 랜덤 말씀 API 호출 (향상된 에러 핸들링 포함)
+  // 오늘의 말씀 API 호출 (풀이 interpretation 포함, 향상된 에러 핸들링)
   const {
-    data: randomVerse,
+    data: dailyVerse,
     isLoading,
     isError,
     isFetching,
     refetch,
     errorMessage,
-  } = useRandomVerse();
+  } = useDailyVerse();
 
   const inputBarPaddingTop = 16;
   const inputBarPaddingBottom = useMemo(() => {
@@ -110,31 +110,33 @@ export default function HomeScreen() {
               ) : (
                 <>
                   <Text style={styles.verseText}>
-                    {randomVerse?.text ?? "말씀을 불러오는 중..."}
+                    {dailyVerse?.text ?? "말씀을 불러오는 중..."}
                   </Text>
-                  <Text style={styles.verseReference}>{randomVerse?.ref ?? ""}</Text>
+                  <Text style={styles.verseReference}>
+                    {dailyVerse?.reference ?? ""}
+                  </Text>
+                  {!!dailyVerse?.interpretation && (
+                    <>
+                      <View style={styles.verseDivider} />
+                      <Text style={styles.verseInterpretation}>
+                        {dailyVerse.interpretation}
+                      </Text>
+                    </>
+                  )}
                 </>
               )}
             </View>
           </View>
 
           <View style={styles.shareSection}>
-            <Text style={styles.shareTitle}>마음을 나누어 주세요</Text>
+            <Text style={styles.shareTitle}>오늘 당신의 마음은 어떤가요?</Text>
             <Text
               style={styles.shareDescription}
               numberOfLines={1}
               adjustsFontSizeToFit
               minimumFontScale={0.8}
             >
-              고민이나 걱정이 있으시다면 편하게 말씀해 주세요
-            </Text>
-            <Text
-              style={styles.shareDescription}
-              numberOfLines={1}
-              adjustsFontSizeToFit
-              minimumFontScale={0.8}
-            >
-              위로가 되는 성경 말씀을 전해드릴게요
+              편히 들려주시면 꼭 맞는 말씀을 전해드릴게요.
             </Text>
           </View>
         </ScrollView>
@@ -311,6 +313,21 @@ const styles = StyleSheet.create({
     letterSpacing: -0.2,
     fontFamily: baseFontFamily,
     alignSelf: "flex-end",
+  },
+  verseDivider: {
+    borderBottomWidth: 1,
+    borderBottomColor: "#D1D5DC",
+    borderStyle: "dashed",
+    marginTop: 20,
+    marginBottom: 20,
+  },
+  verseInterpretation: {
+    fontSize: scaleFont(16),
+    lineHeight: scaleFont(26),
+    color: "#6A7282",
+    letterSpacing: -0.2,
+    fontFamily: baseFontFamily,
+    textAlign: "left",
   },
   shareSection: {
     alignItems: "center",

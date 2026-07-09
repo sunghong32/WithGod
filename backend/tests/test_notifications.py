@@ -1,14 +1,20 @@
+import json
 import tempfile
 import unittest
 from datetime import datetime
 from pathlib import Path
+from unittest.mock import Mock
 
 from notifications.device_store import DeviceStore
 from notifications.manager import DailyVerseNotificationManager
 from notifications.models import MobilePlatform, PushDispatchResult
 from notifications.push_service import PushGateway
 from notifications.scheduler import DailyVerseScheduler
-from notifications.verse_provider import DailyVerseProvider
+from notifications.verse_provider import (
+    DailyVerseProvider,
+    VerseInterpretationStore,
+    VerseInterpreter,
+)
 from settings import AppSettings
 
 
@@ -31,6 +37,7 @@ class NotificationFeatureTest(unittest.TestCase):
         self.temp_dir = tempfile.TemporaryDirectory()
         temp_path = Path(self.temp_dir.name)
         self.device_store_path = temp_path / "devices.json"
+        self.interpretation_store_path = temp_path / "verse_interpretations.json"
         self.verse_store_path = (
             Path(__file__).resolve().parent.parent / "notifications" / "daily_verses.json"
         )
@@ -38,6 +45,7 @@ class NotificationFeatureTest(unittest.TestCase):
             firebase_service_account_path="",
             device_store_path=str(self.device_store_path),
             daily_verse_store_path=str(self.verse_store_path),
+            verse_interpretation_store_path=str(self.interpretation_store_path),
             push_schedule_hour=9,
             push_schedule_minute=0,
             push_default_timezone="Asia/Seoul",
@@ -201,3 +209,62 @@ class NotificationFeatureTest(unittest.TestCase):
         verse_a = self.provider.get_daily_verse(now=datetime(2026, 4, 21, 9, 0))
         verse_b = self.provider.get_daily_verse(now=datetime(2026, 4, 21, 23, 59))
         self.assertEqual(verse_a.verse_id, verse_b.verse_id)
+
+    def _manager_with_interpreter(
+        self, generate_fn: Mock
+    ) -> DailyVerseNotificationManager:
+        # generate_fn(reference, text) 은 운영에서 OpenAI 백엔드 함수가 주입되는 자리로,
+        # 테스트에서는 mock 을 주입해 실제 LLM 호출 없이 캐시/폴백 동작을 검증한다.
+        interpreter = VerseInterpreter(
+            store=VerseInterpretationStore(str(self.interpretation_store_path)),
+            generate_fn=generate_fn,
+        )
+        return DailyVerseNotificationManager(
+            settings=self.settings,
+            device_store=self.store,
+            verse_provider=self.provider,
+            push_gateway=self.gateway,
+            verse_interpreter=interpreter,
+        )
+
+    def test_interpretation_generated_and_cached_on_first_call(self) -> None:
+        now = datetime(2026, 4, 21, 9, 0)
+        generate = Mock(return_value="풀이 첫 문장이에요. 두 번째 문장이에요.")
+        manager = self._manager_with_interpreter(generate)
+
+        verse = manager.get_daily_verse(now=now)
+
+        # (a) 첫 호출 시 LLM 이 1회 호출되어 풀이가 생성된다.
+        generate.assert_called_once_with(verse["reference"], verse["text"])
+        self.assertEqual(verse["interpretation"], "풀이 첫 문장이에요. 두 번째 문장이에요.")
+        # verse_id -> interpretation 이 파일 캐시에 영속되어야 한다.
+        cached = json.loads(self.interpretation_store_path.read_text(encoding="utf-8"))
+        self.assertEqual(cached[verse["verse_id"]], verse["interpretation"])
+
+    def test_interpretation_reused_from_cache_without_second_llm_call(self) -> None:
+        now = datetime(2026, 4, 21, 9, 0)
+        first_generate = Mock(return_value="캐시에 저장될 풀이예요.")
+        first = self._manager_with_interpreter(first_generate).get_daily_verse(now=now)
+        first_generate.assert_called_once()
+
+        # (b) 별도 매니저(같은 캐시 파일)로 다시 호출해도 LLM 은 호출되지 않고 캐시를 재사용한다.
+        second_generate = Mock(return_value="새로 생성되면 안 되는 풀이")
+        second = self._manager_with_interpreter(second_generate).get_daily_verse(now=now)
+
+        second_generate.assert_not_called()
+        self.assertEqual(second["interpretation"], first["interpretation"])
+        self.assertEqual(second["interpretation"], "캐시에 저장될 풀이예요.")
+
+    def test_interpretation_falls_back_to_reflection_on_llm_error(self) -> None:
+        now = datetime(2026, 4, 21, 9, 0)
+        generate = Mock(side_effect=RuntimeError("LLM 호출 실패"))
+        manager = self._manager_with_interpreter(generate)
+
+        verse = manager.get_daily_verse(now=now)
+
+        # (c) LLM 예외 시 reflection 으로 폴백하며, 말씀 자체는 그대로 반환한다(500 없음).
+        generate.assert_called_once()
+        self.assertNotEqual(verse["reflection"], "")
+        self.assertEqual(verse["interpretation"], verse["reflection"])
+        # 폴백 값은 캐시에 저장하지 않는다(다음 요청에서 LLM 재시도).
+        self.assertFalse(self.interpretation_store_path.exists())
