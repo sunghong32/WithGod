@@ -117,7 +117,11 @@ export default function HomeScreen() {
                   </Text>
                   {!!dailyVerse?.interpretation && (
                     <>
-                      <View style={styles.verseDivider} />
+                      <View style={styles.verseDivider}>
+                        {Array.from({ length: 80 }).map((_, i) => (
+                          <View key={i} style={styles.verseDash} />
+                        ))}
+                      </View>
                       <Text style={styles.verseInterpretation}>
                         {dailyVerse.interpretation}
                       </Text>
@@ -315,11 +319,16 @@ const styles = StyleSheet.create({
     alignSelf: "flex-end",
   },
   verseDivider: {
-    borderBottomWidth: 1,
-    borderBottomColor: "#D1D5DC",
-    borderStyle: "dashed",
+    flexDirection: "row",
+    overflow: "hidden",
     marginTop: 20,
     marginBottom: 20,
+  },
+  verseDash: {
+    width: 5,
+    height: 1,
+    marginRight: 4,
+    backgroundColor: "#D1D5DC",
   },
   verseInterpretation: {
     fontSize: scaleFont(16),
