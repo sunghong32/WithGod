@@ -52,13 +52,26 @@ function WheelColumn({ items, index, onChange, width, disabled }: ColumnProps) {
     }
   }, [index]);
 
-  const settle = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const y = e.nativeEvent.contentOffset.y;
-    let i = Math.round(y / ITEM_HEIGHT);
+  const commitIndex = (rawY: number) => {
+    let i = Math.round(rawY / ITEM_HEIGHT);
     i = Math.max(0, Math.min(items.length - 1, i));
-    internal.current = i;
-    scrollToIndex(i, true);
-    if (i !== index) onChange(i);
+    if (i !== internal.current) {
+      internal.current = i;
+      onChange(i);
+    }
+  };
+
+  // 드래그 종료: iOS 는 snap 목표점(targetContentOffset)을 제공하므로 그 값으로 확정.
+  const onDragEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const target = e.nativeEvent.targetContentOffset;
+    commitIndex(target ? target.y : e.nativeEvent.contentOffset.y);
+  };
+
+  // 관성 종료: snapToInterval 이 이미 정렬한 위치에서 값만 확정.
+  // (여기서 강제 scrollTo 를 하면 그 애니메이션이 다시 momentum end 를 유발해
+  //  settle 이 무한 반복되며 휠이 잠기던 버그가 있어 제거함.)
+  const onMomentumEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    commitIndex(e.nativeEvent.contentOffset.y);
   };
 
   return (
@@ -71,8 +84,8 @@ function WheelColumn({ items, index, onChange, width, disabled }: ColumnProps) {
       decelerationRate="fast"
       scrollEnabled={!disabled}
       nestedScrollEnabled
-      onMomentumScrollEnd={settle}
-      onScrollEndDrag={settle}
+      onMomentumScrollEnd={onMomentumEnd}
+      onScrollEndDrag={onDragEnd}
       contentContainerStyle={{ paddingVertical: ITEM_HEIGHT * PAD_ROWS }}
     >
       {items.map((it, i) => (

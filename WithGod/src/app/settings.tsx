@@ -166,8 +166,9 @@ export default function SettingsScreen() {
     });
   }, []);
 
+  // 권한이 명시적으로 "거부됨" 일 때만 배너 노출(미결정 단계에선 OS 팝업이 처리하므로 숨김).
   const showPermissionBanner =
-    isNative && permission !== "granted" && settings.enabled;
+    isNative && permission === "denied" && settings.enabled;
   const timeControlsDisabled = !settings.enabled;
 
   return (
