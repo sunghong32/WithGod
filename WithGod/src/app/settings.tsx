@@ -19,6 +19,7 @@ import { useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  AppState,
   Linking,
   Platform,
   ScrollView,
@@ -105,6 +106,22 @@ export default function SettingsScreen() {
     },
     [isNative],
   );
+
+  // 시스템 설정에서 권한을 바꾸고 앱으로 돌아오면 권한을 재확인해 배너를 갱신.
+  useEffect(() => {
+    if (!isNative) return;
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state !== "active") return;
+      void (async () => {
+        const status = await refreshPermission();
+        // 권한이 새로 켜졌고 알림이 ON 이면 서버에 기기 재등록(동기화).
+        if (status === "granted" && settingsRef.current.enabled) {
+          void persistAndSync(settingsRef.current);
+        }
+      })();
+    });
+    return () => sub.remove();
+  }, [isNative, refreshPermission, persistAndSync]);
 
   const handleToggleEnabled = useCallback(
     async (value: boolean) => {
