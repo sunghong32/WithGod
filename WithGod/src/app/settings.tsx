@@ -11,6 +11,7 @@ import {
   syncNotificationSettingsAsync,
   type PushPermissionStatus,
 } from "@/shared/lib/pushNotifications";
+import { WheelTimePicker } from "@/shared/components/WheelTimePicker";
 import { baseFontFamily, scaleFont } from "@/shared/styles";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
@@ -34,7 +35,7 @@ const formatTime = (hour: number, minute: number): string => {
   const period = hour < 12 ? "오전" : "오후";
   const displayHour = hour % 12 === 0 ? 12 : hour % 12;
   const mm = String(minute).padStart(2, "0");
-  return `${period} ${displayHour}시 ${mm}분`;
+  return `${period} ${displayHour}:${mm}`;
 };
 
 export default function SettingsScreen() {
@@ -129,24 +130,12 @@ export default function SettingsScreen() {
     [isNative, persistAndSync, refreshPermission],
   );
 
-  const adjustHour = useCallback(
-    (delta: number) => {
+  const handleTimeChange = useCallback(
+    (hour: number, minute: number) => {
       const next = {
         ...settingsRef.current,
-        scheduleHour: (settingsRef.current.scheduleHour + delta + 24) % 24,
-      };
-      setSettings(next);
-      void persistAndSync(next);
-    },
-    [persistAndSync],
-  );
-
-  const adjustMinute = useCallback(
-    (delta: number) => {
-      const next = {
-        ...settingsRef.current,
-        scheduleMinute:
-          (settingsRef.current.scheduleMinute + delta + 60) % 60,
+        scheduleHour: hour,
+        scheduleMinute: minute,
       };
       setSettings(next);
       void persistAndSync(next);
@@ -251,74 +240,19 @@ export default function SettingsScreen() {
             <View
               style={[styles.card, timeControlsDisabled && styles.cardDisabled]}
             >
-              <Text style={styles.cardTitle}>알림 시간</Text>
-              <Text style={styles.cardSubtitle}>
-                {formatTime(settings.scheduleHour, settings.scheduleMinute)}
-              </Text>
-
-              <View style={styles.stepperRow}>
-                {/* 시 */}
-                <View style={styles.stepperGroup}>
-                  <Text style={styles.stepperLabel}>시</Text>
-                  <View style={styles.stepperControls}>
-                    <TouchableOpacity
-                      style={styles.stepperButton}
-                      onPress={() => adjustHour(-1)}
-                      disabled={timeControlsDisabled}
-                      activeOpacity={0.7}
-                      accessibilityRole="button"
-                      accessibilityLabel="시간 1시간 줄이기"
-                    >
-                      <Ionicons name="remove" size={22} color="#1E2939" />
-                    </TouchableOpacity>
-                    <Text style={styles.stepperValue}>
-                      {String(settings.scheduleHour).padStart(2, "0")}
-                    </Text>
-                    <TouchableOpacity
-                      style={styles.stepperButton}
-                      onPress={() => adjustHour(1)}
-                      disabled={timeControlsDisabled}
-                      activeOpacity={0.7}
-                      accessibilityRole="button"
-                      accessibilityLabel="시간 1시간 늘리기"
-                    >
-                      <Ionicons name="add" size={22} color="#1E2939" />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-
-                <Text style={styles.stepperColon}>:</Text>
-
-                {/* 분 */}
-                <View style={styles.stepperGroup}>
-                  <Text style={styles.stepperLabel}>분</Text>
-                  <View style={styles.stepperControls}>
-                    <TouchableOpacity
-                      style={styles.stepperButton}
-                      onPress={() => adjustMinute(-5)}
-                      disabled={timeControlsDisabled}
-                      activeOpacity={0.7}
-                      accessibilityRole="button"
-                      accessibilityLabel="분 5분 줄이기"
-                    >
-                      <Ionicons name="remove" size={22} color="#1E2939" />
-                    </TouchableOpacity>
-                    <Text style={styles.stepperValue}>
-                      {String(settings.scheduleMinute).padStart(2, "0")}
-                    </Text>
-                    <TouchableOpacity
-                      style={styles.stepperButton}
-                      onPress={() => adjustMinute(5)}
-                      disabled={timeControlsDisabled}
-                      activeOpacity={0.7}
-                      accessibilityRole="button"
-                      accessibilityLabel="분 5분 늘리기"
-                    >
-                      <Ionicons name="add" size={22} color="#1E2939" />
-                    </TouchableOpacity>
-                  </View>
-                </View>
+              <View style={styles.timeHeaderRow}>
+                <Text style={styles.cardTitle}>알림 시간</Text>
+                <Text style={styles.timeValue}>
+                  {formatTime(settings.scheduleHour, settings.scheduleMinute)}
+                </Text>
               </View>
+
+              <WheelTimePicker
+                hour={settings.scheduleHour}
+                minute={settings.scheduleMinute}
+                onChange={handleTimeChange}
+                disabled={timeControlsDisabled}
+              />
             </View>
 
             <Text style={styles.footerNote}>
@@ -460,7 +394,19 @@ const styles = StyleSheet.create({
     fontFamily: baseFontFamily,
     marginTop: 4,
   },
-  // 스테퍼
+  timeHeaderRow: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    justifyContent: "space-between",
+    marginBottom: 12,
+  },
+  timeValue: {
+    fontSize: scaleFont(18),
+    fontWeight: "500",
+    color: "#4A90E2",
+    fontFamily: baseFontFamily,
+  },
+  // 스테퍼 (미사용 — 휠 피커로 대체)
   stepperRow: {
     flexDirection: "row",
     alignItems: "flex-end",
