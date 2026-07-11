@@ -12,7 +12,13 @@ export default function SplashScreen() {
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {
-      router.replace('/(tabs)');
+      // anchor='(tabs)' 로 인해 스택이 [(tabs), index] 이므로, replace 를 하면
+      // (tabs) 가 하나 더 쌓여 중복된다. 밑의 (tabs) 로 pop 해서 중복을 방지한다.
+      if (router.canGoBack()) {
+        router.back();
+      } else {
+        router.replace('/(tabs)');
+      }
     }, 3000);
 
     return () => clearTimeout(timeoutId);

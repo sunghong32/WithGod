@@ -8,7 +8,6 @@ import { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Keyboard,
-  KeyboardAvoidingView,
   Platform,
   ScrollView,
   StyleSheet,
@@ -17,6 +16,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 
 const LOGO_IMAGE = require("../../shared/assets/images/Logo.png");
 const SEND_ICON = require("../../shared/assets/images/send.png");
@@ -180,17 +180,13 @@ export default function HomeScreen() {
     </View>
   );
 
-  // iOS: KeyboardAvoidingView behavior="padding"
-  // Android: app.json의 softwareKeyboardLayoutMode: "resize"가 자동으로 처리
-  if (Platform.OS === "ios") {
-    return (
-      <KeyboardAvoidingView style={styles.flex} behavior="padding">
-        {content}
-      </KeyboardAvoidingView>
-    );
-  }
-
-  return content;
+  // iOS/Android 모두 keyboard-controller 의 KeyboardAvoidingView 로 처리.
+  // 안드로이드 adjustResize 가 안 먹는 기기(갤럭시 등)도 IME inset 기반으로 일관 처리됨.
+  return (
+    <KeyboardAvoidingView style={styles.flex} behavior="padding">
+      {content}
+    </KeyboardAvoidingView>
+  );
 }
 
 const styles = StyleSheet.create({
