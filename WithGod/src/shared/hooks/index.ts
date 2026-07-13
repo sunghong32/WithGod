@@ -1,2 +1,2 @@
-export { useKeyboardVisible, useKeyboardHeight } from "./useKeyboardVisible";
+export { useKeyboardVisible } from "./useKeyboardVisible";
 export { useSafeAreaPadding } from "./useSafeAreaPadding";

@@ -63,7 +63,6 @@ export default function RootLayout() {
             <Stack.Screen name="result" />
             <Stack.Screen name="settings" />
             <Stack.Screen name="verse-detail" />
-            <Stack.Screen name="modal" options={{ presentation: 'modal', headerShown: true, title: 'Modal' }} />
           </Stack>
           <StatusBar style="auto" />
           </ThemeProvider>
