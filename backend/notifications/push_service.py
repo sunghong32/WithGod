@@ -56,10 +56,9 @@ class FirebasePushGateway(PushGateway):
                 apns=messaging.APNSConfig(
                     headers={"apns-priority": "10"},
                     payload=messaging.APNSPayload(
-                        aps=messaging.Aps(
-                            sound="default",
-                            badge=1,
-                        )
+                        # badge 는 설정하지 않는다: 클라이언트에 배지 클리어 수단이 없어
+                        # badge=1 이 앱 아이콘에 영구 잔류하는 문제가 있었다.
+                        aps=messaging.Aps(sound="default")
                     ),
                 ),
             )

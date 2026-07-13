@@ -28,7 +28,9 @@ class DailyVerseNotificationManager:
         self.verse_interpreter = verse_interpreter
 
     def get_daily_verse(self, now: datetime | None = None) -> dict[str, str]:
-        verse = self.verse_provider.get_daily_verse(now=now)
+        # naive now(또는 None)가 그대로 흘러가면 서버 OS 타임존(UTC 등) 기준 날짜가
+        # 되므로, 항상 push_default_timezone 기준으로 normalize 해서 넘긴다.
+        verse = self.verse_provider.get_daily_verse(now=self._normalize_now(now))
         if self.verse_interpreter is not None:
             verse.interpretation = self.verse_interpreter.interpret(verse)
         return asdict(verse)
@@ -115,9 +117,10 @@ class DailyVerseNotificationManager:
                 if device.schedule_minute is not None
                 else self.settings.push_schedule_minute
             )
-            if local_now.hour != target_hour:
-                continue
-            if local_now.minute != target_minute:
+            # 캐치업 발송: '현재 분 == 목표 분' 정확 일치 대신, 오늘 아직 안 보냈고
+            # (위 last_daily_sent_on 검사) 목표 시각을 지났으면 발송한다.
+            # 프로세스 재시작/스톨로 해당 분을 넘겨도 그날 발송이 누락되지 않는다.
+            if (local_now.hour, local_now.minute) < (target_hour, target_minute):
                 continue
             due_devices.append(device)
             sent_dates[device.token] = local_date
@@ -178,8 +181,10 @@ class DailyVerseNotificationManager:
             raise ValueError(f"Unknown timezone: {name}") from exc
 
     def _normalize_now(self, now: datetime | None) -> datetime:
+        tz = self._resolve_timezone(self.settings.push_default_timezone)
         if now is None:
-            return datetime.now(self._resolve_timezone(self.settings.push_default_timezone))
+            return datetime.now(tz)
         if now.tzinfo is not None:
-            return now
-        return now.replace(tzinfo=self._resolve_timezone(self.settings.push_default_timezone))
+            # aware 면 기본 타임존의 벽시계로 변환한다(일자 계산이 항상 기본 타임존 기준이 되도록).
+            return now.astimezone(tz)
+        return now.replace(tzinfo=tz)

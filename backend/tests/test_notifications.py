@@ -4,6 +4,7 @@ import unittest
 from datetime import datetime
 from pathlib import Path
 from unittest.mock import Mock
+from zoneinfo import ZoneInfo
 
 from notifications.device_store import DeviceStore
 from notifications.manager import DailyVerseNotificationManager
@@ -160,14 +161,18 @@ class NotificationFeatureTest(unittest.TestCase):
         )
         scheduler = DailyVerseScheduler(self.manager, poll_seconds=30)
 
-        # 전역 기본 9:00 에는 발송되지 않는다.
-        skipped = scheduler.run_once(now=datetime(2026, 4, 21, 9, 0))
+        # 개인 설정 7:30 이전(7:29)에는 발송되지 않는다.
+        skipped = scheduler.run_once(now=datetime(2026, 4, 21, 7, 29))
         self.assertEqual(skipped["result"]["success_count"], 0)
 
-        # 개인 설정 7:30 에 발송된다.
+        # 전역 기본 9:00 이 아니라 개인 설정 7:30 에 발송된다.
         sent = scheduler.run_once(now=datetime(2026, 4, 21, 7, 30))
         self.assertEqual(sent["result"]["success_count"], 1)
         self.assertEqual(self.store.list_devices()[0].last_daily_sent_on, "2026-04-21")
+
+        # 이미 발송된 날에는 전역 기본 9:00 이 되어도 중복 발송하지 않는다.
+        duplicate = scheduler.run_once(now=datetime(2026, 4, 21, 9, 0))
+        self.assertEqual(duplicate["result"]["success_count"], 0)
 
     def test_register_device_upserts_same_token(self) -> None:
         first = self.manager.register_device(
@@ -205,10 +210,52 @@ class NotificationFeatureTest(unittest.TestCase):
         duplicate = scheduler.run_once(now=datetime(2026, 4, 21, 9, 0))
         self.assertEqual(duplicate["result"]["success_count"], 0)
 
+        # 캐치업 도입 후에도 같은 날 늦은 시각 재실행이 중복 발송으로 이어지면 안 된다.
+        later_same_day = scheduler.run_once(now=datetime(2026, 4, 21, 15, 0))
+        self.assertEqual(later_same_day["result"]["success_count"], 0)
+
+    def test_scheduler_catches_up_when_target_minute_was_missed(self) -> None:
+        # 프로세스 재시작/스톨로 목표 시각(9:00)의 '그 분'을 넘겨도,
+        # 오늘 아직 안 보냈으면 그날 안에 캐치업 발송해야 한다.
+        self.store.upsert(
+            token="catchup-token",
+            platform=MobilePlatform.ANDROID,
+            timezone="Asia/Seoul",
+        )
+        scheduler = DailyVerseScheduler(self.manager, poll_seconds=30)
+
+        sent = scheduler.run_once(now=datetime(2026, 4, 21, 13, 47))
+        self.assertEqual(sent["result"]["success_count"], 1)
+        self.assertEqual(self.store.list_devices()[0].last_daily_sent_on, "2026-04-21")
+
+        # 같은 날 재실행은 멱등(중복 발송 없음).
+        duplicate = scheduler.run_once(now=datetime(2026, 4, 21, 13, 48))
+        self.assertEqual(duplicate["result"]["success_count"], 0)
+
+        # 다음 날 목표 시각 이전에는 발송하지 않는다.
+        next_day_early = scheduler.run_once(now=datetime(2026, 4, 22, 8, 59))
+        self.assertEqual(next_day_early["result"]["success_count"], 0)
+
+        # 다음 날 목표 시각을 지나면 다시 발송한다.
+        next_day_sent = scheduler.run_once(now=datetime(2026, 4, 22, 9, 30))
+        self.assertEqual(next_day_sent["result"]["success_count"], 1)
+        self.assertEqual(self.store.list_devices()[0].last_daily_sent_on, "2026-04-22")
+
     def test_daily_verse_is_deterministic_for_same_day(self) -> None:
         verse_a = self.provider.get_daily_verse(now=datetime(2026, 4, 21, 9, 0))
         verse_b = self.provider.get_daily_verse(now=datetime(2026, 4, 21, 23, 59))
         self.assertEqual(verse_a.verse_id, verse_b.verse_id)
+
+    def test_daily_verse_uses_default_timezone_for_aware_now(self) -> None:
+        # UTC 2026-04-21 16:00 은 Asia/Seoul 기준 2026-04-22 01:00 이다.
+        # manager 는 push_default_timezone(Asia/Seoul) 벽시계로 normalize 해서
+        # verse_provider 에 넘기므로 4/22 의 말씀이 나와야 한다.
+        utc_now = datetime(2026, 4, 21, 16, 0, tzinfo=ZoneInfo("UTC"))
+        verse_via_manager = self.manager.get_daily_verse(now=utc_now)
+        seoul_next_day = self.provider.get_daily_verse(now=datetime(2026, 4, 22, 1, 0))
+        seoul_same_day = self.provider.get_daily_verse(now=datetime(2026, 4, 21, 16, 0))
+        self.assertEqual(verse_via_manager["verse_id"], seoul_next_day.verse_id)
+        self.assertNotEqual(verse_via_manager["verse_id"], seoul_same_day.verse_id)
 
     def _manager_with_interpreter(
         self, generate_fn: Mock

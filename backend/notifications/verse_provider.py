@@ -4,8 +4,13 @@ import json
 from datetime import datetime
 from pathlib import Path
 from typing import Callable
+from zoneinfo import ZoneInfo
 
 from notifications.models import DailyVerse
+
+# 서버 OS 타임존(UTC 등)과 무관하게 '오늘'은 한국 시간 기준으로 계산한다.
+# 설정(push_default_timezone)을 쓰는 경로는 manager 가 normalize 된 now 를 넘겨준다.
+_DEFAULT_TZ = ZoneInfo("Asia/Seoul")
 
 
 class DailyVerseProvider:
@@ -16,7 +21,10 @@ class DailyVerseProvider:
         verses = self._load()
         if not verses:
             raise RuntimeError("No daily verses configured")
-        current = now or datetime.now()
+        # now 미지정 시 서버 OS 타임존 대신 한국 시간 기준 '오늘'을 사용한다.
+        # aware datetime 이 들어오면 그 타임존의 벽시계 날짜를 그대로 쓴다
+        # (manager 가 push_default_timezone 으로 normalize 해서 넘겨준다).
+        current = now if now is not None else datetime.now(_DEFAULT_TZ)
         index = current.toordinal() % len(verses)
         item = verses[index]
         return DailyVerse(

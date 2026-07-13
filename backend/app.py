@@ -9,7 +9,7 @@
 #   uvicorn app:app --reload --port 8000
 # =========================================================
 
-from fastapi import FastAPI, Request, Query
+from fastapi import Depends, FastAPI, Header, HTTPException, Request, Query
 from fastapi.responses import StreamingResponse
 from pydantic import AliasChoices, BaseModel, Field
 import pandas as pd
@@ -18,10 +18,11 @@ from sentence_transformers import SentenceTransformer
 from pathlib import Path
 from typing import List, Optional, Union, Literal, AsyncGenerator
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 from threading import Lock
 import sqlite3
 import random
-import os, re, json, time, logging, asyncio
+import os, re, json, time, logging, asyncio, secrets
 
 from notifications.jobs import build_notification_manager
 from notifications.manager import DailyVerseNotificationManager
@@ -268,7 +269,10 @@ def _save_daily_random_to_db(user_key: str, day: str, ref: str, text: str) -> No
         conn.commit()
 
 def _day_str(day_offset: int = 0) -> str:
-    return (datetime.now().date() + timedelta(days=int(day_offset))).isoformat()
+    # 서버 OS 타임존(UTC 등)이 아니라 서비스 기준 타임존(기본 Asia/Seoul)의 '오늘'을 쓴다.
+    # 캐시 키 형식(YYYY-MM-DD)은 기존과 동일하게 유지한다.
+    local_now = datetime.now(ZoneInfo(APP_SETTINGS.push_default_timezone))
+    return (local_now.date() + timedelta(days=int(day_offset))).isoformat()
 
 def _resolve_user_key(request: Request) -> str:
     # 앱/클라이언트가 식별자를 보내주면 최우선 사용
@@ -553,6 +557,20 @@ def _notification_manager() -> DailyVerseNotificationManager:
     return manager
 
 
+def require_push_admin(
+    x_api_key: Optional[str] = Header(default=None, alias="X-API-Key"),
+) -> None:
+    """푸시 관리용 엔드포인트 보호 (토큰 목록 조회/삭제/전체 즉시발송).
+
+    키는 환경변수 PUSH_ADMIN_API_KEY 에서 읽는다(.env 는 모듈 로드 시 load_dotenv 로 반영).
+    환경변수가 비어 있으면 관리 API 는 잠긴 상태로 둔다(무조건 401).
+    클라이언트가 쓰는 등록 엔드포인트(POST /push/devices)에는 적용하지 않는다.
+    """
+    expected = os.getenv("PUSH_ADMIN_API_KEY", "")
+    if not expected or x_api_key is None or not secrets.compare_digest(x_api_key, expected):
+        raise HTTPException(status_code=401, detail="Invalid or missing X-API-Key")
+
+
 # GET /random
 # - body 없이 호출
 # - day_offset=1 을 주면 내일 구절을 미리 확인 가능
@@ -619,7 +637,8 @@ def daily_verse():
     return {"daily_verse": manager.get_daily_verse()}
 
 
-@app.get("/push/devices")
+# 관리용: 전체 토큰 목록 노출 → X-API-Key 필요.
+@app.get("/push/devices", dependencies=[Depends(require_push_admin)])
 def list_push_devices():
     manager = _notification_manager()
     return {"devices": manager.list_devices()}
@@ -641,20 +660,27 @@ def register_push_device(inp: DeviceRegisterIn):
             schedule_minute=inp.schedule_minute,
         )
     except ValueError as exc:
-        return {"error": str(exc)}
+        # 잘못된 입력을 201 + {"error": ...} 로 돌려주던 것을 표준 400 으로 변경.
+        raise HTTPException(status_code=400, detail=str(exc))
     return result
 
 
-@app.delete("/push/devices", response_model=Union[DeviceDeleteOut, RandomError])
+# 관리용: 임의 토큰 삭제 → X-API-Key 필요.
+@app.delete(
+    "/push/devices",
+    response_model=DeviceDeleteOut,
+    dependencies=[Depends(require_push_admin)],
+)
 def delete_push_device(token: str = Query(...)):
     manager = _notification_manager()
     deleted = manager.delete_device(token)
     if not deleted:
-        return {"error": "Device token not found"}
+        raise HTTPException(status_code=404, detail="Device token not found")
     return {"deleted": True}
 
 
-@app.post("/push/send/daily-verse")
+# 관리용: 전체(또는 지정 토큰) 즉시 발송 → X-API-Key 필요.
+@app.post("/push/send/daily-verse", dependencies=[Depends(require_push_admin)])
 def send_daily_verse(inp: PushTokensIn):
     manager = _notification_manager()
     try:
