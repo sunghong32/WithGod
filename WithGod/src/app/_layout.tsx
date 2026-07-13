@@ -30,7 +30,9 @@ export default function RootLayout() {
     let isMounted = true;
 
     setupPushNotificationsAsync({
-      openRoute: (href: Href) => router.push(href),
+      // 홈은 스택 최하단 앵커이므로 push 로 중복 생성하지 않고 dismissTo 로 되돌아간다.
+      openRoute: (href: Href) =>
+        href === '/(tabs)' ? router.dismissTo(href) : router.push(href),
     })
       .then((cleanup) => {
         if (!isMounted) {
@@ -62,7 +64,6 @@ export default function RootLayout() {
             <Stack.Screen name="(tabs)" options={{ gestureEnabled: false }} />
             <Stack.Screen name="result" />
             <Stack.Screen name="settings" />
-            <Stack.Screen name="verse-detail" />
           </Stack>
           <StatusBar style="auto" />
           </ThemeProvider>

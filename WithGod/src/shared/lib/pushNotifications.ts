@@ -166,59 +166,27 @@ export const syncNotificationSettingsAsync = async (
   return true;
 };
 
-const buildVerseDetailHref = (
+// 오늘의 말씀 알림은 홈에 이미 같은 내용(말씀+풀이)이 있으므로 별도 상세 화면 없이
+// 홈으로 보낸다. 서버가 data.url 로 명시적 경로를 주면 그 경로를 우선한다.
+const buildNotificationHref = (
   remoteMessage: FirebaseMessagingTypes.RemoteMessage,
-): Href | null => {
-  const data = remoteMessage.data ?? {};
-  const url = getStringValue(data.url);
-
-  if (url) {
-    return url as Href;
-  }
-
-  const ref = getStringValue(data.ref) ?? getStringValue(data.verseRef);
-  const text = getStringValue(data.text) ?? getStringValue(data.verseText);
-  const comment =
-    getStringValue(data.comment) ?? getStringValue(data.commentText);
-  const tag = getStringValue(data.tag);
-  const title =
-    getStringValue(data.title) ??
-    getStringValue(remoteMessage.notification?.title);
-  const body =
-    getStringValue(data.body) ??
-    getStringValue(remoteMessage.notification?.body);
-
-  if (!ref && !text && !comment && !tag && !title && !body) {
-    return null;
-  }
-
-  return {
-    pathname: '/verse-detail',
-    params: {
-      ref,
-      text,
-      comment,
-      tag,
-      title,
-      body,
-    },
-  } as unknown as Href;
+): Href => {
+  const url = getStringValue(remoteMessage.data?.url);
+  return (url ?? '/(tabs)') as Href;
 };
 
 const openRemoteMessage = (
   remoteMessage: FirebaseMessagingTypes.RemoteMessage,
   openRoute: OpenRoute,
 ): void => {
-  const href = buildVerseDetailHref(remoteMessage);
-  if (!href) return;
-  openRoute(href);
+  openRoute(buildNotificationHref(remoteMessage));
 };
 
 const showForegroundAlert = (
   remoteMessage: FirebaseMessagingTypes.RemoteMessage,
   openRoute: OpenRoute,
 ): void => {
-  const href = buildVerseDetailHref(remoteMessage);
+  const href = buildNotificationHref(remoteMessage);
   const title =
     getStringValue(remoteMessage.notification?.title) ??
     getStringValue(remoteMessage.data?.title) ??
