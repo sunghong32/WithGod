@@ -1331,6 +1331,8 @@ export default function ResultScreen() {
           style={styles.backButton}
           onPress={() => router.back()}
           activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel="뒤로 가기"
         >
           <Image
             source={BACK_ICON}

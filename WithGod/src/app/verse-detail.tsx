@@ -42,6 +42,8 @@ export default function VerseDetailScreen() {
           style={styles.backButton}
           onPress={() => router.back()}
           activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel="뒤로 가기"
         >
           <Image source={BACK_ICON} style={styles.backIcon} contentFit="contain" />
         </TouchableOpacity>
@@ -98,7 +100,8 @@ export default function VerseDetailScreen() {
         <TouchableOpacity
           style={styles.homeButton}
           activeOpacity={0.7}
-          onPress={() => router.replace('/(tabs)')}
+          // replace 는 (tabs) 를 중복으로 쌓으므로, 기존 (tabs) 까지 팝한다.
+          onPress={() => router.dismissTo('/(tabs)')}
         >
           <Text style={styles.homeButtonText}>홈으로 돌아가기</Text>
         </TouchableOpacity>

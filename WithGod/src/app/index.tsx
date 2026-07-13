@@ -1,28 +1,48 @@
 import { baseFontFamily, scaleFont } from '@/shared/styles';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
-import { useEffect } from 'react';
+import { useFocusEffect, useNavigation, useRouter } from 'expo-router';
+import { useCallback, useEffect, useRef } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function SplashScreen() {
   const router = useRouter();
+  const navigation = useNavigation();
   const insets = useSafeAreaInsets();
+  const timerElapsedRef = useRef(false);
+
+  const dismissSplash = useCallback(() => {
+    // anchor='(tabs)' 로 인해 스택이 [(tabs), index] 이므로, replace 를 하면
+    // (tabs) 가 하나 더 쌓여 중복된다. 밑의 (tabs) 로 pop 해서 중복을 방지한다.
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/(tabs)');
+    }
+  }, [router]);
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {
-      // anchor='(tabs)' 로 인해 스택이 [(tabs), index] 이므로, replace 를 하면
-      // (tabs) 가 하나 더 쌓여 중복된다. 밑의 (tabs) 로 pop 해서 중복을 방지한다.
-      if (router.canGoBack()) {
-        router.back();
-      } else {
-        router.replace('/(tabs)');
+      timerElapsedRef.current = true;
+      // 푸시 딥링크 등으로 다른 화면이 이미 위에 떠 있으면 back() 이 그 화면을
+      // 팝해버리므로, 스플래시가 최상단(포커스)일 때만 닫는다.
+      if (navigation.isFocused()) {
+        dismissSplash();
       }
     }, 3000);
 
     return () => clearTimeout(timeoutId);
-  }, [router]);
+  }, [navigation, dismissSplash]);
+
+  // 딥링크 화면에서 돌아와 스플래시가 다시 보이면(타이머는 이미 소진) 즉시 닫는다.
+  useFocusEffect(
+    useCallback(() => {
+      if (timerElapsedRef.current) {
+        dismissSplash();
+      }
+    }, [dismissSplash])
+  );
 
   return (
     <View style={styles.root}>

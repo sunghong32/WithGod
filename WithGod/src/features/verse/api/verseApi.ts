@@ -1,13 +1,9 @@
 import { apiClient } from "@/shared/api/client";
 import { parseError, logError, ApiError } from "@/shared/api/errors";
 import {
-  RandomOutSchema,
-  RecommendOutSchema,
   DailyVerseResponseSchema,
-  type RandomOut,
   type DailyVerse,
   type RecommendIn,
-  type RecommendOut,
   type RecommendItem,
 } from "./schema";
 
@@ -157,18 +153,6 @@ const handleSsePayload = (
 };
 
 export const verseApi = {
-  // 랜덤 성경 구절 조회
-  getRandomVerse: async (): Promise<RandomOut> => {
-    try {
-      const { data } = await apiClient.get("/random");
-      return RandomOutSchema.parse(data);
-    } catch (error) {
-      const apiError = parseError(error);
-      logError(apiError, "getRandomVerse");
-      throw apiError;
-    }
-  },
-
   // 오늘의 말씀 조회 (풀이 interpretation 포함)
   getDailyVerse: async (): Promise<DailyVerse> => {
     try {
@@ -178,18 +162,6 @@ export const verseApi = {
     } catch (error) {
       const apiError = parseError(error);
       logError(apiError, "getDailyVerse");
-      throw apiError;
-    }
-  },
-
-  // 기분에 맞는 성경 구절 추천
-  getRecommendation: async (input: RecommendIn): Promise<RecommendOut> => {
-    try {
-      const { data } = await apiClient.post("/recommend", input);
-      return RecommendOutSchema.parse(data);
-    } catch (error) {
-      const apiError = parseError(error);
-      logError(apiError, "getRecommendation");
       throw apiError;
     }
   },
@@ -205,6 +177,16 @@ export const verseApi = {
     let buffer = "";
     let lastIndex = 0;
     let closed = false;
+    let doneReceived = false;
+
+    // done 수신 여부를 추적해, done 없이 스트림이 끝나면 무한 로딩 대신 에러 처리한다.
+    const trackedHandlers: RecommendStreamHandlers = {
+      ...handlers,
+      onDone: (results) => {
+        doneReceived = true;
+        handlers.onDone?.(results);
+      },
+    };
 
     const close = () => {
       closed = true;
@@ -215,7 +197,7 @@ export const verseApi = {
       if (!chunk) return;
       buffer += chunk;
       buffer = drainSseBuffer(buffer, (payload, eventName) =>
-        handleSsePayload(payload, eventName, handlers)
+        handleSsePayload(payload, eventName, trackedHandlers)
       );
     };
 
@@ -253,6 +235,25 @@ export const verseApi = {
         handleChunk("\n\n");
         buffer = "";
       }
+      if (!doneReceived) {
+        handlers.onError?.("응답이 완전히 도착하지 않았어요. 다시 시도해주세요", {
+          source: "parse",
+          status: xhr.status,
+          readyState: xhr.readyState,
+          responseText: xhr.responseText?.slice(-500),
+          url,
+        });
+      }
+    };
+
+    xhr.ontimeout = () => {
+      if (closed) return;
+      handlers.onError?.("응답 시간이 초과됐어요. 다시 시도해주세요", {
+        source: "network",
+        status: xhr.status,
+        readyState: xhr.readyState,
+        url,
+      });
     };
 
     xhr.onerror = () => {
@@ -268,6 +269,8 @@ export const verseApi = {
 
     try {
       xhr.open("POST", url);
+      // LLM 스트리밍 전체 소요 상한 (서버가 ping 을 보내도 총 시간 기준으로 끊는다)
+      xhr.timeout = 90000;
       xhr.setRequestHeader("Content-Type", "application/json");
       xhr.setRequestHeader("Accept", "text/event-stream");
       xhr.send(JSON.stringify(input));

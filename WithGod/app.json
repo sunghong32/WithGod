@@ -6,7 +6,7 @@
     "orientation": "portrait",
     "icon": "./src/shared/assets/images/icon.png",
     "scheme": "withgod",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "runtimeVersion": {
       "policy": "appVersion"
@@ -18,8 +18,12 @@
       "supportsTablet": false,
       "bundleIdentifier": "kr.co.mincha.withgod",
       "googleServicesFile": "./GoogleService-Info.plist",
+      "entitlements": {
+        "aps-environment": "production"
+      },
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSPhotoLibraryAddUsageDescription": "말씀 카드를 사진 앨범에 저장하기 위해 사용됩니다."
       }
     },
     "android": {
@@ -33,10 +37,8 @@
         "backgroundColor": "#4A90E2",
         "resizeMode": "cover"
       },
-      "edgeToEdgeEnabled": false,
       "predictiveBackGestureEnabled": false,
-      "softwareKeyboardLayoutMode": "resize",
-      "navigationBarColor": "#4A90E2"
+      "softwareKeyboardLayoutMode": "resize"
     },
     "web": {
       "output": "static",
@@ -67,7 +69,8 @@
             "backgroundColor": "#4A90E2"
           }
         }
-      ]
+      ],
+      "expo-font"
     ],
     "experiments": {
       "typedRoutes": true,

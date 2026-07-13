@@ -1,15 +1,12 @@
 import { useMemo } from "react";
-import { Platform, StatusBar } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export function useSafeAreaPadding() {
   const insets = useSafeAreaInsets();
 
-  const headerPaddingTop = useMemo(() => {
-    return Platform.OS === "android"
-      ? (StatusBar.currentHeight ?? 0) + 12
-      : insets.top + 12;
-  }, [insets.top]);
+  // edge-to-edge 기준: 양 플랫폼 모두 창이 상태바 뒤까지 그려지므로 insets.top 만 쓴다.
+  // (Android 에서 StatusBar.currentHeight 를 더하면 상태바 높이가 이중으로 들어간다)
+  const headerPaddingTop = useMemo(() => insets.top + 12, [insets.top]);
 
   const getInputBarPaddingBottom = useMemo(() => {
     return (isKeyboardVisible: boolean) => {
