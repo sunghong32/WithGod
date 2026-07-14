@@ -303,8 +303,8 @@ def _style_to_limits(style: str):
     if style == "long":
         return {
             "text_limit": "1–2문장(약 120–180자)",
-            "comment_limit": "3–4문장(약 220–300자)",
-            "max_tokens": 800
+            "comment_limit": "4–5문장(약 260–360자)",
+            "max_tokens": 1500
         }
     # default: medium
     return {
@@ -313,14 +313,28 @@ def _style_to_limits(style: str):
         "max_tokens": 550
     }
 
+# 추천 코멘트용 공용 시스템 프롬프트: '상담 도우미'가 아니라 '목사님'처럼,
+# 말씀을 짧게 풀어 설명(성경 풀이)한 뒤 성도의 상황에 다정하게 적용하도록 지시.
+_RECOMMEND_SYSTEM = (
+    "당신은 따뜻하고 지혜로운 한국인 목사님입니다. "
+    "성도가 털어놓은 마음에, 성경 구절을 짧게 설교하듯 풀어 건넵니다.\n"
+    "규칙:\n"
+    "- 반드시 한국어만 사용합니다.\n"
+    "- 먼저 그 구절이 '무슨 뜻인지'를 쉽게 풀어 설명합니다(성경 풀이).\n"
+    "- 그다음 그 말씀이 지금 이 사람의 상황에 어떤 위로·의미가 되는지 다정하게 적용합니다.\n"
+    "- 훈계하듯 가르치지 말고, 곁에서 손잡아 주듯 부드럽게 말합니다.\n"
+    "- 과장·단정적 단언·번영신학식 약속은 피하고 신학적으로 무난하게 씁니다."
+)
+
+
 def _build_user_prompt(mood: str, candidates: List[dict], picks: int, style_limits: dict) -> str:
     verses_block = "\n".join([f"- {c['ref']} :: {_clip(c['text'])}" for c in candidates])
     return f"""
-역할: 당신은 한국어만 사용하는 기독교 상담 도우미입니다.
+역할: 당신은 따뜻한 한국인 목사님입니다.
 규칙:
 - 반드시 한국어만 사용하세요. 영어/중국어/일본어 금지.
 - text는 {style_limits['text_limit']} 로 인용하세요.
-- comment는 {style_limits['comment_limit']} 로 작성하세요.
+- comment는 {style_limits['comment_limit']} 로 작성하되, 그 구절이 무슨 뜻인지 쉽게 풀어 설명(성경 풀이)한 뒤 성도의 상황에 다정하게 적용하는 흐름을 한 단락에 담으세요. (번호·소제목 없이 매끄럽게)
 - 각 구절의 주제(감정)를 'tag'로 1~2개만 추가하세요. 예: \"두려움\", \"걱정\", \"사랑\", \"소망\", \"감사\", \"회개\" 등
 - 출력은 JSON 배열만. 다른 설명/서문/주석 금지.
 
@@ -345,24 +359,26 @@ def _build_user_prompt(mood: str, candidates: List[dict], picks: int, style_limi
 
 
 def _build_single_comment_prompt(mood: str, verse: dict, style_limits: dict) -> str:
-    """스트리밍용: 구절 1개에 대해 tag + comment만 생성하는 프롬프트"""
+    """스트리밍용: 구절 1개에 대해 tag + comment(말씀 풀이+적용)를 생성하는 프롬프트"""
     return f"""
-역할: 당신은 한국어만 사용하는 기독교 상담 도우미입니다.
-규칙:
-- 반드시 한국어만 사용하세요. 영어/중국어/일본어 금지.
-- comment는 {style_limits['comment_limit']} 로 작성하세요.
-- 주제(감정)를 'tag'로 1~2개만 추가하세요. 예: "두려움", "걱정", "사랑", "소망", "감사", "회개" 등
-- 출력은 JSON 객체 1개만. 다른 설명/서문/주석 금지.
-
-사용자 기분/상태: "{mood}"
+역할: 당신은 따뜻한 한국인 목사님입니다. (반드시 한국어만 사용)
 
 성경 구절: {verse['ref']} :: {verse['text']}
+성도의 마음: "{mood}"
 
-요청:
-정확한 JSON 객체 1개로만 출력 (반드시 아래 키 순서를 지켜주세요):
+요청: 이 구절을 성도에게 건네는 짧은 '말씀 나눔'을 comment 로 작성하세요.
+- comment 분량: {style_limits['comment_limit']}.
+- 반드시 아래 두 가지를 자연스러운 한 단락에 함께 담으세요:
+  (1) 이 구절이 본래 무슨 뜻인지 쉽게 풀어 설명 (성경 풀이)
+  (2) 그 말씀이 지금 성도의 상황에 어떤 위로·의미가 되는지 다정한 적용
+- (1)(2) 같은 번호·표시나 소제목은 넣지 말고 매끄럽게 이어 쓰세요.
+- 'tag'는 감정 주제 1~2개. 예: "두려움", "위로", "소망", "회복" 등
+- 출력은 JSON 객체 1개만. 다른 설명/서문/주석 금지.
+
+정확한 JSON 객체 1개로만 출력 (아래 키 순서 유지):
 {{
   "tag": "두려움",
-  "comment": "짧지 않지만 군더더기 없는 한국어 코멘트"
+  "comment": "말씀 풀이와 적용이 함께 담긴 목회적 코멘트"
 }}
 """.strip()
 
@@ -765,11 +781,7 @@ def recommend(inp: RecommendIn):
 
     # 2) OpenAI 생성
     limits = _style_to_limits(COMMENT_STYLE)
-    system = (
-        "당신은 한국어만 사용하는 목회적 상담 도우미입니다. "
-        "항상 따뜻하고 공감적인 어휘를 사용하고, 신학적으로 무난한 표현만 사용하세요. "
-        "인용/적용은 균형 있게, 과장이나 단정적 단언은 피하세요."
-    )
+    system = _RECOMMEND_SYSTEM
     user = _build_user_prompt(inp.mood, cands, PICKS, limits)
     _lap("prompt", t)
     t = time.perf_counter()
@@ -951,11 +963,7 @@ def _recommend_stream_response(mood: str) -> StreamingResponse:
 
         loop = asyncio.get_event_loop()
         limits = _style_to_limits(COMMENT_STYLE)
-        system = (
-            "당신은 한국어만 사용하는 목회적 상담 도우미입니다. "
-            "항상 따뜻하고 공감적인 어휘를 사용하고, 신학적으로 무난한 표현만 사용하세요. "
-            "인용/적용은 균형 있게, 과장이나 단정적 단언은 피하세요."
-        )
+        system = _RECOMMEND_SYSTEM
         per_card_tokens = max(300, limits["max_tokens"] // PICKS)
 
         # 준비 단계: 쿼리 확장 → 넓게 검색 → LLM 재순위. 진행 중엔 ping 으로 연결 유지.
@@ -1095,11 +1103,7 @@ def _comment_stream_response(inp: CommentStreamIn) -> StreamingResponse:
     async def generate_sse():
         index_value = int(inp.index or 0)
         limits = _style_to_limits(COMMENT_STYLE)
-        system = (
-            "당신은 한국어만 사용하는 목회적 상담 도우미입니다. "
-            "항상 따뜻하고 공감적인 어휘를 사용하고, 신학적으로 무난한 표현만 사용하세요. "
-            "인용/적용은 균형 있게, 과장이나 단정적 단언은 피하세요."
-        )
+        system = _RECOMMEND_SYSTEM
         verse = {"ref": inp.ref, "text": inp.text}
         if KOREAN_ONLY:
             verse["text"] = _keep_korean_only(verse["text"])
