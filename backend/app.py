@@ -726,7 +726,7 @@ def send_daily_verse(inp: PushTokensIn):
 )
 def recommend(inp: RecommendIn):
     # ---------- Backend-only configuration ----------
-    TOP_K = 5
+    TOP_K = 12               # 넓게 뽑아 LLM이 재순위/선택
     PICKS = 3
     COMMENT_STYLE = "long"   # short | medium | long
     KOREAN_ONLY = True       # 한자/가나 제거 여부
@@ -738,8 +738,11 @@ def recommend(inp: RecommendIn):
 
     t = time.perf_counter()
 
-    # 1) RAG 검색
-    q = model.encode([f"query: {inp.mood}"], normalize_embeddings=True).astype("float32")
+    # 1) RAG 검색 (감정/상황을 검색 키워드로 확장해 의미 매칭 정확도 향상)
+    search_query = _expand_search_query(inp.mood)
+    _lap("expand", t)
+    t = time.perf_counter()
+    q = model.encode([f"query: {search_query}"], normalize_embeddings=True).astype("float32")
     _lap("encode", t)
     t = time.perf_counter()
 
@@ -846,17 +849,93 @@ def _search_candidates(mood: str, top_k: int) -> List[dict]:
     return cands
 
 
-def _pick_next_candidate(mood: str, top_k: int, excluded_refs: List[str]) -> Optional[dict]:
-    excluded = set(excluded_refs)
-    for cand in _search_candidates(mood, top_k):
-        if cand["ref"] not in excluded:
-            return cand
-    return None
+def _expand_search_query(mood: str) -> str:
+    """사용자의 감정/상황 문장을 성경 검색에 적합한 '감정·주제 키워드'로 확장한다.
+
+    성경 본문은 옛 문어체라 사용자의 일상어와 표면 어휘가 겹치지 않는다.
+    LLM으로 핵심 감정 + 그에 응답하는 신앙 주제 키워드를 뽑아 원문에 덧붙여
+    임베딩 검색의 의미 매칭 정확도를 높인다. 실패 시 원문 그대로 검색(무중단).
+    """
+    if not OPENAI_API_KEY:
+        return mood
+    system = (
+        "너는 사용자의 감정/상황 문장을 성경 구절 검색용 한국어 키워드로 바꾸는 도우미다. "
+        "핵심 감정과, 그 감정에 성경이 건네는 위로/응답 주제를 함께 뽑아라. "
+        "설명 없이 쉼표로 구분한 키워드만 출력한다."
+    )
+    user = (
+        f'사용자 문장: "{mood}"\n\n'
+        "위 문장의 (1) 핵심 감정과 (2) 그 감정에 성경이 건네는 위로·응답 주제를 "
+        "한국어 키워드 6~10개로 확장해 쉼표로만 나열하라.\n"
+        '예: "요즘 너무 지치고 힘들어요" → 지침, 피곤, 번아웃, 안식, 쉼, 위로, 회복, 하나님의 돌보심'
+    )
+    try:
+        kws = _keep_korean_only(_call_openai_as_text(system, user, max_tokens=120)).strip()
+        return f"{mood} {kws}" if kws else mood
+    except Exception:
+        log.exception("query expansion failed; fallback to raw mood")
+        return mood
+
+
+def _select_verses(mood: str, candidates: List[dict], picks: int) -> List[dict]:
+    """후보 구절 중 사용자 입력의 '의미·정서'에 가장 맞는 picks개를 LLM이 재순위.
+
+    유사도 상위를 그대로 확정하지 않고, 넓게 뽑은 후보를 LLM이 다시 평가해
+    입력 맥락에 맞는 것만 고르게 한다. 실패 시 유사도 상위 picks개로 폴백.
+    """
+    fallback = candidates[:picks]
+    if not OPENAI_API_KEY or len(candidates) <= picks:
+        return fallback
+    listed = "\n".join(
+        f"{n + 1}. {c['ref']} :: {_clip(str(c['text']), 80)}"
+        for n, c in enumerate(candidates)
+    )
+    system = (
+        "너는 사용자의 감정/상황에 가장 잘 맞는 성경 구절을 고르는 목회적 도우미다. "
+        "표면 단어의 일치가 아니라 '의미와 정서'가 통하는 구절을 우선한다."
+    )
+    user = (
+        f'사용자 입력: "{mood}"\n\n'
+        f"후보 구절({len(candidates)}개):\n{listed}\n\n"
+        f"위 후보 중 사용자 입력의 감정·상황에 가장 잘 어울리는 {picks}개를 "
+        "가장 잘 맞는 순서대로 골라라. 후보 번호만 JSON으로 출력하라. "
+        '형식: {"picks": [번호, 번호, 번호]}'
+    )
+    try:
+        parsed = json.loads(_call_openai_as_json(system, user, max_tokens=100))
+        nums = parsed.get("picks") if isinstance(parsed, dict) else parsed
+        selected: List[dict] = []
+        seen: set[int] = set()
+        for n in (nums or []):
+            idx = int(n) - 1
+            if 0 <= idx < len(candidates) and idx not in seen:
+                seen.add(idx)
+                selected.append(candidates[idx])
+            if len(selected) >= picks:
+                break
+        # LLM이 부족하게 골랐으면 유사도 순으로 채운다.
+        for i, c in enumerate(candidates):
+            if len(selected) >= picks:
+                break
+            if i not in seen:
+                selected.append(c)
+        return selected[:picks] if selected else fallback
+    except Exception:
+        log.exception("verse selection failed; fallback to top-k")
+        return fallback
+
+
+def _prepare_recommendations(mood: str, search_k: int, picks: int) -> List[dict]:
+    """쿼리 확장 → 넓게 검색 → LLM 재순위 를 한 번에 수행(동기, executor용)."""
+    query = _expand_search_query(mood)
+    candidates = _search_candidates(query, search_k)
+    return _select_verses(mood, candidates, picks)
 
 
 # ---------- /recommend/stream (SSE) ----------
 def _recommend_stream_response(mood: str) -> StreamingResponse:
-    TOP_K = 5
+    # 넓게 뽑아(SEARCH_K) LLM이 재순위해서 PICKS개를 확정한다.
+    SEARCH_K = 15
     PICKS = 3
     COMMENT_STYLE = "long"
     KOREAN_ONLY = True
@@ -878,22 +957,24 @@ def _recommend_stream_response(mood: str) -> StreamingResponse:
             "인용/적용은 균형 있게, 과장이나 단정적 단언은 피하세요."
         )
         per_card_tokens = max(300, limits["max_tokens"] // PICKS)
-        used_refs: List[str] = []
 
-        for idx in range(PICKS):
-            rag_task = loop.run_in_executor(None, _pick_next_candidate, mood, TOP_K, used_refs)
-            while not rag_task.done():
-                yield f"data: {json.dumps({'event': 'ping'}, ensure_ascii=False)}\n\n"
-                await asyncio.sleep(1)
+        # 준비 단계: 쿼리 확장 → 넓게 검색 → LLM 재순위. 진행 중엔 ping 으로 연결 유지.
+        prep_task = loop.run_in_executor(
+            None, _prepare_recommendations, mood, SEARCH_K, PICKS
+        )
+        while not prep_task.done():
+            yield f"data: {json.dumps({'event': 'ping'}, ensure_ascii=False)}\n\n"
+            await asyncio.sleep(1)
+        selected_verses = await prep_task
 
-            selected = await rag_task
-            if not selected:
-                break
+        if not selected_verses:
+            yield f"data: {json.dumps({'event': 'done'}, ensure_ascii=False)}\n\n"
+            return
 
+        for idx, selected in enumerate(selected_verses):
             verse_data = {"text": str(selected["text"]), "ref": selected["ref"]}
             if KOREAN_ONLY:
                 verse_data["text"] = _keep_korean_only(verse_data["text"])
-            used_refs.append(selected["ref"])
             yield f"data: {json.dumps({'event': 'verse', 'index': idx, 'verse': verse_data}, ensure_ascii=False)}\n\n"
 
             user = _build_single_comment_prompt(mood, selected, limits)
