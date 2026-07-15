@@ -1,4 +1,5 @@
 import { baseFontFamily, scaleFont } from "@/shared/styles";
+import { Ionicons } from "@expo/vector-icons";
 import { Modal, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 type Props = {
@@ -24,7 +25,9 @@ export function NotificationPrimingModal({ visible, onAccept, onLater }: Props) 
     >
       <View style={styles.backdrop}>
         <View style={styles.card}>
-          <Text style={styles.emoji}>🙏</Text>
+          <View style={styles.iconCircle}>
+            <Ionicons name="notifications-outline" size={28} color="#4A90E2" />
+          </View>
           <Text style={styles.title}>매일 말씀 알림</Text>
           <Text style={styles.description}>
             매일 원하는 시간에 오늘의 말씀과{"\n"}따뜻한 풀이를 보내드려요.
@@ -77,9 +80,14 @@ const styles = StyleSheet.create({
     shadowRadius: 32,
     elevation: 12,
   },
-  emoji: {
-    fontSize: scaleFont(40),
-    marginBottom: 12,
+  iconCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: "#E7F0FF",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 14,
   },
   title: {
     fontSize: scaleFont(20),
