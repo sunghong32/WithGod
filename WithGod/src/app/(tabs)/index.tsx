@@ -1,9 +1,18 @@
 import { useDailyVerse } from "@/features/verse/hooks/useDailyVerse";
+import { NotificationPrimingModal } from "@/shared/components/NotificationPrimingModal";
 import { useKeyboardVisible, useSafeAreaPadding } from "@/shared/hooks";
+import {
+  hasSeenNotificationPriming,
+  markNotificationPrimingSeen,
+} from "@/shared/lib/notificationSettings";
+import {
+  getPushPermissionStatusAsync,
+  requestPermissionAndRegisterAsync,
+} from "@/shared/lib/pushNotifications";
 import { baseFontFamily, scaleFont } from "@/shared/styles";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -23,9 +32,51 @@ const SEND_ICON = require("../../shared/assets/images/send.png");
 
 export default function HomeScreen() {
   const [message, setMessage] = useState("");
+  const [showPriming, setShowPriming] = useState(false);
   const isKeyboardVisible = useKeyboardVisible();
   const { headerPaddingTop, getInputBarPaddingBottom } = useSafeAreaPadding();
   const router = useRouter();
+
+  // 첫 실행 프라이밍: 알림 권한이 미결정이고 안내를 아직 안 봤으면,
+  // 시스템 팝업 대신 맥락을 설명하는 모달을 먼저 보여준다.
+  // (홈이 포커스될 때 = 스플래시가 걷힌 뒤라 스플래시 위에 뜨지 않는다)
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      (async () => {
+        if (Platform.OS !== "ios" && Platform.OS !== "android") return;
+        if (await hasSeenNotificationPriming()) return;
+        const status = await getPushPermissionStatusAsync();
+        if (!active) return;
+        // Android 는 '한 번도 안 물어봄'과 '거부'를 구분할 수 없어(check=false 뿐)
+        // 프라이밍을 아직 안 봤다면 denied 도 미결정으로 간주하고 안내를 띄운다.
+        const needsPriming =
+          status === "undetermined" ||
+          (Platform.OS === "android" && status === "denied");
+        if (needsPriming) {
+          setShowPriming(true);
+        } else {
+          // 이미 허용(또는 iOS 에서 확정 거부)된 상태면 프라이밍을 물을 필요가 없다
+          await markNotificationPrimingSeen();
+        }
+      })();
+      return () => {
+        active = false;
+      };
+    }, [])
+  );
+
+  const handlePrimingAccept = useCallback(async () => {
+    setShowPriming(false);
+    await markNotificationPrimingSeen();
+    // 여기서 시스템 권한 팝업이 뜨고, 허용 시 기본 설정(ON·오전 9시)으로 등록된다
+    await requestPermissionAndRegisterAsync();
+  }, []);
+
+  const handlePrimingLater = useCallback(async () => {
+    setShowPriming(false);
+    await markNotificationPrimingSeen();
+  }, []);
 
   // 오늘의 말씀 API 호출 (풀이 interpretation 포함, 향상된 에러 핸들링)
   const {
@@ -177,6 +228,12 @@ export default function HomeScreen() {
             />
           </TouchableOpacity>
         </View>
+
+        <NotificationPrimingModal
+          visible={showPriming}
+          onAccept={handlePrimingAccept}
+          onLater={handlePrimingLater}
+        />
     </View>
   );
 

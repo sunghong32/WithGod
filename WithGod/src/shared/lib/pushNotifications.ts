@@ -151,6 +151,26 @@ const registerDeviceTokenAsync = async (
 };
 
 /**
+ * 프라이밍 안내에서 '알림 받기'를 선택했을 때: 시스템 권한 요청 → 허용 시
+ * 저장된 설정(기본 ON·오전 9시)으로 서버에 기기를 등록한다.
+ *
+ * @returns 권한 허용 여부
+ */
+export const requestPermissionAndRegisterAsync = async (): Promise<boolean> => {
+  if (!isNativePlatform) return false;
+
+  const granted = await requestPushPermissionAsync();
+  if (!granted) return false;
+
+  const savedSettings = await getNotificationSettings();
+  const token = await getFcmTokenAsync();
+  if (token) {
+    await registerDeviceTokenAsync(token, savedSettings);
+  }
+  return true;
+};
+
+/**
  * 설정 화면에서 토글/시각을 바꾼 뒤 호출하여 백엔드에 즉시 반영한다.
  * 토큰을 다시 받아 device_id 와 함께 enabled/schedule 을 전송한다.
  *
@@ -237,7 +257,11 @@ export const setupPushNotificationsAsync = async ({
   let unsubscribeTokenRefresh: () => void = () => {};
 
   try {
-    const permissionGranted = await requestPushPermissionAsync();
+    // 앱 시작 시 시스템 권한 팝업을 바로 띄우지 않는다(맥락 없는 요청 방지).
+    // 미결정(undetermined) 상태면 홈의 프라이밍 안내를 거쳐
+    // requestPermissionAndRegisterAsync 로 요청한다.
+    const permission = await getPushPermissionStatusAsync();
+    const permissionGranted = permission === 'granted';
 
     // 저장된 사용자 설정(알림 on/off, 시각)을 함께 보내서
     // 앱 재시작 시 OFF 가 기본값 true 로 덮어써지지 않도록 한다.

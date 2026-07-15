@@ -10,6 +10,7 @@ const DEVICE_ID_KEY = 'withgod.deviceId';
 const ENABLED_KEY = 'withgod.notifications.enabled';
 const HOUR_KEY = 'withgod.notifications.scheduleHour';
 const MINUTE_KEY = 'withgod.notifications.scheduleMinute';
+const PRIMING_SEEN_KEY = 'withgod.notifications.primingSeen';
 
 export const DEFAULT_SCHEDULE_HOUR = 9;
 export const DEFAULT_SCHEDULE_MINUTE = 0;
@@ -85,6 +86,19 @@ export const getNotificationSettings =
           : clampInt(Number(minuteRaw), 0, 59),
     };
   };
+
+/**
+ * 알림 프라이밍(사전 안내) 화면을 이미 보여줬는지 여부.
+ * 시스템 권한 팝업은 iOS에서 한 번뿐이라, 맥락을 설명하는 안내를 먼저 보여주고
+ * 사용자가 응답한 뒤에는 다시 노출하지 않는다.
+ */
+export const hasSeenNotificationPriming = async (): Promise<boolean> => {
+  return (await getStorageItem(PRIMING_SEEN_KEY)) === 'true';
+};
+
+export const markNotificationPrimingSeen = async (): Promise<void> => {
+  await setStorageItem(PRIMING_SEEN_KEY, 'true');
+};
 
 export const saveNotificationSettings = async (
   settings: NotificationSettings,
