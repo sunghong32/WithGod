@@ -2,7 +2,7 @@
   "expo": {
     "name": "신과함께",
     "slug": "WithGod",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "orientation": "portrait",
     "icon": "./src/shared/assets/images/icon.png",
     "scheme": "withgod",
@@ -57,6 +57,26 @@
         }
       ],
       "./plugins/with-rnfirebase-static-framework",
+      "@bacons/apple-targets",
+      [
+        "react-native-android-widget",
+        {
+          "widgets": [
+            {
+              "name": "DailyVerse",
+              "label": "오늘의 말씀",
+              "description": "매일 새로운 말씀을 홈 화면에서 만나보세요",
+              "minWidth": "250dp",
+              "minHeight": "110dp",
+              "targetCellWidth": 4,
+              "targetCellHeight": 2,
+              "resizeMode": "horizontal|vertical",
+              "updatePeriodMillis": 1800000,
+              "previewImage": "./src/shared/assets/widget/daily-verse-preview.png"
+            }
+          ]
+        }
+      ],
       "expo-router",
       [
         "expo-splash-screen",

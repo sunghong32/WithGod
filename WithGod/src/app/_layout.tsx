@@ -10,6 +10,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useColorScheme } from '@/shared/hooks/use-color-scheme';
 import { QueryProvider } from '@/shared/lib/QueryProvider';
 import { setupPushNotificationsAsync } from '@/shared/lib/pushNotifications';
+import { refreshHomeWidgetAsync } from '@/widgets/refreshHomeWidget';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -23,6 +24,11 @@ export default function RootLayout() {
 
   useEffect(() => {
     SplashScreen.hideAsync();
+  }, []);
+
+  // 앱을 열 때 안드로이드 홈 위젯도 오늘의 말씀으로 즉시 동기화 (best-effort)
+  useEffect(() => {
+    void refreshHomeWidgetAsync();
   }, []);
 
   useEffect(() => {
