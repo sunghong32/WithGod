@@ -1,14 +1,17 @@
 import {
+  createIndexedTokenParser,
+  createRecommendStreamParser,
   verseApi,
   type RecommendItem,
   type RecommendStreamController,
   type RecommendStreamVerse,
+  type StreamKey,
 } from "@/features/verse";
+import { ScreenHeader } from "@/shared/components/ScreenHeader";
 import { useSafeAreaPadding } from "@/shared/hooks";
-import { baseFontFamily, scaleFont } from "@/shared/styles";
+import { baseFontFamily, colors, scaleFont } from "@/shared/styles";
 import { Ionicons } from "@expo/vector-icons";
-import { Image } from "expo-image";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useLocalSearchParams } from "expo-router";
 import * as Sharing from "expo-sharing";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -25,12 +28,7 @@ import {
 } from "react-native";
 import { captureRef } from "react-native-view-shot";
 
-const BACK_ICON = require("../shared/assets/images/chevron-right.png");
 
-type StreamKey = "ref" | "text" | "comment" | "tag";
-type IndexedTokenKey = "comment" | "tag";
-
-const STREAM_KEYS = new Set<StreamKey>(["ref", "text", "comment", "tag"]);
 const TYPING_TICK_MS = 30;
 const TYPING_CHARS_PER_TICK = 2;
 const VERSE_TYPING_TICK_MS = 24;
@@ -46,378 +44,9 @@ type VerseTypingTask = {
   cursor: number;
 };
 
-const decodePartialJsonString = (raw: string) => {
-  let output = "";
-  let escape = false;
-  let unicodeMode = false;
-  let unicodeBuffer = "";
-
-  for (let i = 0; i < raw.length; i += 1) {
-    const char = raw[i];
-    if (unicodeMode) {
-      if (/[0-9a-fA-F]/.test(char)) {
-        unicodeBuffer += char;
-        if (unicodeBuffer.length === 4) {
-          output += String.fromCharCode(parseInt(unicodeBuffer, 16));
-          unicodeMode = false;
-          unicodeBuffer = "";
-          escape = false;
-        }
-      } else {
-        output += `\\u${unicodeBuffer}${char}`;
-        unicodeMode = false;
-        unicodeBuffer = "";
-        escape = false;
-      }
-      continue;
-    }
-
-    if (escape) {
-      switch (char) {
-        case "n":
-          output += "\n";
-          break;
-        case "r":
-          output += "\r";
-          break;
-        case "t":
-          output += "\t";
-          break;
-        case '"':
-          output += '"';
-          break;
-        case "\\":
-          output += "\\";
-          break;
-        case "/":
-          output += "/";
-          break;
-        case "u":
-          unicodeMode = true;
-          unicodeBuffer = "";
-          break;
-        default:
-          output += char;
-      }
-      if (!unicodeMode) {
-        escape = false;
-      }
-      continue;
-    }
-
-    if (char === "\\") {
-      escape = true;
-      continue;
-    }
-
-    output += char;
-  }
-
-  if (unicodeMode) {
-    output += `\\u${unicodeBuffer}`;
-  } else if (escape) {
-    output += "\\";
-  }
-
-  return output;
-};
-
-const createRecommendStreamParser = (callbacks: {
-  onItemStart: (index: number) => void;
-  onFieldUpdate: (index: number, key: StreamKey, value: string) => void;
-  onActiveField: (index: number, key: StreamKey | null) => void;
-}) => {
-  const state = {
-    inString: false,
-    escape: false,
-    stringBuffer: "",
-    pendingKey: null as string | null,
-    expectingValueKey: null as string | null,
-    activeValueKey: null as StreamKey | null,
-    awaitingResultsArray: false,
-    arrayDepth: 0,
-    resultsArrayDepth: 0,
-    currentIndex: -1,
-  };
-
-  const reset = () => {
-    state.inString = false;
-    state.escape = false;
-    state.stringBuffer = "";
-    state.pendingKey = null;
-    state.expectingValueKey = null;
-    state.activeValueKey = null;
-    state.awaitingResultsArray = false;
-    state.arrayDepth = 0;
-    state.resultsArrayDepth = 0;
-    state.currentIndex = -1;
-  };
-
-  const feed = (chunk: string) => {
-    if (!chunk) return;
-    for (let i = 0; i < chunk.length; i += 1) {
-      const char = chunk[i];
-      if (state.inString) {
-        if (state.escape) {
-          state.escape = false;
-          state.stringBuffer += char;
-          if (state.activeValueKey && state.currentIndex >= 0) {
-            callbacks.onFieldUpdate(
-              state.currentIndex,
-              state.activeValueKey,
-              decodePartialJsonString(state.stringBuffer),
-            );
-          }
-          continue;
-        }
-
-        if (char === "\\") {
-          state.escape = true;
-          state.stringBuffer += "\\";
-          continue;
-        }
-
-        if (char === '"') {
-          state.inString = false;
-          const finished = state.stringBuffer;
-          state.stringBuffer = "";
-          if (state.activeValueKey && state.currentIndex >= 0) {
-            callbacks.onFieldUpdate(
-              state.currentIndex,
-              state.activeValueKey,
-              decodePartialJsonString(finished),
-            );
-            callbacks.onActiveField(state.currentIndex, null);
-          } else {
-            state.pendingKey = decodePartialJsonString(finished);
-          }
-          state.activeValueKey = null;
-          continue;
-        }
-
-        state.stringBuffer += char;
-        if (state.activeValueKey && state.currentIndex >= 0) {
-          callbacks.onFieldUpdate(
-            state.currentIndex,
-            state.activeValueKey,
-            decodePartialJsonString(state.stringBuffer),
-          );
-        }
-        continue;
-      }
-
-      if (char === '"') {
-        if (state.awaitingResultsArray) {
-          state.awaitingResultsArray = false;
-        }
-        state.inString = true;
-        state.stringBuffer = "";
-        if (
-          state.expectingValueKey &&
-          STREAM_KEYS.has(state.expectingValueKey as StreamKey)
-        ) {
-          state.activeValueKey = state.expectingValueKey as StreamKey;
-          if (state.currentIndex >= 0) {
-            callbacks.onActiveField(state.currentIndex, state.activeValueKey);
-          }
-        } else {
-          state.activeValueKey = null;
-        }
-        state.expectingValueKey = null;
-        continue;
-      }
-
-      if (char === "[") {
-        state.arrayDepth += 1;
-        if (state.awaitingResultsArray) {
-          state.resultsArrayDepth = state.arrayDepth;
-          state.awaitingResultsArray = false;
-        } else if (state.resultsArrayDepth === 0 && state.currentIndex < 0) {
-          // top-level array 응답 대응
-          state.resultsArrayDepth = state.arrayDepth;
-        }
-        continue;
-      }
-
-      if (char === "]") {
-        if (state.arrayDepth > 0) {
-          if (state.resultsArrayDepth === state.arrayDepth) {
-            state.resultsArrayDepth = 0;
-          }
-          state.arrayDepth -= 1;
-        }
-        continue;
-      }
-
-      if (char === "{") {
-        if (state.awaitingResultsArray) {
-          state.awaitingResultsArray = false;
-        }
-        if (
-          state.resultsArrayDepth > 0 &&
-          state.arrayDepth >= state.resultsArrayDepth
-        ) {
-          state.currentIndex += 1;
-          callbacks.onItemStart(state.currentIndex);
-        }
-        continue;
-      }
-
-      if (char === ":" && state.pendingKey) {
-        state.expectingValueKey = state.pendingKey;
-        state.awaitingResultsArray =
-          state.pendingKey === "result" ||
-          state.pendingKey === "results" ||
-          state.pendingKey === "comments" ||
-          state.pendingKey === "data";
-        state.pendingKey = null;
-        continue;
-      }
-
-      if (
-        (char === "," || char === "}" || char === "]") &&
-        state.expectingValueKey
-      ) {
-        state.expectingValueKey = null;
-      }
-    }
-  };
-
-  return { feed, reset };
-};
-
-const createIndexedTokenParser = (callbacks: {
-  onFieldUpdate: (key: IndexedTokenKey, value: string) => void;
-  onActiveField: (key: IndexedTokenKey | null) => void;
-  onObjectDone?: () => void;
-}) => {
-  const state = {
-    inString: false,
-    escape: false,
-    stringBuffer: "",
-    pendingKey: null as string | null,
-    expectingValueKey: null as string | null,
-    activeValueKey: null as IndexedTokenKey | null,
-    objectDepth: 0,
-    sawObjectStart: false,
-  };
-
-  const reset = () => {
-    state.inString = false;
-    state.escape = false;
-    state.stringBuffer = "";
-    state.pendingKey = null;
-    state.expectingValueKey = null;
-    state.activeValueKey = null;
-    state.objectDepth = 0;
-    state.sawObjectStart = false;
-  };
-
-  const feed = (chunk: string) => {
-    if (!chunk) return;
-
-    for (let i = 0; i < chunk.length; i += 1) {
-      const char = chunk[i];
-
-      if (state.inString) {
-        if (state.escape) {
-          state.escape = false;
-          state.stringBuffer += char;
-          if (state.activeValueKey) {
-            callbacks.onFieldUpdate(
-              state.activeValueKey,
-              decodePartialJsonString(state.stringBuffer),
-            );
-          }
-          continue;
-        }
-
-        if (char === "\\") {
-          state.escape = true;
-          state.stringBuffer += "\\";
-          continue;
-        }
-
-        if (char === '"') {
-          state.inString = false;
-          const finished = state.stringBuffer;
-          state.stringBuffer = "";
-
-          if (state.activeValueKey) {
-            callbacks.onFieldUpdate(
-              state.activeValueKey,
-              decodePartialJsonString(finished),
-            );
-            callbacks.onActiveField(null);
-            state.activeValueKey = null;
-          } else {
-            state.pendingKey = decodePartialJsonString(finished);
-          }
-          continue;
-        }
-
-        state.stringBuffer += char;
-        if (state.activeValueKey) {
-          callbacks.onFieldUpdate(
-            state.activeValueKey,
-            decodePartialJsonString(state.stringBuffer),
-          );
-        }
-        continue;
-      }
-
-      if (char === '"') {
-        state.inString = true;
-        state.stringBuffer = "";
-        if (
-          state.expectingValueKey === "comment" ||
-          state.expectingValueKey === "tag"
-        ) {
-          state.activeValueKey = state.expectingValueKey;
-          callbacks.onActiveField(state.activeValueKey);
-        } else {
-          state.activeValueKey = null;
-        }
-        state.expectingValueKey = null;
-        continue;
-      }
-
-      if (char === "{") {
-        state.sawObjectStart = true;
-        state.objectDepth += 1;
-        continue;
-      }
-
-      if (char === "}" && state.objectDepth > 0) {
-        state.objectDepth -= 1;
-        if (state.sawObjectStart && state.objectDepth === 0) {
-          callbacks.onObjectDone?.();
-        }
-        continue;
-      }
-
-      if (char === ":" && state.pendingKey) {
-        state.expectingValueKey = state.pendingKey;
-        state.pendingKey = null;
-        continue;
-      }
-
-      if (
-        (char === "," || char === "}" || char === "]") &&
-        state.expectingValueKey
-      ) {
-        state.expectingValueKey = null;
-      }
-    }
-  };
-
-  return { feed, reset };
-};
-
 export default function ResultScreen() {
-  const router = useRouter();
   const { mood } = useLocalSearchParams<{ mood: string }>();
-  const { insets, headerPaddingTop } = useSafeAreaPadding();
+  const { insets } = useSafeAreaPadding();
   const [results, setResults] = useState<RecommendItem[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamError, setStreamError] = useState<string | null>(null);
@@ -787,7 +416,13 @@ export default function ResultScreen() {
         value: unknown,
         depth: number,
       ): RecommendItem[] | null => {
-        if (Array.isArray(value)) return value as RecommendItem[];
+        if (Array.isArray(value)) {
+          // 서버가 배열 원소로 null/문자열 등을 보내도 렌더 경로가 깨지지 않도록 방어
+          return value.filter(
+            (item): item is RecommendItem =>
+              !!item && typeof item === "object",
+          );
+        }
         if (!value || typeof value !== "object" || depth <= 0) return null;
         const record = value as Record<string, unknown>;
         const candidates = [
@@ -831,12 +466,16 @@ export default function ResultScreen() {
             item.tag.length > 0,
         );
 
-      if (!extracted) {
-        // done 이벤트에 결과 payload가 없는 경우, 스트리밍 중 누적된 draft를 최종 결과로 사용
+      // done 이벤트에 결과 payload가 없거나 빈 배열([])인 경우,
+      // 스트리밍 중 누적된 draft를 최종 결과로 사용
+      if (!extracted || extracted.length === 0) {
+        const reason = !extracted
+          ? "no extractable payload"
+          : "extracted empty array";
         if (fallback.length > 0) {
           if (__DEV__) {
             console.log(
-              `[SSE] done payload empty -> finalize from draft (${fallback.length} items)`,
+              `[SSE] done payload empty (${reason}) -> finalize from draft (${fallback.length} items)`,
             );
           }
           finalizeResults(fallback);
@@ -846,32 +485,7 @@ export default function ResultScreen() {
 
         if (__DEV__) {
           console.group("[SSE Finalize Error]");
-          console.log("Reason: no extractable payload and no draft fallback");
-          console.log("Done payload:", payload);
-          console.log("Current draft:", draftRef.current);
-          console.groupEnd();
-        }
-        setStreamError("말씀을 불러오지 못했어요");
-        setIsStreaming(false);
-        return;
-      }
-
-      // done payload가 빈 배열([])로 오는 경우, 이미 타이핑된 draft를 우선 사용
-      if (Array.isArray(extracted) && extracted.length === 0) {
-        if (fallback.length > 0) {
-          if (__DEV__) {
-            console.log(
-              `[SSE] done payload [] -> finalize from draft (${fallback.length} items)`,
-            );
-          }
-          finalizeResults(fallback);
-          setIsStreaming(false);
-          return;
-        }
-
-        if (__DEV__) {
-          console.group("[SSE Finalize Error]");
-          console.log("Reason: extracted empty array and no draft fallback");
+          console.log(`Reason: ${reason} and no draft fallback`);
           console.log("Done payload:", payload);
           console.log("Current draft:", draftRef.current);
           console.groupEnd();
@@ -1187,6 +801,10 @@ export default function ResultScreen() {
             console.groupEnd();
           }
           stopTyping();
+          // 에러 이후에도 verse 타이핑·indexed 토큰 펌프 인터벌이 계속 돌지 않도록 함께 정지
+          stopVerseTyping();
+          stopIndexedTokenPump();
+          pendingDoneRef.current = null;
           stopStream();
         },
       },
@@ -1269,13 +887,28 @@ export default function ResultScreen() {
   const errorMessage =
     streamError ?? (hasError ? "말씀을 불러오지 못했어요" : null);
 
-  const contentRef = useRef<View>(null);
   const captureViewRef = useRef<View>(null);
+  const contentLayoutRef = useRef<{ width: number; height: number } | null>(
+    null,
+  );
   const [contentLayout, setContentLayout] = useState<{
     width: number;
     height: number;
   } | null>(null);
   const [isCapturing, setIsCapturing] = useState(false);
+
+  // 스트리밍 중에는 onLayout 마다 setState 하지 않으므로(아래 onLayout 참고),
+  // 스트리밍이 끝나는 시점에 마지막 측정값을 한 번만 상태로 커밋한다.
+  useEffect(() => {
+    if (isStreaming) return;
+    const measured = contentLayoutRef.current;
+    if (!measured) return;
+    setContentLayout((prev) =>
+      prev && prev.width === measured.width && prev.height === measured.height
+        ? prev
+        : measured,
+    );
+  }, [isStreaming]);
 
   const handleCaptureAndShare = useCallback(async () => {
     if (!contentLayout || contentLayout.height <= 0 || results.length === 0)
@@ -1326,39 +959,26 @@ export default function ResultScreen() {
   return (
     <View style={styles.container}>
       {/* Header - 위로의 말씀 */}
-      <View style={[styles.header, { paddingTop: headerPaddingTop }]}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => router.back()}
-          activeOpacity={0.7}
-          accessibilityRole="button"
-          accessibilityLabel="뒤로 가기"
-        >
-          <Image
-            source={BACK_ICON}
-            style={styles.backIcon}
-            contentFit="contain"
-          />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>위로의 말씀</Text>
-        {canCapture ? (
-          <TouchableOpacity
-            style={styles.captureButton}
-            onPress={handleCaptureAndShare}
-            disabled={isCapturing}
-            accessibilityRole="button"
-            accessibilityLabel="전체 화면을 이미지로 저장·공유"
-          >
-            <Ionicons
-              name={isCapturing ? "hourglass-outline" : "share-outline"}
-              size={22}
-              color={isCapturing ? "#9CA3AF" : "#1E2939"}
-            />
-          </TouchableOpacity>
-        ) : (
-          <View style={styles.headerSpacer} />
-        )}
-      </View>
+      <ScreenHeader
+        title="위로의 말씀"
+        right={
+          canCapture ? (
+            <TouchableOpacity
+              style={styles.captureButton}
+              onPress={handleCaptureAndShare}
+              disabled={isCapturing}
+              accessibilityRole="button"
+              accessibilityLabel="전체 화면을 이미지로 저장·공유"
+            >
+              <Ionicons
+                name={isCapturing ? "hourglass-outline" : "share-outline"}
+                size={22}
+                color={isCapturing ? "#9CA3AF" : "#1E2939"}
+              />
+            </TouchableOpacity>
+          ) : undefined
+        }
+      />
 
       <ScrollView
         ref={scrollViewRef}
@@ -1373,13 +993,18 @@ export default function ResultScreen() {
         scrollEventThrottle={16}
       >
         <View
-          ref={contentRef}
-          onLayout={(e) =>
-            setContentLayout({
-              width: e.nativeEvent.layout.width,
-              height: e.nativeEvent.layout.height,
-            })
-          }
+          onLayout={(e) => {
+            const { width, height } = e.nativeEvent.layout;
+            contentLayoutRef.current = { width, height };
+            // 캡처는 스트리밍 종료 후에만 가능하므로, 스트리밍 중 레이아웃 변화로
+            // 전체 화면 재렌더가 반복되지 않도록 상태 커밋을 건너뛴다.
+            if (isStreaming) return;
+            setContentLayout((prev) =>
+              prev && prev.width === width && prev.height === height
+                ? prev
+                : { width, height },
+            );
+          }}
           collapsable={false}
           style={[styles.scrollContent, { paddingBottom: insets.bottom + 32 }]}
         >
@@ -1398,7 +1023,7 @@ export default function ResultScreen() {
             <View style={styles.loadingCard}>
               <ActivityIndicator
                 size="small"
-                color="#4A90E2"
+                color={colors.primary}
                 style={styles.loadingIndicator}
               />
               <Text style={styles.loadingCardText}>말씀을 찾고 있어요...</Text>
@@ -1421,68 +1046,21 @@ export default function ResultScreen() {
                   if (!hasVisibleResultContent(result)) {
                     return null;
                   }
-                  const isTextActive =
+                  const isFieldActive = (key: StreamKey) =>
                     isStreaming &&
                     activeField?.index === index &&
-                    activeField?.key === "text";
-                  const isCommentActive =
-                    isStreaming &&
-                    activeField?.index === index &&
-                    activeField?.key === "comment";
-                  const isTagActive =
-                    isStreaming &&
-                    activeField?.index === index &&
-                    activeField?.key === "tag";
-                  const showVerseText = (result.text?.length ?? 0) > 0;
-                  const showReference = showVerseText && !!result.ref;
-                  const tagValue = (result.tag ?? "").trim();
-                  const showTag =
-                    showVerseText && tagValue.length > 0 && !isTagActive;
-                  const canShowComment =
-                    showVerseText && (tagValue.length > 0 || !isStreaming);
-                  const showComment =
-                    canShowComment && (result.comment?.length ?? 0) > 0;
+                    activeField?.key === key;
 
                   return (
-                    <View key={`result-${index}`} style={styles.verseCard}>
-                      {/* 성경 구절 */}
-                      {showVerseText && (
-                        <Text style={styles.verseText}>
-                          {'"'}
-                          {result.text ?? ""}
-                          {isTextActive && cursorVisible ? (
-                            <Text style={styles.typingCursor}>▍</Text>
-                          ) : null}
-                          {'"'}
-                        </Text>
-                      )}
-
-                      {/* 성경 몇장 몇절 */}
-                      {showReference && (
-                        <Text style={styles.verseReference}>{result.ref}</Text>
-                      )}
-
-                      {/* 태그 */}
-                      {showTag && (
-                        <View style={styles.tagRow}>
-                          <View style={styles.tag}>
-                            <Text style={styles.tagText}>{tagValue}</Text>
-                          </View>
-                        </View>
-                      )}
-
-                      {/* 코멘트 (말풍선 스타일) */}
-                      {showComment && (
-                        <View style={styles.commentBubble}>
-                          <Text style={styles.commentText}>
-                            {result.comment ?? ""}
-                            {isCommentActive && cursorVisible ? (
-                              <Text style={styles.typingCursor}>▍</Text>
-                            ) : null}
-                          </Text>
-                        </View>
-                      )}
-                    </View>
+                    <VerseResultCard
+                      key={`result-${index}`}
+                      result={result}
+                      isStreaming={isStreaming}
+                      isTextActive={isFieldActive("text")}
+                      isCommentActive={isFieldActive("comment")}
+                      isTagActive={isFieldActive("tag")}
+                      cursorVisible={cursorVisible}
+                    />
                   );
                 })}
               </View>
@@ -1538,28 +1116,7 @@ export default function ResultScreen() {
             <Text style={styles.sectionTitle}>당신을 위한 말씀</Text>
             <View style={styles.resultsContainer}>
               {visibleResults.map((result, index) => (
-                <View key={`capture-${index}`} style={styles.verseCard}>
-                  <Text style={styles.verseText}>
-                    {'"'}
-                    {result.text ?? ""}
-                    {'"'}
-                  </Text>
-                  {result.ref ? (
-                    <Text style={styles.verseReference}>{result.ref}</Text>
-                  ) : null}
-                  {result.tag ? (
-                    <View style={styles.tagRow}>
-                      <View style={styles.tag}>
-                        <Text style={styles.tagText}>{result.tag}</Text>
-                      </View>
-                    </View>
-                  ) : null}
-                  {result.comment ? (
-                    <View style={styles.commentBubble}>
-                      <Text style={styles.commentText}>{result.comment}</Text>
-                    </View>
-                  ) : null}
-                </View>
+                <VerseResultCard key={`capture-${index}`} result={result} />
               ))}
             </View>
           </View>
@@ -1569,43 +1126,81 @@ export default function ResultScreen() {
   );
 }
 
+type VerseResultCardProps = {
+  result: RecommendItem;
+  isStreaming?: boolean;
+  isTextActive?: boolean;
+  isCommentActive?: boolean;
+  isTagActive?: boolean;
+  cursorVisible?: boolean;
+};
+
+/**
+ * 라이브 렌더와 캡처용 오프스크린 뷰가 공유하는 말씀 카드.
+ * 스트리밍 관련 props 를 넘기지 않으면(캡처 경로) 완성된 카드로 렌더링된다.
+ */
+function VerseResultCard({
+  result,
+  isStreaming = false,
+  isTextActive = false,
+  isCommentActive = false,
+  isTagActive = false,
+  cursorVisible = false,
+}: VerseResultCardProps) {
+  const showVerseText = (result.text?.length ?? 0) > 0;
+  const showReference = showVerseText && !!result.ref;
+  const tagValue = (result.tag ?? "").trim();
+  const showTag = showVerseText && tagValue.length > 0 && !isTagActive;
+  const canShowComment = showVerseText && (tagValue.length > 0 || !isStreaming);
+  const showComment = canShowComment && (result.comment?.length ?? 0) > 0;
+
+  return (
+    <View style={styles.verseCard}>
+      {/* 성경 구절 */}
+      {showVerseText && (
+        <Text style={styles.verseText}>
+          {'"'}
+          {result.text ?? ""}
+          {isTextActive && cursorVisible ? (
+            <Text style={styles.typingCursor}>▍</Text>
+          ) : null}
+          {'"'}
+        </Text>
+      )}
+
+      {/* 성경 몇장 몇절 */}
+      {showReference && (
+        <Text style={styles.verseReference}>{result.ref}</Text>
+      )}
+
+      {/* 태그 */}
+      {showTag && (
+        <View style={styles.tagRow}>
+          <View style={styles.tag}>
+            <Text style={styles.tagText}>{tagValue}</Text>
+          </View>
+        </View>
+      )}
+
+      {/* 코멘트 (말풍선 스타일) */}
+      {showComment && (
+        <View style={styles.commentBubble}>
+          <Text style={styles.commentText}>
+            {result.comment ?? ""}
+            {isCommentActive && cursorVisible ? (
+              <Text style={styles.typingCursor}>▍</Text>
+            ) : null}
+          </Text>
+        </View>
+      )}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F9FAFB",
-  },
-  header: {
-    backgroundColor: "#FFFFFF",
-    borderBottomColor: "#E5E7EB",
-    borderBottomWidth: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-  },
-  backButton: {
-    width: 32,
-    height: 32,
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 8,
-  },
-  backIcon: {
-    width: 8,
-    height: 14,
-    transform: [{ rotate: "180deg" }],
-    tintColor: "#101828",
-  },
-  headerTitle: {
-    flex: 1,
-    fontSize: scaleFont(18),
-    lineHeight: scaleFont(24),
-    fontWeight: "600",
-    color: "#101828",
-    fontFamily: baseFontFamily,
-  },
-  headerSpacer: {
-    width: 32,
+    backgroundColor: colors.background,
   },
   captureButton: {
     width: 32,
@@ -1627,7 +1222,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   captureBackground: {
-    backgroundColor: "#F9FAFB",
+    backgroundColor: colors.background,
   },
   /** 캡처본에서만 상단 여백을 넉넉히, 하단 여백은 줄임 */
   captureContentPadding: {
@@ -1640,7 +1235,7 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   userMessageBubble: {
-    backgroundColor: "#4A90E2",
+    backgroundColor: colors.primary,
     borderRadius: 16,
     borderBottomRightRadius: 4,
     paddingHorizontal: 16,
@@ -1657,7 +1252,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: scaleFont(18),
     fontWeight: "600",
-    color: "#101828",
+    color: colors.textPrimary,
     marginBottom: 16,
     fontFamily: baseFontFamily,
   },
@@ -1681,7 +1276,7 @@ const styles = StyleSheet.create({
   },
   loadingCardText: {
     fontSize: scaleFont(16),
-    color: "#6A7282",
+    color: colors.textSecondary,
     fontFamily: baseFontFamily,
   },
   // 에러
@@ -1695,14 +1290,14 @@ const styles = StyleSheet.create({
   },
   errorTitle: {
     fontSize: scaleFont(16),
-    color: "#6A7282",
+    color: colors.textSecondary,
     marginBottom: 4,
     fontFamily: baseFontFamily,
     textAlign: "center",
   },
   errorDescription: {
     fontSize: scaleFont(16),
-    color: "#6A7282",
+    color: colors.textSecondary,
     fontFamily: baseFontFamily,
     textAlign: "center",
   },
@@ -1731,14 +1326,14 @@ const styles = StyleSheet.create({
     fontFamily: baseFontFamily,
   },
   typingCursor: {
-    color: "#4A90E2",
+    color: colors.primary,
     fontWeight: "600",
   },
   // 레퍼런스
   verseReference: {
     fontSize: scaleFont(14),
     fontWeight: "600",
-    color: "#4A90E2",
+    color: colors.primary,
     fontFamily: baseFontFamily,
     marginBottom: 6,
   },
@@ -1756,7 +1351,7 @@ const styles = StyleSheet.create({
   tagText: {
     fontSize: scaleFont(12),
     fontWeight: "500",
-    color: "#6A7282",
+    color: colors.textSecondary,
     fontFamily: baseFontFamily,
   },
   // 코멘트 말풍선
@@ -1776,7 +1371,7 @@ const styles = StyleSheet.create({
   },
   // 다시 검색하기 버튼
   searchAgainButton: {
-    backgroundColor: "#4A90E2",
+    backgroundColor: colors.primary,
     borderRadius: 12,
     paddingVertical: 16,
     alignItems: "center",

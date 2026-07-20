@@ -1,4 +1,4 @@
-import { baseFontFamily, scaleFont } from "@/shared/styles";
+import { baseFontFamily, colors, scaleFont } from "@/shared/styles";
 import { Ionicons } from "@expo/vector-icons";
 import { Modal, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
@@ -26,7 +26,7 @@ export function NotificationPrimingModal({ visible, onAccept, onLater }: Props) 
       <View style={styles.backdrop}>
         <View style={styles.card}>
           <View style={styles.iconCircle}>
-            <Ionicons name="notifications-outline" size={28} color="#4A90E2" />
+            <Ionicons name="notifications-outline" size={28} color={colors.primary} />
           </View>
           <Text style={styles.title}>매일 말씀 알림</Text>
           <Text style={styles.description}>
@@ -93,7 +93,7 @@ const styles = StyleSheet.create({
     fontSize: scaleFont(20),
     lineHeight: scaleFont(28),
     fontWeight: "600",
-    color: "#101828",
+    color: colors.textPrimary,
     fontFamily: baseFontFamily,
     marginBottom: 10,
   },
@@ -107,7 +107,7 @@ const styles = StyleSheet.create({
   },
   acceptButton: {
     alignSelf: "stretch",
-    backgroundColor: "#4A90E2",
+    backgroundColor: colors.primary,
     borderRadius: 14,
     paddingVertical: 14,
     alignItems: "center",
@@ -126,7 +126,7 @@ const styles = StyleSheet.create({
   },
   laterButtonText: {
     fontSize: scaleFont(15),
-    color: "#6A7282",
+    color: colors.textSecondary,
     fontFamily: baseFontFamily,
   },
 });

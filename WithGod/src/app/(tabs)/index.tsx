@@ -9,7 +9,7 @@ import {
   getPushPermissionStatusAsync,
   requestPermissionAndRegisterAsync,
 } from "@/shared/lib/pushNotifications";
-import { baseFontFamily, scaleFont } from "@/shared/styles";
+import { baseFontFamily, colors, scaleFont } from "@/shared/styles";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { useFocusEffect, useRouter } from "expo-router";
@@ -151,8 +151,9 @@ export default function HomeScreen() {
             </View>
 
             <View style={styles.verseCard}>
-              {isLoading || isFetching ? (
-                <ActivityIndicator size="small" color="#4A90E2" style={styles.loader} />
+              {/* 데이터가 이미 있으면 백그라운드 리페치 중에도 말씀을 유지(깜빡임 방지) */}
+              {isLoading || (isFetching && !dailyVerse) ? (
+                <ActivityIndicator size="small" color={colors.primary} style={styles.loader} />
               ) : isError ? (
                 <TouchableOpacity onPress={() => refetch()} activeOpacity={0.7}>
                   <Text style={styles.errorText}>{errorMessage}</Text>
@@ -200,7 +201,7 @@ export default function HomeScreen() {
           <TextInput
             style={styles.textInput}
             placeholder="지금 마음이나 고민을 들려주세요"
-            placeholderTextColor="#6A7282"
+            placeholderTextColor={colors.textSecondary}
             value={message}
             onChangeText={setMessage}
             multiline
@@ -252,11 +253,11 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    backgroundColor: "#F9FAFB",
+    backgroundColor: colors.background,
   },
   header: {
     backgroundColor: "#FFFFFF",
-    borderBottomColor: "#E5E7EB",
+    borderBottomColor: colors.border,
     borderBottomWidth: 1,
     flexDirection: "row",
     alignItems: "center",
@@ -281,7 +282,7 @@ const styles = StyleSheet.create({
     fontSize: scaleFont(24),
     lineHeight: scaleFont(32),
     fontWeight: "600",
-    color: "#101828",
+    color: colors.textPrimary,
     fontFamily: baseFontFamily,
   },
   settingsButton: {
@@ -315,14 +316,14 @@ const styles = StyleSheet.create({
     height: 24,
     width: 4,
     borderRadius: 999,
-    backgroundColor: "#4A90E2",
+    backgroundColor: colors.primary,
     marginRight: 8,
   },
   todayTitle: {
     fontSize: scaleFont(20),
     lineHeight: scaleFont(28),
     fontWeight: "600",
-    color: "#101828",
+    color: colors.textPrimary,
     fontFamily: baseFontFamily,
   },
   verseCard: {
@@ -341,14 +342,14 @@ const styles = StyleSheet.create({
   },
   errorText: {
     fontSize: scaleFont(16),
-    color: "#6A7282",
+    color: colors.textSecondary,
     textAlign: "center",
     fontFamily: baseFontFamily,
     marginBottom: 8,
   },
   retryText: {
     fontSize: scaleFont(14),
-    color: "#4A90E2",
+    color: colors.primary,
     textAlign: "center",
     fontFamily: baseFontFamily,
     fontWeight: "500",
@@ -366,7 +367,7 @@ const styles = StyleSheet.create({
     fontSize: scaleFont(16),
     lineHeight: scaleFont(24),
     fontWeight: "600",
-    color: "#4A90E2",
+    color: colors.primary,
     letterSpacing: -0.2,
     fontFamily: baseFontFamily,
     alignSelf: "flex-end",
@@ -386,7 +387,7 @@ const styles = StyleSheet.create({
   verseInterpretation: {
     fontSize: scaleFont(16),
     lineHeight: scaleFont(26),
-    color: "#6A7282",
+    color: colors.textSecondary,
     letterSpacing: -0.2,
     fontFamily: baseFontFamily,
     textAlign: "left",
@@ -412,7 +413,7 @@ const styles = StyleSheet.create({
   },
   inputBar: {
     backgroundColor: "rgba(255, 255, 255, 0.95)",
-    borderTopColor: "#E5E7EB",
+    borderTopColor: colors.border,
     borderTopWidth: 1,
     flexDirection: "row",
     alignItems: "center",
@@ -457,6 +458,6 @@ const styles = StyleSheet.create({
     width: 16,
   },
   sendButtonActive: {
-    backgroundColor: "#4A90E2",
+    backgroundColor: colors.primary,
   },
 });

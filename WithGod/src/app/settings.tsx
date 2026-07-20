@@ -11,11 +11,10 @@ import {
   syncNotificationSettingsAsync,
   type PushPermissionStatus,
 } from "@/shared/lib/pushNotifications";
+import { ScreenHeader } from "@/shared/components/ScreenHeader";
 import { WheelTimePicker } from "@/shared/components/WheelTimePicker";
-import { baseFontFamily, scaleFont } from "@/shared/styles";
+import { baseFontFamily, colors, scaleFont } from "@/shared/styles";
 import { Ionicons } from "@expo/vector-icons";
-import { Image } from "expo-image";
-import { useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -30,8 +29,6 @@ import {
   View,
 } from "react-native";
 
-const BACK_ICON = require("../shared/assets/images/chevron-right.png");
-
 const formatTime = (hour: number, minute: number): string => {
   const period = hour < 12 ? "오전" : "오후";
   const displayHour = hour % 12 === 0 ? 12 : hour % 12;
@@ -39,9 +36,11 @@ const formatTime = (hour: number, minute: number): string => {
   return `${period} ${displayHour}:${mm}`;
 };
 
+// 휠 연속 조작 시 서버 동기화를 마지막 변경만 보내기 위한 대기 시간
+const TIME_SYNC_DEBOUNCE_MS = 600;
+
 export default function SettingsScreen() {
-  const router = useRouter();
-  const { insets, headerPaddingTop } = useSafeAreaPadding();
+  const { insets } = useSafeAreaPadding();
 
   const [settings, setSettings] = useState<NotificationSettings>(
     DEFAULT_NOTIFICATION_SETTINGS,
@@ -50,10 +49,16 @@ export default function SettingsScreen() {
     useState<PushPermissionStatus>("undetermined");
   const [isLoading, setIsLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [syncFailed, setSyncFailed] = useState(false);
 
-  // 가장 최근 설정값을 ref 로 유지(시각 스테퍼 연속 조작 시 최신값 기준 저장)
+  // 가장 최근 설정값을 ref 로 유지(시각 휠 연속 조작 시 최신값 기준 저장).
+  // 렌더 중 ref 변이는 React 규칙 위반이므로 커밋 후 effect 에서 동기화한다.
   const settingsRef = useRef(settings);
-  settingsRef.current = settings;
+  useEffect(() => {
+    settingsRef.current = settings;
+  }, [settings]);
+
+  const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const isNative = Platform.OS === "ios" || Platform.OS === "android";
 
@@ -79,33 +84,49 @@ export default function SettingsScreen() {
     };
   }, [refreshPermission]);
 
-  // 저장 + 백엔드 동기화. 권한이 없으면 동기화는 건너뛰고 로컬에만 저장.
-  const persistAndSync = useCallback(
+  // 서버 동기화. 알림 ON 상태에서 권한이 없으면 건너뛴다(OFF 는 권한과 무관하게 수신 거부를 반영).
+  const syncToServer = useCallback(
     async (next: NotificationSettings) => {
-      await saveNotificationSettings(next);
       if (!isNative) return;
-      if (!next.enabled) {
-        // OFF 는 권한과 무관하게 서버에 반영(수신 거부)
-        setIsSyncing(true);
-        try {
-          await syncNotificationSettingsAsync(next);
-        } finally {
-          setIsSyncing(false);
-        }
-        return;
+      if (next.enabled) {
+        const status = await getPushPermissionStatusAsync();
+        setPermission(status);
+        if (status !== "granted") return;
       }
-      const status = await getPushPermissionStatusAsync();
-      setPermission(status);
-      if (status !== "granted") return;
       setIsSyncing(true);
       try {
-        await syncNotificationSettingsAsync(next);
+        const ok = await syncNotificationSettingsAsync(next);
+        setSyncFailed(!ok);
       } finally {
         setIsSyncing(false);
       }
     },
     [isNative],
   );
+
+  // 저장 + 백엔드 즉시 동기화. 대기 중인 디바운스 동기화는 취소한다(이 호출이 최신값을 전송하므로).
+  const persistAndSync = useCallback(
+    async (next: NotificationSettings) => {
+      if (syncTimerRef.current) {
+        clearTimeout(syncTimerRef.current);
+        syncTimerRef.current = null;
+      }
+      await saveNotificationSettings(next);
+      await syncToServer(next);
+    },
+    [syncToServer],
+  );
+
+  // 화면 이탈 시 대기 중인 시간 변경 동기화를 유실하지 않도록 즉시 전송(best-effort)
+  useEffect(() => {
+    return () => {
+      if (syncTimerRef.current) {
+        clearTimeout(syncTimerRef.current);
+        syncTimerRef.current = null;
+        void syncToServer(settingsRef.current);
+      }
+    };
+  }, [syncToServer]);
 
   // 시스템 설정에서 권한을 바꾸고 앱으로 돌아오면 권한을 재확인해 배너를 갱신.
   useEffect(() => {
@@ -155,9 +176,16 @@ export default function SettingsScreen() {
         scheduleMinute: minute,
       };
       setSettings(next);
-      void persistAndSync(next);
+      // 로컬 저장은 즉시, 서버 동기화는 휠 연속 조작이 끝난 뒤 마지막 값만 전송
+      // (요청 폭주 및 네트워크 응답 순서 역전으로 이전 시각이 남는 문제 방지)
+      void saveNotificationSettings(next);
+      if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
+      syncTimerRef.current = setTimeout(() => {
+        syncTimerRef.current = null;
+        void syncToServer(settingsRef.current);
+      }, TIME_SYNC_DEBOUNCE_MS);
     },
-    [persistAndSync],
+    [syncToServer],
   );
 
   const openSystemSettings = useCallback(() => {
@@ -173,23 +201,7 @@ export default function SettingsScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={[styles.header, { paddingTop: headerPaddingTop }]}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => router.back()}
-          activeOpacity={0.7}
-          accessibilityRole="button"
-          accessibilityLabel="뒤로 가기"
-        >
-          <Image
-            source={BACK_ICON}
-            style={styles.backIcon}
-            contentFit="contain"
-          />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>알림 설정</Text>
-        <View style={styles.headerSpacer} />
-      </View>
+      <ScreenHeader title="알림 설정" />
 
       <ScrollView
         contentContainerStyle={[
@@ -200,7 +212,7 @@ export default function SettingsScreen() {
       >
         {isLoading ? (
           <View style={styles.loadingWrap}>
-            <ActivityIndicator size="small" color="#4A90E2" />
+            <ActivityIndicator size="small" color={colors.primary} />
           </View>
         ) : (
           <>
@@ -247,9 +259,9 @@ export default function SettingsScreen() {
                 <Switch
                   value={settings.enabled}
                   onValueChange={handleToggleEnabled}
-                  trackColor={{ false: "#E5E7EB", true: "#A9CBF1" }}
-                  thumbColor={settings.enabled ? "#4A90E2" : "#F9FAFB"}
-                  ios_backgroundColor="#E5E7EB"
+                  trackColor={{ false: colors.border, true: "#A9CBF1" }}
+                  thumbColor={settings.enabled ? colors.primary : colors.background}
+                  ios_backgroundColor={colors.border}
                 />
               </View>
             </View>
@@ -276,7 +288,9 @@ export default function SettingsScreen() {
             <Text style={styles.footerNote}>
               {isSyncing
                 ? "저장 중..."
-                : "변경 사항은 자동으로 저장됩니다."}
+                : syncFailed
+                  ? "서버에 반영하지 못했어요. 잠시 후 다시 시도해주세요."
+                  : "변경 사항은 자동으로 저장됩니다."}
             </Text>
           </>
         )}
@@ -288,40 +302,7 @@ export default function SettingsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F9FAFB",
-  },
-  header: {
-    backgroundColor: "#FFFFFF",
-    borderBottomColor: "#E5E7EB",
-    borderBottomWidth: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-  },
-  backButton: {
-    width: 32,
-    height: 32,
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 8,
-  },
-  backIcon: {
-    width: 8,
-    height: 14,
-    transform: [{ rotate: "180deg" }],
-    tintColor: "#101828",
-  },
-  headerTitle: {
-    flex: 1,
-    fontSize: scaleFont(18),
-    lineHeight: scaleFont(24),
-    fontWeight: "600",
-    color: "#101828",
-    fontFamily: baseFontFamily,
-  },
-  headerSpacer: {
-    width: 32,
+    backgroundColor: colors.background,
   },
   scrollContent: {
     paddingHorizontal: 16,
@@ -402,13 +383,13 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: scaleFont(16),
     fontWeight: "600",
-    color: "#101828",
+    color: colors.textPrimary,
     fontFamily: baseFontFamily,
   },
   cardSubtitle: {
     fontSize: scaleFont(14),
     lineHeight: scaleFont(20),
-    color: "#6A7282",
+    color: colors.textSecondary,
     fontFamily: baseFontFamily,
     marginTop: 4,
   },
@@ -421,52 +402,8 @@ const styles = StyleSheet.create({
   timeValue: {
     fontSize: scaleFont(18),
     fontWeight: "500",
-    color: "#4A90E2",
+    color: colors.primary,
     fontFamily: baseFontFamily,
-  },
-  // 스테퍼 (미사용 — 휠 피커로 대체)
-  stepperRow: {
-    flexDirection: "row",
-    alignItems: "flex-end",
-    justifyContent: "center",
-    marginTop: 20,
-  },
-  stepperGroup: {
-    alignItems: "center",
-  },
-  stepperLabel: {
-    fontSize: scaleFont(12),
-    color: "#6A7282",
-    fontFamily: baseFontFamily,
-    marginBottom: 8,
-  },
-  stepperControls: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  stepperButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: "#F3F4F6",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  stepperValue: {
-    fontSize: scaleFont(24),
-    fontWeight: "700",
-    color: "#1E2939",
-    fontFamily: baseFontFamily,
-    minWidth: 56,
-    textAlign: "center",
-  },
-  stepperColon: {
-    fontSize: scaleFont(24),
-    fontWeight: "700",
-    color: "#1E2939",
-    fontFamily: baseFontFamily,
-    marginHorizontal: 12,
-    marginBottom: 8,
   },
   footerNote: {
     fontSize: scaleFont(13),

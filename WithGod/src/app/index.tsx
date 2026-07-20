@@ -1,4 +1,4 @@
-import { baseFontFamily, scaleFont } from '@/shared/styles';
+import { baseFontFamily, colors, scaleFont } from '@/shared/styles';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useNavigation, useRouter } from 'expo-router';
@@ -47,7 +47,7 @@ export default function SplashScreen() {
   return (
     <View style={styles.root}>
       <LinearGradient
-        colors={['#4A90E2', '#4FA3EE', '#5EB2F8']}
+        colors={[colors.primary, '#4FA3EE', '#5EB2F8']}
         locations={[0, 0.55, 1]}
         start={{ x: 0.2, y: 0 }}
         end={{ x: 0.8, y: 1 }}
@@ -91,7 +91,7 @@ export default function SplashScreen() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#4A90E2',
+    backgroundColor: colors.primary,
   },
   safeArea: {
     flex: 1,

@@ -123,10 +123,13 @@ export const getFcmTokenAsync = async (): Promise<string | null> => {
   }
 };
 
+/**
+ * 서버에 기기 토큰·설정을 등록한다. 예외는 던지지 않고 성공 여부만 반환한다(no-throw).
+ */
 const registerDeviceTokenAsync = async (
   token: string,
   settings?: NotificationSettings,
-): Promise<void> => {
+): Promise<boolean> => {
   try {
     const deviceId = await getOrCreateDeviceId();
     const resolved = settings ?? (await getNotificationSettings());
@@ -143,10 +146,12 @@ const registerDeviceTokenAsync = async (
           `${resolved.scheduleHour}:${String(resolved.scheduleMinute).padStart(2, '0')})`,
       );
     }
+    return true;
   } catch (error) {
     if (__DEV__) {
       console.warn('[Push] Failed to register FCM token on server', error);
     }
+    return false;
   }
 };
 
@@ -182,8 +187,7 @@ export const syncNotificationSettingsAsync = async (
   if (!isNativePlatform) return false;
   const token = await getFcmTokenAsync();
   if (!token) return false;
-  await registerDeviceTokenAsync(token, settings);
-  return true;
+  return registerDeviceTokenAsync(token, settings);
 };
 
 // 오늘의 말씀 알림은 홈에 이미 같은 내용(말씀+풀이)이 있으므로 별도 상세 화면 없이

@@ -22,15 +22,17 @@ const STORAGE_FILE = 'withgod-storage.json';
 const isWeb = Platform.OS === 'web';
 
 let memoryCache: Record<string, string> | null = null;
+// 콜드 캐시 상태의 동시 loadAll 이 각자 별도 캐시 객체를 만들지 않도록 in-flight 프로미스를 공유
+let loadPromise: Promise<Record<string, string>> | null = null;
+// 동시 persist 가 중간 스냅샷으로 최신 쓰기를 덮어쓰지 않도록 파일 쓰기를 직렬화
+let writeChain: Promise<void> = Promise.resolve();
 
 const getFileUri = (): string | null => {
   if (!documentDirectory) return null;
   return `${documentDirectory}${STORAGE_FILE}`;
 };
 
-const loadAll = async (): Promise<Record<string, string>> => {
-  if (memoryCache) return memoryCache;
-
+const doLoadAll = async (): Promise<Record<string, string>> => {
   if (isWeb) {
     memoryCache = {};
     try {
@@ -65,7 +67,16 @@ const loadAll = async (): Promise<Record<string, string>> => {
   return memoryCache;
 };
 
-const persist = async (data: Record<string, string>): Promise<void> => {
+const loadAll = async (): Promise<Record<string, string>> => {
+  if (memoryCache) return memoryCache;
+  if (!loadPromise) {
+    loadPromise = doLoadAll();
+  }
+  return loadPromise;
+};
+
+const doPersist = async (data: Record<string, string>): Promise<void> => {
+  // 직렬화를 쓰기 차례가 됐을 때 수행해, 큐 대기 중 반영된 최신 키까지 함께 기록한다
   const serialized = JSON.stringify(data);
 
   if (isWeb) {
@@ -86,6 +97,11 @@ const persist = async (data: Record<string, string>): Promise<void> => {
   } catch (error) {
     if (__DEV__) console.warn('[Storage] Failed to persist', error);
   }
+};
+
+const persist = (data: Record<string, string>): Promise<void> => {
+  writeChain = writeChain.then(() => doPersist(data)).catch(() => {});
+  return writeChain;
 };
 
 export const getStorageItem = async (key: string): Promise<string | null> => {
