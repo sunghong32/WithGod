@@ -26,7 +26,10 @@ export const refreshHomeWidgetAsync = async (): Promise<void> => {
         ),
       }),
     });
-  } catch {
-    // 위젯 미설치·모듈 미탑재 등 — 조용히 무시
+  } catch (error) {
+    // 위젯 미설치·모듈 미탑재 등 — 사용자에겐 무해하므로 조용히 넘기되 개발 중엔 남긴다
+    if (__DEV__) {
+      console.warn('[Widget] refreshHomeWidget failed', error);
+    }
   }
 };

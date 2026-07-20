@@ -106,6 +106,11 @@ const PLACEHOLDER = {
 export async function widgetTaskHandler(
   props: WidgetTaskHandlerProps,
 ): Promise<void> {
+  if (__DEV__) {
+    console.log(
+      `[Widget] task: ${props.widgetAction} (${props.widgetInfo.widgetName}#${props.widgetInfo.widgetId})`,
+    );
+  }
   switch (props.widgetAction) {
     case "WIDGET_ADDED":
     case "WIDGET_UPDATE":

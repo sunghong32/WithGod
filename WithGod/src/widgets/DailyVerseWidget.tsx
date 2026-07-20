@@ -1,3 +1,7 @@
+// react-native-android-widget 은 위젯 컴포넌트를 React 렌더러 밖에서 순수 함수로
+// 호출하므로, React Compiler 의 메모 캐시 훅 주입을 이 파일에서만 비활성화한다.
+"use no memo";
+
 import { FlexWidget, TextWidget } from "react-native-android-widget";
 
 export interface DailyVerseWidgetProps {
