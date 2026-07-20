@@ -1,5 +1,6 @@
 import { useDailyVerse } from "@/features/verse/hooks/useDailyVerse";
 import { NotificationPrimingModal } from "@/shared/components/NotificationPrimingModal";
+import { WidgetGuideModal } from "@/shared/components/WidgetGuideModal";
 import { useKeyboardVisible, useSafeAreaPadding } from "@/shared/hooks";
 import {
   hasSeenNotificationPriming,
@@ -9,11 +10,15 @@ import {
   getPushPermissionStatusAsync,
   requestPermissionAndRegisterAsync,
 } from "@/shared/lib/pushNotifications";
+import {
+  hasSeenWidgetPromo,
+  markWidgetPromoSeen,
+} from "@/shared/lib/widgetPromo";
 import { baseFontFamily, colors, scaleFont } from "@/shared/styles";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { useFocusEffect, useRouter } from "expo-router";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Keyboard,
@@ -33,9 +38,39 @@ const SEND_ICON = require("../../shared/assets/images/send.png");
 export default function HomeScreen() {
   const [message, setMessage] = useState("");
   const [showPriming, setShowPriming] = useState(false);
+  const [showWidgetPromo, setShowWidgetPromo] = useState(false);
+  const [showWidgetGuide, setShowWidgetGuide] = useState(false);
   const isKeyboardVisible = useKeyboardVisible();
   const { headerPaddingTop, getInputBarPaddingBottom } = useSafeAreaPadding();
   const router = useRouter();
+
+  // 위젯 기능 1회성 안내 배너: 아직 안 봤으면 오늘의 말씀 카드 아래에 노출
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      if (Platform.OS !== "ios" && Platform.OS !== "android") return;
+      if (await hasSeenWidgetPromo()) return;
+      if (active) setShowWidgetPromo(true);
+    })();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const handleWidgetPromoOpen = useCallback(() => {
+    setShowWidgetGuide(true);
+  }, []);
+
+  const handleWidgetGuideClose = useCallback(async () => {
+    setShowWidgetGuide(false);
+    setShowWidgetPromo(false);
+    await markWidgetPromoSeen();
+  }, []);
+
+  const handleWidgetPromoDismiss = useCallback(async () => {
+    setShowWidgetPromo(false);
+    await markWidgetPromoSeen();
+  }, []);
 
   // 첫 실행 프라이밍: 알림 권한이 미결정이고 안내를 아직 안 봤으면,
   // 시스템 팝업 대신 맥락을 설명하는 모달을 먼저 보여준다.
@@ -184,6 +219,35 @@ export default function HomeScreen() {
             </View>
           </View>
 
+          {showWidgetPromo && (
+            <TouchableOpacity
+              style={styles.widgetPromo}
+              activeOpacity={0.85}
+              onPress={handleWidgetPromoOpen}
+              accessibilityRole="button"
+              accessibilityLabel="홈 화면 위젯 안내 보기"
+            >
+              <View style={styles.widgetPromoIcon}>
+                <Ionicons name="grid-outline" size={16} color={colors.primary} />
+              </View>
+              <View style={styles.widgetPromoTextWrap}>
+                <Text style={styles.widgetPromoTitle}>홈 화면 위젯이 생겼어요</Text>
+                <Text style={styles.widgetPromoSubtitle}>
+                  앱을 열지 않아도 매일 말씀을 만나보세요
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={styles.widgetPromoClose}
+                onPress={handleWidgetPromoDismiss}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                accessibilityRole="button"
+                accessibilityLabel="위젯 안내 닫기"
+              >
+                <Ionicons name="close" size={16} color="#9CA3AF" />
+              </TouchableOpacity>
+            </TouchableOpacity>
+          )}
+
           <View style={styles.shareSection}>
             <Text style={styles.shareTitle}>오늘 당신의 마음은 어떤가요?</Text>
             <Text
@@ -234,6 +298,11 @@ export default function HomeScreen() {
           visible={showPriming}
           onAccept={handlePrimingAccept}
           onLater={handlePrimingLater}
+        />
+
+        <WidgetGuideModal
+          visible={showWidgetGuide}
+          onClose={handleWidgetGuideClose}
         />
     </View>
   );
@@ -391,6 +460,47 @@ const styles = StyleSheet.create({
     letterSpacing: -0.2,
     fontFamily: baseFontFamily,
     textAlign: "left",
+  },
+  widgetPromo: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F0F6FF",
+    borderColor: "#D8E6FA",
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    marginTop: -24,
+    marginBottom: 24,
+  },
+  widgetPromoIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 10,
+  },
+  widgetPromoTextWrap: {
+    flex: 1,
+  },
+  widgetPromoTitle: {
+    fontSize: scaleFont(14),
+    fontWeight: "600",
+    color: colors.textPrimary,
+    fontFamily: baseFontFamily,
+  },
+  widgetPromoSubtitle: {
+    fontSize: scaleFont(12),
+    lineHeight: scaleFont(17),
+    color: colors.textSecondary,
+    fontFamily: baseFontFamily,
+    marginTop: 2,
+  },
+  widgetPromoClose: {
+    marginLeft: 8,
+    padding: 2,
   },
   shareSection: {
     alignItems: "center",

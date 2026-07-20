@@ -13,6 +13,7 @@ import {
 } from "@/shared/lib/pushNotifications";
 import { ScreenHeader } from "@/shared/components/ScreenHeader";
 import { WheelTimePicker } from "@/shared/components/WheelTimePicker";
+import { WidgetGuideModal } from "@/shared/components/WidgetGuideModal";
 import { baseFontFamily, colors, scaleFont } from "@/shared/styles";
 import { Ionicons } from "@expo/vector-icons";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -50,6 +51,7 @@ export default function SettingsScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncFailed, setSyncFailed] = useState(false);
+  const [showWidgetGuide, setShowWidgetGuide] = useState(false);
 
   // 가장 최근 설정값을 ref 로 유지(시각 휠 연속 조작 시 최신값 기준 저장).
   // 렌더 중 ref 변이는 React 규칙 위반이므로 커밋 후 effect 에서 동기화한다.
@@ -285,6 +287,25 @@ export default function SettingsScreen() {
               />
             </View>
 
+            {/* 홈 화면 위젯 안내 */}
+            <TouchableOpacity
+              style={styles.card}
+              activeOpacity={0.8}
+              onPress={() => setShowWidgetGuide(true)}
+              accessibilityRole="button"
+              accessibilityLabel="홈 화면 위젯 추가 방법 보기"
+            >
+              <View style={styles.cardRow}>
+                <View style={styles.cardRowText}>
+                  <Text style={styles.cardTitle}>홈 화면 위젯</Text>
+                  <Text style={styles.cardSubtitle}>
+                    앱을 열지 않아도 홈 화면에서 오늘의 말씀을 볼 수 있어요
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
+              </View>
+            </TouchableOpacity>
+
             <Text style={styles.footerNote}>
               {isSyncing
                 ? "저장 중..."
@@ -295,6 +316,11 @@ export default function SettingsScreen() {
           </>
         )}
       </ScrollView>
+
+      <WidgetGuideModal
+        visible={showWidgetGuide}
+        onClose={() => setShowWidgetGuide(false)}
+      />
     </View>
   );
 }
