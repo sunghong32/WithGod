@@ -1,0 +1,11 @@
+[Unit]
+Description=WithGod 데이터 백업 매일 실행
+
+[Timer]
+# 롤업(03:00 KST)이 끝난 뒤에 돈다. 서버 시계가 UTC 면 03:40 KST = 18:40 UTC.
+OnCalendar=*-*-* 18:40:00 UTC
+# 인스턴스가 꺼져 있어 놓친 실행은 부팅 후 따라잡는다.
+Persistent=true
+
+[Install]
+WantedBy=timers.target
