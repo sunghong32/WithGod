@@ -12,6 +12,15 @@ const POST_INSTALL_SNIPPET = `    ${POST_INSTALL_MARKER}
           c.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
         end
       end
+    end
+    # Xcode 26 Clang과 fmt 11.0의 consteval 비호환 회피.
+    # fmt base.h가 FMT_USE_CONSTEVAL을 #ifndef 가드 없이 정의해 매크로 주입이
+    # 안 먹히므로 헤더를 직접 패치한다 (pod install 마다 재적용됨).
+    fmt_base = File.join(installer.sandbox.root, 'fmt', 'include', 'fmt', 'base.h')
+    if File.exist?(fmt_base)
+      src = File.read(fmt_base)
+      patched = src.gsub('#  define FMT_USE_CONSTEVAL 1', '#  define FMT_USE_CONSTEVAL 0')
+      File.write(fmt_base, patched) if patched != src
     end`;
 
 const STANDALONE_POST_INSTALL = `
