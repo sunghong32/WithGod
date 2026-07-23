@@ -5,11 +5,11 @@ After=network-online.target
 [Service]
 Type=oneshot
 User=ubuntu
-WorkingDirectory=/home/ubuntu/WithGod/backend
+WorkingDirectory=/home/ubuntu/withgod/backend
 # 오프사이트 사본을 쓰려면 아래 줄의 주석을 풀고 버킷 이름을 넣는다.
 # 인스턴스가 통째로 죽으면 로컬 백업도 함께 사라지므로 사실상 필수다.
 # Environment=BACKUP_S3_BUCKET=with-god-backups
-ExecStart=/home/ubuntu/WithGod/backend/scripts/backup-data.sh
+ExecStart=/home/ubuntu/withgod/backend/scripts/backup-data.sh
 # 실패 시 기존 크래시 알림 경로를 그대로 탄다.
 OnFailure=tg-alert@%n.service
 
