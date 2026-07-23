@@ -32,6 +32,8 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+# 필요한 환경변수 목록은 커밋한다(값은 비어 있음)
+!.env.example
 
 # vercel
 .vercel

@@ -24,3 +24,98 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/*
+ * 대시보드 색 토큰.
+ *
+ * 차트는 원시 hex 가 아니라 역할 이름으로 색을 쓰고, 라이트/다크 값은 여기
+ * 한 곳에서만 바뀐다. 계열 색은 색각 이상 분리도·표면 대비 검증을 통과한
+ * 조합이므로 임의로 바꾸지 말 것(블루↔오렌지, 라이트/다크 각각 검증됨).
+ */
+.viz-root {
+  color-scheme: light;
+  --surface-1: #fcfcfb;
+  --surface-2: #f3f2ef;
+  --text-primary: #0b0b0b;
+  --text-secondary: #52514e;
+  --text-muted: #85837c;
+  --border-1: #e3e2dd;
+  --grid: #eceae5;
+  --series-1: #2a78d6; /* 재방문 · WAU */
+  --series-2: #eb6834; /* 신규 · MAU */
+  /* 리텐션 히트맵용 순차 램프(블루, 밝음→어두움) */
+  --seq-0: #f3f2ef;
+  --seq-1: #cde2fb;
+  --seq-2: #9ec5f4;
+  --seq-3: #6da7ec;
+  --seq-4: #3987e5;
+  --seq-5: #256abf;
+  --seq-6: #184f95;
+  /*
+   * 칠 위에 얹는 글자색. 램프 방향이 라이트/다크에서 반대라 밝기로 자동
+   * 판정하면 한쪽 모드에서 반드시 틀린다 — 단계마다 짝을 명시한다.
+   */
+  --seq-0-ink: #0b0b0b;
+  --seq-1-ink: #0b0b0b;
+  --seq-2-ink: #0b0b0b;
+  --seq-3-ink: #0b0b0b;
+  --seq-4-ink: #0b0b0b;
+  --seq-5-ink: #ffffff;
+  --seq-6-ink: #ffffff;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) .viz-root {
+    color-scheme: dark;
+    --surface-1: #1a1a19;
+    --surface-2: #232322;
+    --text-primary: #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted: #8d8c83;
+    --border-1: #35352f;
+    --grid: #2b2b28;
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --seq-0: #232322;
+    --seq-1: #184f95;
+    --seq-2: #256abf;
+    --seq-3: #3987e5;
+    --seq-4: #5598e7;
+    --seq-5: #86b6ef;
+    --seq-6: #cde2fb;
+    --seq-0-ink: #ffffff;
+    --seq-1-ink: #ffffff;
+    --seq-2-ink: #ffffff;
+    --seq-3-ink: #0b0b0b;
+    --seq-4-ink: #0b0b0b;
+    --seq-5-ink: #0b0b0b;
+    --seq-6-ink: #0b0b0b;
+  }
+}
+
+:root[data-theme="dark"] .viz-root {
+  color-scheme: dark;
+  --surface-1: #1a1a19;
+  --surface-2: #232322;
+  --text-primary: #ffffff;
+  --text-secondary: #c3c2b7;
+  --text-muted: #8d8c83;
+  --border-1: #35352f;
+  --grid: #2b2b28;
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --seq-0: #232322;
+  --seq-1: #184f95;
+  --seq-2: #256abf;
+  --seq-3: #3987e5;
+  --seq-4: #5598e7;
+  --seq-5: #86b6ef;
+  --seq-6: #cde2fb;
+  --seq-0-ink: #ffffff;
+  --seq-1-ink: #ffffff;
+  --seq-2-ink: #ffffff;
+  --seq-3-ink: #0b0b0b;
+  --seq-4-ink: #0b0b0b;
+  --seq-5-ink: #0b0b0b;
+  --seq-6-ink: #0b0b0b;
+}
