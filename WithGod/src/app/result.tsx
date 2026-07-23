@@ -7,27 +7,24 @@ import {
   type RecommendStreamVerse,
   type StreamKey,
 } from "@/features/verse";
+import { useBookmarks, useToggleBookmark } from "@/features/bookmarks";
 import { ScreenHeader } from "@/shared/components/ScreenHeader";
+import { VerseActionRow } from "@/shared/components/VerseActionRow";
 import { useSafeAreaPadding } from "@/shared/hooks";
 import { baseFontFamily, colors, scaleFont } from "@/shared/styles";
-import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams } from "expo-router";
-import * as Sharing from "expo-sharing";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   type LayoutChangeEvent,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
-  Platform,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
-import { captureRef } from "react-native-view-shot";
-
 
 const TYPING_TICK_MS = 30;
 const TYPING_CHARS_PER_TICK = 2;
@@ -887,98 +884,10 @@ export default function ResultScreen() {
   const errorMessage =
     streamError ?? (hasError ? "말씀을 불러오지 못했어요" : null);
 
-  const captureViewRef = useRef<View>(null);
-  const contentLayoutRef = useRef<{ width: number; height: number } | null>(
-    null,
-  );
-  const [contentLayout, setContentLayout] = useState<{
-    width: number;
-    height: number;
-  } | null>(null);
-  const [isCapturing, setIsCapturing] = useState(false);
-
-  // 스트리밍 중에는 onLayout 마다 setState 하지 않으므로(아래 onLayout 참고),
-  // 스트리밍이 끝나는 시점에 마지막 측정값을 한 번만 상태로 커밋한다.
-  useEffect(() => {
-    if (isStreaming) return;
-    const measured = contentLayoutRef.current;
-    if (!measured) return;
-    setContentLayout((prev) =>
-      prev && prev.width === measured.width && prev.height === measured.height
-        ? prev
-        : measured,
-    );
-  }, [isStreaming]);
-
-  const handleCaptureAndShare = useCallback(async () => {
-    if (!contentLayout || contentLayout.height <= 0 || results.length === 0)
-      return;
-    setIsCapturing(true);
-  }, [contentLayout, results.length]);
-
-  useEffect(() => {
-    if (!isCapturing || !contentLayout || !captureViewRef.current) return;
-    const canShare = Sharing.isAvailableAsync().then(Boolean);
-    const timer = setTimeout(async () => {
-      try {
-        const uri = await captureRef(captureViewRef, {
-          format: "png",
-          quality: 1,
-          width: contentLayout.width,
-          height: contentLayout.height,
-          result: "tmpfile",
-        });
-        if (await canShare) {
-          await Sharing.shareAsync(uri, {
-            mimeType: "image/png",
-            dialogTitle: "위로의 말씀 이미지 공유",
-          });
-        } else if (Platform.OS === "web") {
-          const link = document.createElement("a");
-          link.href = uri;
-          link.download = "withgod-comfort.png";
-          link.click();
-        }
-      } catch (e) {
-        if (__DEV__) console.warn("Capture failed:", e);
-      } finally {
-        setIsCapturing(false);
-      }
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [isCapturing, contentLayout]);
-
-  const canCapture =
-    !showLoading &&
-    !isStreaming &&
-    !hasError &&
-    visibleResults.length > 0 &&
-    contentLayout &&
-    contentLayout.height > 0;
-
   return (
     <View style={styles.container}>
       {/* Header - 위로의 말씀 */}
-      <ScreenHeader
-        title="위로의 말씀"
-        right={
-          canCapture ? (
-            <TouchableOpacity
-              style={styles.captureButton}
-              onPress={handleCaptureAndShare}
-              disabled={isCapturing}
-              accessibilityRole="button"
-              accessibilityLabel="전체 화면을 이미지로 저장·공유"
-            >
-              <Ionicons
-                name={isCapturing ? "hourglass-outline" : "share-outline"}
-                size={22}
-                color={isCapturing ? "#9CA3AF" : "#1E2939"}
-              />
-            </TouchableOpacity>
-          ) : undefined
-        }
-      />
+      <ScreenHeader title="위로의 말씀" />
 
       <ScrollView
         ref={scrollViewRef}
@@ -993,19 +902,6 @@ export default function ResultScreen() {
         scrollEventThrottle={16}
       >
         <View
-          onLayout={(e) => {
-            const { width, height } = e.nativeEvent.layout;
-            contentLayoutRef.current = { width, height };
-            // 캡처는 스트리밍 종료 후에만 가능하므로, 스트리밍 중 레이아웃 변화로
-            // 전체 화면 재렌더가 반복되지 않도록 상태 커밋을 건너뛴다.
-            if (isStreaming) return;
-            setContentLayout((prev) =>
-              prev && prev.width === width && prev.height === height
-                ? prev
-                : { width, height },
-            );
-          }}
-          collapsable={false}
           style={[styles.scrollContent, { paddingBottom: insets.bottom + 32 }]}
         >
           {/* 유저 입력 말풍선 - 오른쪽 정렬 */}
@@ -1055,6 +951,8 @@ export default function ResultScreen() {
                     <VerseResultCard
                       key={`result-${index}`}
                       result={result}
+                      mood={mood}
+                      canSave={!isStreaming && !streamError}
                       isStreaming={isStreaming}
                       isTextActive={isFieldActive("text")}
                       isCommentActive={isFieldActive("comment")}
@@ -1081,53 +979,16 @@ export default function ResultScreen() {
           )}
         </View>
       </ScrollView>
-
-      {/* 전체 스크롤 콘텐츠 캡처용 오프스크린 뷰 */}
-      {isCapturing && contentLayout && contentLayout.height > 0 && (
-        <View
-          style={[
-            styles.captureOffscreen,
-            {
-              left: -contentLayout.width - 100,
-              width: contentLayout.width,
-              height: contentLayout.height,
-            },
-          ]}
-          pointerEvents="none"
-        >
-          <View
-            ref={captureViewRef}
-            style={[
-              styles.scrollContent,
-              styles.captureBackground,
-              styles.captureContentPadding,
-              {
-                width: contentLayout.width,
-                height: contentLayout.height,
-              },
-            ]}
-            collapsable={false}
-          >
-            <View style={styles.userMessageContainer}>
-              <View style={styles.userMessageBubble}>
-                <Text style={styles.userMessageText}>{mood}</Text>
-              </View>
-            </View>
-            <Text style={styles.sectionTitle}>당신을 위한 말씀</Text>
-            <View style={styles.resultsContainer}>
-              {visibleResults.map((result, index) => (
-                <VerseResultCard key={`capture-${index}`} result={result} />
-              ))}
-            </View>
-          </View>
-        </View>
-      )}
     </View>
   );
 }
 
 type VerseResultCardProps = {
   result: RecommendItem;
+  /** 저장 시 함께 기록할 사용자 입력(마음) */
+  mood?: string;
+  /** 스트리밍이 에러 없이 끝나 카드 내용이 온전할 때만 true (하트 노출 조건) */
+  canSave?: boolean;
   isStreaming?: boolean;
   isTextActive?: boolean;
   isCommentActive?: boolean;
@@ -1135,24 +996,46 @@ type VerseResultCardProps = {
   cursorVisible?: boolean;
 };
 
-/**
- * 라이브 렌더와 캡처용 오프스크린 뷰가 공유하는 말씀 카드.
- * 스트리밍 관련 props 를 넘기지 않으면(캡처 경로) 완성된 카드로 렌더링된다.
- */
 function VerseResultCard({
   result,
+  mood,
+  canSave = false,
   isStreaming = false,
   isTextActive = false,
   isCommentActive = false,
   isTagActive = false,
   cursorVisible = false,
 }: VerseResultCardProps) {
+  const { data: savedVerses } = useBookmarks();
+  const toggleBookmark = useToggleBookmark();
+
   const showVerseText = (result.text?.length ?? 0) > 0;
   const showReference = showVerseText && !!result.ref;
   const tagValue = (result.tag ?? "").trim();
   const showTag = showVerseText && tagValue.length > 0 && !isTagActive;
   const canShowComment = showVerseText && (tagValue.length > 0 || !isStreaming);
   const showComment = canShowComment && (result.comment?.length ?? 0) > 0;
+
+  // 액션 줄(하트·복사·공유)은 스트리밍이 에러 없이 끝나 내용이 온전할 때만
+  // 노출 (중단된 스트림의 잘린 ref/text 가 저장·공유되는 것을 막는다)
+  const showActions = showReference && canSave;
+  const isSaved =
+    !!result.ref &&
+    !!savedVerses?.some(
+      (item) => item.source === "recommend" && item.reference === result.ref,
+    );
+
+  const handleToggleSave = () => {
+    if (!result.ref) return;
+    toggleBookmark.mutate({
+      reference: result.ref,
+      text: result.text ?? "",
+      note: result.comment || undefined,
+      tag: tagValue || undefined,
+      mood: mood || undefined,
+      source: "recommend",
+    });
+  };
 
   return (
     <View style={styles.verseCard}>
@@ -1193,6 +1076,18 @@ function VerseResultCard({
           </Text>
         </View>
       )}
+
+      {/* 하단 액션 줄: 하트 · 복사 · 공유 */}
+      {showActions && (
+        <VerseActionRow
+          reference={result.ref}
+          text={result.text ?? ""}
+          isSaved={isSaved}
+          onToggleSave={handleToggleSave}
+          analyticsSource="recommend"
+          style={styles.actionRow}
+        />
+      )}
     </View>
   );
 }
@@ -1202,32 +1097,12 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
-  captureButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: "center",
-    justifyContent: "center",
-  },
   scrollContentContainer: {
     flexGrow: 1,
   },
   scrollContent: {
     paddingHorizontal: 16,
     paddingTop: 20,
-  },
-  captureOffscreen: {
-    position: "absolute",
-    top: 0,
-    overflow: "hidden",
-  },
-  captureBackground: {
-    backgroundColor: colors.background,
-  },
-  /** 캡처본에서만 상단 여백을 넉넉히, 하단 여백은 줄임 */
-  captureContentPadding: {
-    paddingTop: 72,
-    paddingBottom: 24,
   },
   // 유저 메시지 - 오른쪽 정렬
   userMessageContainer: {
@@ -1336,6 +1211,9 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontFamily: baseFontFamily,
     marginBottom: 6,
+  },
+  actionRow: {
+    marginTop: 14,
   },
   tagRow: {
     alignSelf: "flex-end",

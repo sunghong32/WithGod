@@ -70,6 +70,7 @@ export default function RootLayout() {
             <Stack.Screen name="(tabs)" options={{ gestureEnabled: false }} />
             <Stack.Screen name="result" />
             <Stack.Screen name="settings" />
+            <Stack.Screen name="bookmarks" />
           </Stack>
           <StatusBar style="auto" />
           </ThemeProvider>

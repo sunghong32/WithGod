@@ -1,6 +1,8 @@
+import { useBookmarks, useToggleBookmark } from "@/features/bookmarks";
 import { useDailyVerse } from "@/features/verse/hooks/useDailyVerse";
 import { NotificationPrimingModal } from "@/shared/components/NotificationPrimingModal";
 import { WidgetGuideModal } from "@/shared/components/WidgetGuideModal";
+import { VerseActionRow } from "@/shared/components/VerseActionRow";
 import { useKeyboardVisible, useSafeAreaPadding } from "@/shared/hooks";
 import {
   hasSeenNotificationPriming,
@@ -123,6 +125,28 @@ export default function HomeScreen() {
     errorMessage,
   } = useDailyVerse();
 
+  // 오늘의 말씀 저장(하트) 토글
+  const { data: savedVerses } = useBookmarks();
+  const toggleBookmark = useToggleBookmark();
+  const isDailyBookmarked = useMemo(
+    () =>
+      !!dailyVerse &&
+      !!savedVerses?.some(
+        (item) =>
+          item.source === "daily" && item.reference === dailyVerse.reference,
+      ),
+    [dailyVerse, savedVerses],
+  );
+  const handleToggleDailyBookmark = useCallback(() => {
+    if (!dailyVerse) return;
+    toggleBookmark.mutate({
+      reference: dailyVerse.reference,
+      text: dailyVerse.text,
+      note: dailyVerse.interpretation || dailyVerse.reflection || undefined,
+      source: "daily",
+    });
+  }, [dailyVerse, toggleBookmark]);
+
   const inputBarPaddingTop = 16;
   const inputBarPaddingBottom = useMemo(() => {
     return getInputBarPaddingBottom(isKeyboardVisible);
@@ -165,11 +189,20 @@ export default function HomeScreen() {
           </View>
           <Text style={styles.headerTitle}>신과함께</Text>
           <TouchableOpacity
+            style={styles.headerIconButton}
+            onPress={() => router.push("/bookmarks")}
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel="마음에 담은 말씀 보기"
+          >
+            <Ionicons name="heart-outline" size={24} color="#1E2939" />
+          </TouchableOpacity>
+          <TouchableOpacity
             style={styles.settingsButton}
             onPress={() => router.push("/settings")}
             activeOpacity={0.7}
             accessibilityRole="button"
-            accessibilityLabel="알림 설정"
+            accessibilityLabel="설정"
           >
             <Ionicons name="settings-outline" size={24} color="#1E2939" />
           </TouchableOpacity>
@@ -213,6 +246,24 @@ export default function HomeScreen() {
                         {dailyVerse.interpretation}
                       </Text>
                     </>
+                  )}
+                  {/* 액션 줄 — 다른 말씀 카드들과 동일하게 카드 하단 우측.
+                      오늘의 말씀 풀이는 전역 콘텐츠라 공유·복사에 함께 담는다. */}
+                  {!!dailyVerse && (
+                    <VerseActionRow
+                      reference={dailyVerse.reference}
+                      text={dailyVerse.text}
+                      note={dailyVerse.interpretation || undefined}
+                      isSaved={isDailyBookmarked}
+                      onToggleSave={handleToggleDailyBookmark}
+                      analyticsSource="daily"
+                      saveLabel={
+                        isDailyBookmarked
+                          ? "오늘의 말씀 마음에서 빼기"
+                          : "오늘의 말씀 마음에 담기"
+                      }
+                      style={styles.dailyActionRow}
+                    />
                   )}
                 </>
               )}
@@ -354,13 +405,23 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     fontFamily: baseFontFamily,
   },
-  settingsButton: {
+  // 배경 칩 없이 톱니와 같은 크기의 아이콘 버튼.
+  // 저장 상태 하트와는 위치(카드 하단 우측)로 구분된다.
+  headerIconButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
     alignItems: "center",
     justifyContent: "center",
     marginLeft: 12,
+  },
+  settingsButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    marginLeft: 4,
   },
   scrollContent: {
     paddingHorizontal: 24,
@@ -394,6 +455,9 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: colors.textPrimary,
     fontFamily: baseFontFamily,
+  },
+  dailyActionRow: {
+    marginTop: 16,
   },
   verseCard: {
     backgroundColor: "#FFFFFF",

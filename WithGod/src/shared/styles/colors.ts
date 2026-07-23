@@ -15,4 +15,8 @@ export const colors = {
   textSecondary: "#6A7282",
   /** 구분선·테두리 */
   border: "#E5E7EB",
+  /** 저장(하트) 활성 색 — 좋아요 버튼 관례에 맞춘 레드 */
+  heartActive: "#ED4956",
+  /** 비활성 아이콘 (하트 미저장, 복사/공유 기본) */
+  iconMuted: "#9CA3AF",
 } as const;
