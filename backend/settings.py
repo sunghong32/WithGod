@@ -31,6 +31,10 @@ class AppSettings:
     push_schedule_minute: int
     push_default_timezone: str
     scheduler_poll_seconds: int
+    # 분석 설정은 뒤에 붙었으므로 기존 호출부가 그대로 동작하도록 기본값을 둔다.
+    analytics_db_path: str = str(ROOT / "data" / "analytics.sqlite3")
+    analytics_raw_retention_days: int = 90
+    analytics_rollup_hour: int = 3
 
     @classmethod
     def from_env(cls) -> "AppSettings":
@@ -58,4 +62,14 @@ class AppSettings:
             push_schedule_minute=int(os.getenv("PUSH_SCHEDULE_MINUTE", "0")),
             push_default_timezone=os.getenv("PUSH_DEFAULT_TIMEZONE", "Asia/Seoul"),
             scheduler_poll_seconds=int(os.getenv("SCHEDULER_POLL_SECONDS", "30")),
+            analytics_db_path=os.getenv(
+                "ANALYTICS_DB_PATH",
+                str(data_dir / "analytics.sqlite3"),
+            ),
+            # 원시 이벤트 보관기간. 지나면 롤업 잡이 지운다(집계치는 영구 보존).
+            # EC2 볼륨이 16GiB 라 여유가 있지만, 좁아지면 이 값부터 줄이면 된다.
+            analytics_raw_retention_days=int(
+                os.getenv("ANALYTICS_RAW_RETENTION_DAYS", "90")
+            ),
+            analytics_rollup_hour=int(os.getenv("ANALYTICS_ROLLUP_HOUR", "3")),
         )

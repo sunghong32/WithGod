@@ -24,6 +24,9 @@ import sqlite3
 import random
 import os, re, json, time, logging, asyncio, secrets
 
+from analytics.db import init_db as init_analytics_db
+from analytics.routes import router as analytics_router
+from analytics.scheduler import AnalyticsRollupScheduler
 from notifications.jobs import build_notification_manager
 from notifications.manager import DailyVerseNotificationManager
 from notifications.scheduler import DailyVerseScheduler
@@ -1179,6 +1182,10 @@ async def comment_stream(inp: CommentStreamIn):
     return _comment_stream_response(inp)
 
 
+# 자체 지표: POST /telemetry/events(앱 수집) + GET /admin/analytics/*(대시보드)
+app.include_router(analytics_router)
+
+
 @app.on_event("startup")
 async def startup_notifications() -> None:
     manager = build_notification_manager(APP_SETTINGS)
@@ -1196,9 +1203,22 @@ async def startup_notifications() -> None:
     app.state.notification_manager = manager
     app.state.notification_scheduler = scheduler
 
+    # 자체 지표 수집. 스키마 생성은 멱등이라 워커마다 호출돼도 안전하다.
+    init_analytics_db(APP_SETTINGS.analytics_db_path)
+    rollup_scheduler = AnalyticsRollupScheduler(
+        db_path=APP_SETTINGS.analytics_db_path,
+        hour=APP_SETTINGS.analytics_rollup_hour,
+        raw_retention_days=APP_SETTINGS.analytics_raw_retention_days,
+    )
+    rollup_scheduler.start()
+    app.state.analytics_scheduler = rollup_scheduler
+
 
 @app.on_event("shutdown")
 async def shutdown_notifications() -> None:
     scheduler = getattr(app.state, "notification_scheduler", None)
     if scheduler is not None:
         scheduler.stop()
+    rollup_scheduler = getattr(app.state, "analytics_scheduler", None)
+    if rollup_scheduler is not None:
+        rollup_scheduler.stop()
