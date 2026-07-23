@@ -17,7 +17,9 @@ set -euo pipefail
 BACKEND_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DATA_DIR="${DATA_DIR:-${BACKEND_DIR}/data}"
 NOTIFICATIONS_DIR="${BACKEND_DIR}/notifications"
-BACKUP_ROOT="${BACKUP_ROOT:-/var/backups/with-god}"
+# /var/backups 는 root 전용이라 서비스 사용자로는 못 쓴다. systemd 유닛이
+# StateDirectory 로 만들어 주는 경로를 기본값으로 둔다.
+BACKUP_ROOT="${BACKUP_ROOT:-/var/lib/with-god-backup}"
 KEEP_DAYS="${BACKUP_KEEP_DAYS:-14}"
 
 STAMP="$(date +%Y%m%d-%H%M%S)"

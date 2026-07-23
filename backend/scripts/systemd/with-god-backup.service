@@ -1,17 +1,22 @@
 [Unit]
 Description=WithGod 백엔드 데이터 백업 (지표 SQLite + 푸시 기기 목록)
 After=network-online.target
+# 실패 시 기존 크래시 알림 경로를 그대로 탄다. ([Service] 가 아니라 [Unit] 키다)
+OnFailure=tg-alert@%n.service
 
 [Service]
 Type=oneshot
 User=ubuntu
 WorkingDirectory=/home/ubuntu/withgod/backend
-# 오프사이트 사본을 쓰려면 아래 줄의 주석을 풀고 버킷 이름을 넣는다.
+# systemd 가 /var/lib/with-god-backup 을 User= 소유로 만들어 준다.
+# /var/backups 는 root 전용이라 ubuntu 로 도는 이 서비스가 쓸 수 없다.
+StateDirectory=with-god-backup
+Environment=BACKUP_ROOT=%S/with-god-backup
+# 오프사이트 사본을 쓰려면 아래 줄의 주석을 풀 것.
 # 인스턴스가 통째로 죽으면 로컬 백업도 함께 사라지므로 사실상 필수다.
+# (EC2 에 S3 쓰기 IAM 역할이 붙어 있어야 동작한다)
 # Environment=BACKUP_S3_BUCKET=with-god-backups
 ExecStart=/home/ubuntu/withgod/backend/scripts/backup-data.sh
-# 실패 시 기존 크래시 알림 경로를 그대로 탄다.
-OnFailure=tg-alert@%n.service
 
 [Install]
 WantedBy=multi-user.target
