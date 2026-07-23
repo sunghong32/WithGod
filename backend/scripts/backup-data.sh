@@ -78,11 +78,27 @@ SIZE="$(du -h "${ARCHIVE}" | cut -f1)"
 echo "[backup] ${ARCHIVE} (${SIZE})"
 
 # --- 오프사이트 사본 ---
+# 자격증명은 EC2 인스턴스 역할(IMDS)에서 자동으로 온다. 키를 파일에 두지 않는다.
 if [ -n "${BACKUP_S3_BUCKET:-}" ]; then
-  command -v aws >/dev/null 2>&1 || fail "BACKUP_S3_BUCKET 이 설정됐지만 aws CLI 가 없습니다"
-  aws s3 cp "${ARCHIVE}" "s3://${BACKUP_S3_BUCKET}/with-god/$(basename "${ARCHIVE}")" \
-    --only-show-errors || fail "S3 업로드 실패"
-  echo "[backup] s3://${BACKUP_S3_BUCKET}/with-god/$(basename "${ARCHIVE}")"
+  KEY="with-god/$(basename "${ARCHIVE}")"
+  if command -v aws >/dev/null 2>&1; then
+    aws s3 cp "${ARCHIVE}" "s3://${BACKUP_S3_BUCKET}/${KEY}" --only-show-errors \
+      || fail "S3 업로드 실패"
+  else
+    # aws CLI 가 없는 서버가 있어 boto3 로도 올릴 수 있게 해둔다.
+    # (BACKUP_PYTHON 으로 boto3 가 설치된 인터프리터를 지정한다)
+    "${BACKUP_PYTHON:-python3}" - "${ARCHIVE}" "${BACKUP_S3_BUCKET}" "${KEY}" <<'PY' \
+      || fail "S3 업로드 실패 (boto3). aws CLI 또는 boto3 가 필요합니다"
+import sys
+try:
+    import boto3
+except ImportError:
+    sys.exit("boto3 가 설치돼 있지 않습니다")
+archive, bucket, key = sys.argv[1:4]
+boto3.client("s3").upload_file(archive, bucket, key)
+PY
+  fi
+  echo "[backup] s3://${BACKUP_S3_BUCKET}/${KEY}"
 fi
 
 # --- 로컬 보관 정리 (S3 쪽은 버킷 수명주기 규칙에 맡긴다) ---
