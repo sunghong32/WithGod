@@ -1,5 +1,5 @@
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { type Href, Stack, useRouter } from 'expo-router';
+import { type Href, Stack, usePathname, useRouter } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
@@ -8,6 +8,7 @@ import 'react-native-reanimated';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { useColorScheme } from '@/shared/hooks/use-color-scheme';
+import { logScreenViewEvent } from '@/shared/lib/analytics';
 import { QueryProvider } from '@/shared/lib/QueryProvider';
 import { setupPushNotificationsAsync } from '@/shared/lib/pushNotifications';
 import { refreshHomeWidgetAsync } from '@/widgets/refreshHomeWidget';
@@ -25,6 +26,13 @@ export default function RootLayout() {
   useEffect(() => {
     SplashScreen.hideAsync();
   }, []);
+
+  // 화면 전환 추적 (스플래시와 홈은 둘 다 '/'라 home 으로 1회 기록된다)
+  const pathname = usePathname();
+  useEffect(() => {
+    const screenName = pathname === '/' ? 'home' : pathname.replace(/^\//, '');
+    void logScreenViewEvent(screenName);
+  }, [pathname]);
 
   // 앱을 열 때 안드로이드 홈 위젯도 오늘의 말씀으로 즉시 동기화 (best-effort)
   useEffect(() => {

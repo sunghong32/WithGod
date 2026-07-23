@@ -1,3 +1,4 @@
+import { logAnalyticsEvent } from "@/shared/lib/analytics";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   loadBookmarks,
@@ -25,8 +26,12 @@ export function useToggleBookmark() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: BookmarkInput) => toggleBookmark(input),
-    onSuccess: ({ bookmarks }) => {
+    onSuccess: ({ bookmarks, added }, input) => {
       queryClient.setQueryData<Bookmark[]>(bookmarkKeys.all, bookmarks);
+      void logAnalyticsEvent(added ? "verse_save" : "verse_unsave", {
+        source: input.source,
+        reference: input.reference,
+      });
     },
   });
 }
@@ -41,8 +46,13 @@ export function useRemoveBookmark() {
       reference: string;
       source: BookmarkSource;
     }) => removeBookmark(reference, source),
-    onSuccess: (bookmarks) => {
+    onSuccess: (bookmarks, { reference, source }) => {
       queryClient.setQueryData<Bookmark[]>(bookmarkKeys.all, bookmarks);
+      void logAnalyticsEvent("verse_unsave", {
+        source,
+        reference,
+        from: "bookmarks_screen",
+      });
     },
   });
 }

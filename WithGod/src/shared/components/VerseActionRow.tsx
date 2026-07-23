@@ -1,3 +1,4 @@
+import { logAnalyticsEvent } from "@/shared/lib/analytics";
 import { baseFontFamily, colors, scaleFont } from "@/shared/styles";
 import { Ionicons } from "@expo/vector-icons";
 import * as Clipboard from "expo-clipboard";
@@ -78,6 +79,10 @@ export function VerseActionRow({
       setCopied(true);
       if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
       copyTimerRef.current = setTimeout(() => setCopied(false), COPY_FEEDBACK_MS);
+      void logAnalyticsEvent("verse_copy", {
+        source: analyticsSource,
+        reference,
+      });
     } catch (error) {
       if (__DEV__) console.warn("[VerseActionRow] copy failed", error);
     }
@@ -102,6 +107,10 @@ export function VerseActionRow({
         await Sharing.shareAsync(uri, {
           mimeType: "image/png",
           dialogTitle: "말씀 공유",
+        });
+        void logAnalyticsEvent("verse_share", {
+          source: analyticsSource,
+          reference,
         });
       } catch (error) {
         if (__DEV__) console.warn("[VerseActionRow] share failed", error);

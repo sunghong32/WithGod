@@ -4,6 +4,7 @@ import { NotificationPrimingModal } from "@/shared/components/NotificationPrimin
 import { WidgetGuideModal } from "@/shared/components/WidgetGuideModal";
 import { VerseActionRow } from "@/shared/components/VerseActionRow";
 import { useKeyboardVisible, useSafeAreaPadding } from "@/shared/hooks";
+import { logAnalyticsEvent } from "@/shared/lib/analytics";
 import {
   hasSeenNotificationPriming,
   markNotificationPrimingSeen,
@@ -160,6 +161,8 @@ export default function HomeScreen() {
     }
 
     Keyboard.dismiss();
+    // 입력 내용은 개인적인 마음이라 보내지 않고 길이만 기록한다
+    void logAnalyticsEvent("mood_submit", { length: trimmedMessage.length });
     router.push({
       pathname: "/result",
       params: { mood: trimmedMessage },
