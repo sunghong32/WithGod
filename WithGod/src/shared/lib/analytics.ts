@@ -1,11 +1,17 @@
 import { Platform } from "react-native";
 
+import { trackEvent, trackScreen } from "./telemetry";
+
 /**
- * Firebase Analytics 래퍼.
+ * 분석 이벤트 래퍼.
  *
  * - 네이티브(iOS/Android)에서만 동작하고 웹은 no-op.
  * - 분석 실패가 앱 흐름을 깨지 않도록 모든 호출을 삼킨다.
  * - 사용자가 입력한 마음 텍스트 같은 개인 내용은 절대 파라미터로 보내지 않는다.
+ *
+ * Firebase 와 자체 수집(telemetry) 양쪽으로 같은 이벤트를 보낸다. 호출부는
+ * 이 파일만 알면 되므로 화면 코드는 어디로 가는지 신경 쓰지 않는다.
+ * 자체 수집은 어드민 대시보드용이고, Firebase 는 수치 대조용으로 남긴다.
  */
 
 type AnalyticsParams = Record<string, string | number | boolean>;
@@ -30,6 +36,7 @@ export const logAnalyticsEvent = async (
   params?: AnalyticsParams,
 ): Promise<void> => {
   if (!isNative) return;
+  trackEvent(name, params);
   try {
     const { analytics, module } = getAnalyticsApi();
     await module.logEvent(analytics, name, params);
@@ -40,6 +47,7 @@ export const logAnalyticsEvent = async (
 
 export const logScreenViewEvent = async (screenName: string): Promise<void> => {
   if (!isNative) return;
+  trackScreen(screenName);
   try {
     const { analytics, module } = getAnalyticsApi();
     await module.logScreenView(analytics, {

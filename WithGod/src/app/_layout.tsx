@@ -11,6 +11,7 @@ import { useColorScheme } from '@/shared/hooks/use-color-scheme';
 import { logScreenViewEvent } from '@/shared/lib/analytics';
 import { QueryProvider } from '@/shared/lib/QueryProvider';
 import { setupPushNotificationsAsync } from '@/shared/lib/pushNotifications';
+import { startTelemetry, stopTelemetry } from '@/shared/lib/telemetry';
 import { refreshHomeWidgetAsync } from '@/widgets/refreshHomeWidget';
 
 SplashScreen.preventAutoHideAsync();
@@ -25,6 +26,12 @@ export default function RootLayout() {
 
   useEffect(() => {
     SplashScreen.hideAsync();
+  }, []);
+
+  // 자체 지표 수집 시작. 화면 추적보다 먼저 켜져야 첫 screen_view 가 잡힌다.
+  useEffect(() => {
+    void startTelemetry();
+    return stopTelemetry;
   }, []);
 
   // 화면 전환 추적 (스플래시와 홈은 둘 다 '/'라 home 으로 1회 기록된다)

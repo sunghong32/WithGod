@@ -11,6 +11,10 @@ import {
   syncNotificationSettingsAsync,
   type PushPermissionStatus,
 } from "@/shared/lib/pushNotifications";
+import {
+  isTelemetryEnabled,
+  setTelemetryEnabled,
+} from "@/shared/lib/telemetry";
 import { ScreenHeader } from "@/shared/components/ScreenHeader";
 import { WheelTimePicker } from "@/shared/components/WheelTimePicker";
 import { WidgetGuideModal } from "@/shared/components/WidgetGuideModal";
@@ -52,6 +56,17 @@ export default function SettingsScreen() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncFailed, setSyncFailed] = useState(false);
   const [showWidgetGuide, setShowWidgetGuide] = useState(false);
+  const [telemetryOn, setTelemetryOn] = useState(isTelemetryEnabled());
+
+  // 통계 수집 여부는 SDK 초기화(비동기) 후에 확정되므로 화면 진입 시 다시 읽는다.
+  useEffect(() => {
+    setTelemetryOn(isTelemetryEnabled());
+  }, []);
+
+  const handleToggleTelemetry = useCallback((next: boolean) => {
+    setTelemetryOn(next);
+    void setTelemetryEnabled(next);
+  }, []);
 
   // 가장 최근 설정값을 ref 로 유지(시각 휠 연속 조작 시 최신값 기준 저장).
   // 렌더 중 ref 변이는 React 규칙 위반이므로 커밋 후 effect 에서 동기화한다.
@@ -283,6 +298,26 @@ export default function SettingsScreen() {
                   minute={settings.scheduleMinute}
                   onChange={handleTimeChange}
                   disabled={timeControlsDisabled}
+                />
+              </View>
+            </View>
+
+            {/* 사용 통계 — 앱 개선용 익명 집계. 언제든 끌 수 있어야 한다 */}
+            <View style={styles.card}>
+              <View style={styles.cardRow}>
+                <View style={styles.cardRowText}>
+                  <Text style={styles.cardTitle}>사용 통계 보내기</Text>
+                  <Text style={styles.cardSubtitle}>
+                    어떤 기능이 도움이 되는지 익명으로 집계해요. 입력하신 마음은
+                    보내지 않아요
+                  </Text>
+                </View>
+                <Switch
+                  value={telemetryOn}
+                  onValueChange={handleToggleTelemetry}
+                  trackColor={{ false: colors.border, true: "#A9CBF1" }}
+                  thumbColor={telemetryOn ? colors.primary : colors.background}
+                  ios_backgroundColor={colors.border}
                 />
               </View>
             </View>
