@@ -203,7 +203,7 @@ export default function SettingsScreen() {
 
   return (
     <View style={styles.container}>
-      <ScreenHeader title="알림 설정" />
+      <ScreenHeader title="설정" />
 
       <ScrollView
         contentContainerStyle={[
@@ -249,7 +249,7 @@ export default function SettingsScreen() {
               </View>
             )}
 
-            {/* 알림 받기 토글 */}
+            {/* 알림 — 수신 여부와 시각은 한 기능이라 같은 카드로 묶는다 */}
             <View style={styles.card}>
               <View style={styles.cardRow}>
                 <View style={styles.cardRowText}>
@@ -266,25 +266,25 @@ export default function SettingsScreen() {
                   ios_backgroundColor={colors.border}
                 />
               </View>
-            </View>
 
-            {/* 알림 시간 */}
-            <View
-              style={[styles.card, timeControlsDisabled && styles.cardDisabled]}
-            >
-              <View style={styles.timeHeaderRow}>
-                <Text style={styles.cardTitle}>알림 시간</Text>
-                <Text style={styles.timeValue}>
-                  {formatTime(settings.scheduleHour, settings.scheduleMinute)}
-                </Text>
+              <View style={styles.cardDivider} />
+
+              {/* 알림이 꺼져 있으면 시간 영역만 흐리게 — 토글은 항상 조작 가능해야 한다 */}
+              <View style={timeControlsDisabled ? styles.cardDisabled : null}>
+                <View style={styles.timeHeaderRow}>
+                  <Text style={styles.cardTitle}>알림 시간</Text>
+                  <Text style={styles.timeValue}>
+                    {formatTime(settings.scheduleHour, settings.scheduleMinute)}
+                  </Text>
+                </View>
+
+                <WheelTimePicker
+                  hour={settings.scheduleHour}
+                  minute={settings.scheduleMinute}
+                  onChange={handleTimeChange}
+                  disabled={timeControlsDisabled}
+                />
               </View>
-
-              <WheelTimePicker
-                hour={settings.scheduleHour}
-                minute={settings.scheduleMinute}
-                onChange={handleTimeChange}
-                disabled={timeControlsDisabled}
-              />
             </View>
 
             {/* 홈 화면 위젯 안내 */}
@@ -396,6 +396,11 @@ const styles = StyleSheet.create({
   },
   cardDisabled: {
     opacity: 0.5,
+  },
+  cardDivider: {
+    height: 1,
+    backgroundColor: colors.border,
+    marginVertical: 18,
   },
   cardRow: {
     flexDirection: "row",
