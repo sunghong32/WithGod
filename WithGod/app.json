@@ -58,6 +58,7 @@
         }
       ],
       "./plugins/with-rnfirebase-static-framework",
+      "./plugins/with-remove-ad-id-permission",
       "@bacons/apple-targets",
       [
         "react-native-android-widget",
