@@ -13,6 +13,7 @@ import { QueryProvider } from '@/shared/lib/QueryProvider';
 import { setupPushNotificationsAsync } from '@/shared/lib/pushNotifications';
 import { startTelemetry, stopTelemetry } from '@/shared/lib/telemetry';
 import { TelemetryConsentModal } from '@/shared/components/TelemetryConsentModal';
+import { UpdatePromptModal } from '@/shared/components/UpdatePromptModal';
 import { refreshHomeWidgetAsync } from '@/widgets/refreshHomeWidget';
 
 SplashScreen.preventAutoHideAsync();
@@ -90,6 +91,8 @@ export default function RootLayout() {
           </Stack>
           {/* 유럽 첫 실행 시 통계 수집 동의창 (그 외 지역은 뜨지 않음) */}
           <TelemetryConsentModal />
+          {/* 새 버전이 있으면 업데이트 안내 (서버 미응답 시 뜨지 않음) */}
+          <UpdatePromptModal />
           <StatusBar style="auto" />
           </ThemeProvider>
         </KeyboardProvider>

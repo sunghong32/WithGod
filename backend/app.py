@@ -27,6 +27,7 @@ import os, re, json, time, logging, asyncio, secrets
 from analytics.db import init_db as init_analytics_db
 from analytics.routes import router as analytics_router
 from analytics.scheduler import AnalyticsRollupScheduler
+from app_version import router as app_version_router
 from notifications.jobs import build_notification_manager
 from notifications.manager import DailyVerseNotificationManager
 from notifications.scheduler import DailyVerseScheduler
@@ -1184,6 +1185,8 @@ async def comment_stream(inp: CommentStreamIn):
 
 # 자체 지표: POST /telemetry/events(앱 수집) + GET /admin/analytics/*(대시보드)
 app.include_router(analytics_router)
+# 앱 버전 게이팅: GET /app-version (업데이트 안내 팝업용)
+app.include_router(app_version_router)
 
 
 @app.on_event("startup")
