@@ -9,7 +9,7 @@ import { createEventId } from './ids';
 import { clearQueue, flush, loadQueue, enqueue, shouldFlush } from './queue';
 import { persistSession, restoreSession, touchSession } from './session';
 
-export { needsConsentPrompt } from './consent';
+export { needsConsentPrompt, isConsentRequiredRegion } from './consent';
 
 /**
  * 자체 지표 수집 SDK.

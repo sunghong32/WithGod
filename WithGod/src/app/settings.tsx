@@ -12,6 +12,7 @@ import {
   type PushPermissionStatus,
 } from "@/shared/lib/pushNotifications";
 import {
+  isConsentRequiredRegion,
   isTelemetryEnabled,
   setTelemetryEnabled,
 } from "@/shared/lib/telemetry";
@@ -57,6 +58,9 @@ export default function SettingsScreen() {
   const [syncFailed, setSyncFailed] = useState(false);
   const [showWidgetGuide, setShowWidgetGuide] = useState(false);
   const [telemetryOn, setTelemetryOn] = useState(isTelemetryEnabled());
+  // 동의가 필요한 지역(EU/EEA)에서만 통계 토글을 노출한다. 지역은 실행 중
+  // 바뀌지 않으므로 최초 1회만 계산한다.
+  const [showTelemetryToggle] = useState(() => isConsentRequiredRegion());
 
   // 통계 수집 여부는 SDK 초기화(비동기) 후에 확정되므로 화면 진입 시 다시 읽는다.
   useEffect(() => {
@@ -302,25 +306,31 @@ export default function SettingsScreen() {
               </View>
             </View>
 
-            {/* 사용 통계 — 앱 개선용 익명 집계. 언제든 끌 수 있어야 한다 */}
-            <View style={styles.card}>
-              <View style={styles.cardRow}>
-                <View style={styles.cardRowText}>
-                  <Text style={styles.cardTitle}>사용 통계 보내기</Text>
-                  <Text style={styles.cardSubtitle}>
-                    어떤 기능이 도움이 되는지 익명으로 집계해요. 입력하신 마음은
-                    보내지 않아요
-                  </Text>
+            {/*
+              사용 통계 토글은 동의가 필요한 지역(EU/EEA)에서만 노출한다.
+              그 외 지역은 기본 수집이라 토글이 없다 — 대다수 사용자에게 불필요한
+              선택을 강요하지 않기 위해서다. 유럽은 GDPR상 철회 수단이 필수라 유지.
+            */}
+            {showTelemetryToggle && (
+              <View style={styles.card}>
+                <View style={styles.cardRow}>
+                  <View style={styles.cardRowText}>
+                    <Text style={styles.cardTitle}>사용 통계 보내기</Text>
+                    <Text style={styles.cardSubtitle}>
+                      어떤 기능이 도움이 되는지 익명으로 집계해요. 입력하신 마음은
+                      보내지 않아요
+                    </Text>
+                  </View>
+                  <Switch
+                    value={telemetryOn}
+                    onValueChange={handleToggleTelemetry}
+                    trackColor={{ false: colors.border, true: "#A9CBF1" }}
+                    thumbColor={telemetryOn ? colors.primary : colors.background}
+                    ios_backgroundColor={colors.border}
+                  />
                 </View>
-                <Switch
-                  value={telemetryOn}
-                  onValueChange={handleToggleTelemetry}
-                  trackColor={{ false: colors.border, true: "#A9CBF1" }}
-                  thumbColor={telemetryOn ? colors.primary : colors.background}
-                  ios_backgroundColor={colors.border}
-                />
               </View>
-            </View>
+            )}
 
             {/* 홈 화면 위젯 안내 */}
             <TouchableOpacity
