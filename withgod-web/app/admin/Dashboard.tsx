@@ -18,6 +18,7 @@ import {
 } from "@/lib/analytics";
 
 import { ActiveUsersChart } from "./components/ActiveUsersChart";
+import { AppVersionControl } from "./components/AppVersionControl";
 import { BreakdownList } from "./components/BreakdownList";
 import { ChartCard } from "./components/ChartCard";
 import { EventTable } from "./components/EventTable";
@@ -243,6 +244,8 @@ export function Dashboard() {
                 </div>
               </ChartCard>
             </div>
+
+            <AppVersionControl />
           </div>
         ) : null}
       </main>
