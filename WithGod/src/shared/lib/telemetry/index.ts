@@ -3,11 +3,13 @@ import { AppState, Platform, type AppStateStatus } from 'react-native';
 
 import type { TelemetryBatchPayload } from '@/shared/api/telemetryApi';
 import { getOrCreateDeviceId } from '@/shared/lib/notificationSettings';
-import { getStorageItem, setStorageItem } from '@/shared/lib/storage';
 
+import { readConsent, resolveEnabled, writeConsent } from './consent';
 import { createEventId } from './ids';
 import { clearQueue, flush, loadQueue, enqueue, shouldFlush } from './queue';
 import { persistSession, restoreSession, touchSession } from './session';
+
+export { needsConsentPrompt } from './consent';
 
 /**
  * 자체 지표 수집 SDK.
@@ -20,7 +22,6 @@ import { persistSession, restoreSession, touchSession } from './session';
  * 서버에서 파라미터 키를 한 번 더 화이트리스트로 거른다.
  */
 
-const ENABLED_KEY = 'withgod.telemetry.enabled';
 const FLUSH_INTERVAL_MS = 30_000;
 
 type TelemetryParams = Record<string, string | number | boolean>;
@@ -28,8 +29,11 @@ type TelemetryParams = Record<string, string | number | boolean>;
 const isNative = Platform.OS === 'ios' || Platform.OS === 'android';
 
 let anonId = '';
-let enabled = true;
+// 동의 상태가 정해지기 전(특히 유럽 첫 실행)에는 수집하지 않는다. 지역·저장된
+// 동의를 읽는 startTelemetry 가 실제 값을 정한다.
+let enabled = false;
 let started = false;
+let collectionStarted = false;
 let flushTimer: ReturnType<typeof setInterval> | null = null;
 let appStateSubscription: { remove: () => void } | null = null;
 
@@ -101,12 +105,39 @@ const syncFirebaseConsent = async (consented: boolean): Promise<void> => {
   }
 };
 
+/**
+ * 실제 수집을 시작한다(익명 ID 준비, 세션·큐 복원, 리스너 등록).
+ *
+ * startTelemetry 와 분리한 이유: 유럽 사용자는 앱 시작 시엔 수집을 미뤄두고,
+ * 동의창에서 '동의'를 누른 뒤에야 여기로 들어와 수집을 시작하기 때문이다.
+ * 여러 번 불려도 한 번만 설정한다.
+ */
+const beginCollection = async (): Promise<void> => {
+  if (collectionStarted) return;
+  collectionStarted = true;
+
+  anonId = await getOrCreateDeviceId();
+  await restoreSession();
+  await loadQueue();
+
+  appStateSubscription = AppState.addEventListener('change', handleAppStateChange);
+  flushTimer = setInterval(flushNow, FLUSH_INTERVAL_MS);
+
+  trackEvent('app_open');
+  flushNow();
+};
+
+/**
+ * 설정 토글 / 동의창에서 호출. 수집 동의를 켜거나 끈다(철회 포함).
+ * 켜면 그 자리에서 수집을 시작하고, 끄면 큐를 비운다.
+ */
 export const setTelemetryEnabled = async (next: boolean): Promise<void> => {
   enabled = next;
-  await setStorageItem(ENABLED_KEY, next ? '1' : '0');
+  await writeConsent(next);
   // 자체 수집과 Firebase 자동 수집을 함께 켜고 끈다.
   void syncFirebaseConsent(next);
   if (next) {
+    await beginCollection();
     flushNow();
     return;
   }
@@ -116,16 +147,20 @@ export const setTelemetryEnabled = async (next: boolean): Promise<void> => {
 
 /**
  * 앱 시작 시 1회 호출. 실패해도 앱 흐름을 막지 않는다.
+ *
+ * 저장된 동의와 지역을 종합해 수집 여부를 정한다. 유럽에서 아직 동의하지
+ * 않았으면 수집하지 않고 대기한다(동의창은 별도 컴포넌트가 띄운다).
  */
 export const startTelemetry = async (): Promise<void> => {
   if (!isNative || started) return;
   started = true;
 
   try {
-    const stored = await getStorageItem(ENABLED_KEY);
-    enabled = stored !== '0';
+    const consent = await readConsent();
+    enabled = resolveEnabled(consent);
     // 저장된 동의 상태를 Firebase 자동 수집에도 매 실행 반영한다. 특히 이전에
-    // 꺼둔 사용자는 이번 실행에서 Firebase 가 자동 수집을 시작하기 전에 꺼야 한다.
+    // 꺼둔(또는 아직 동의 안 한 유럽) 사용자는 Firebase 가 자동 수집을 시작하기
+    // 전에 꺼야 한다.
     void syncFirebaseConsent(enabled);
     if (!enabled) {
       // 초기화가 끝나기 전 짧은 순간에 담긴 이벤트까지 정리한다.
@@ -133,15 +168,7 @@ export const startTelemetry = async (): Promise<void> => {
       return;
     }
 
-    anonId = await getOrCreateDeviceId();
-    await restoreSession();
-    await loadQueue();
-
-    appStateSubscription = AppState.addEventListener('change', handleAppStateChange);
-    flushTimer = setInterval(flushNow, FLUSH_INTERVAL_MS);
-
-    trackEvent('app_open');
-    flushNow();
+    await beginCollection();
   } catch (error) {
     if (__DEV__) console.warn('[Telemetry] start failed', error);
   }
@@ -155,6 +182,7 @@ export const stopTelemetry = (): void => {
   appStateSubscription?.remove();
   appStateSubscription = null;
   started = false;
+  collectionStarted = false;
 };
 
 export const trackEvent = (name: string, params?: TelemetryParams): void => {

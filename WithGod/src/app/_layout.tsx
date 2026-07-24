@@ -12,6 +12,7 @@ import { logScreenViewEvent } from '@/shared/lib/analytics';
 import { QueryProvider } from '@/shared/lib/QueryProvider';
 import { setupPushNotificationsAsync } from '@/shared/lib/pushNotifications';
 import { startTelemetry, stopTelemetry } from '@/shared/lib/telemetry';
+import { TelemetryConsentModal } from '@/shared/components/TelemetryConsentModal';
 import { refreshHomeWidgetAsync } from '@/widgets/refreshHomeWidget';
 
 SplashScreen.preventAutoHideAsync();
@@ -87,6 +88,8 @@ export default function RootLayout() {
             <Stack.Screen name="settings" />
             <Stack.Screen name="bookmarks" />
           </Stack>
+          {/* 유럽 첫 실행 시 통계 수집 동의창 (그 외 지역은 뜨지 않음) */}
+          <TelemetryConsentModal />
           <StatusBar style="auto" />
           </ThemeProvider>
         </KeyboardProvider>
