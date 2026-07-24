@@ -54,7 +54,7 @@
       },
       "android": {
         "serviceAccountKeyPath": "../backend/secrets/play-submit-key.json",
-        "track": "internal"
+        "track": "alpha"
       }
     }
   }
