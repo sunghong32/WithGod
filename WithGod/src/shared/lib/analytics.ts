@@ -1,6 +1,6 @@
 import { Platform } from "react-native";
 
-import { trackEvent, trackScreen } from "./telemetry";
+import { isTelemetryEnabled, trackEvent, trackScreen } from "./telemetry";
 
 /**
  * 분석 이벤트 래퍼.
@@ -35,7 +35,9 @@ export const logAnalyticsEvent = async (
   name: string,
   params?: AnalyticsParams,
 ): Promise<void> => {
-  if (!isNative) return;
+  // 사용자가 통계 수집을 끄면 자체 수집뿐 아니라 Firebase 로도 보내지 않는다.
+  // (자동 수집 자체는 setFirebaseAnalyticsCollectionEnabled 로 중단한다)
+  if (!isNative || !isTelemetryEnabled()) return;
   trackEvent(name, params);
   try {
     const { analytics, module } = getAnalyticsApi();
@@ -45,8 +47,29 @@ export const logAnalyticsEvent = async (
   }
 };
 
-export const logScreenViewEvent = async (screenName: string): Promise<void> => {
+/**
+ * Firebase 의 자동 수집(세션, 앱 최초 실행, IP 기반 대략적 위치 등)을 켜고 끈다.
+ *
+ * 명시적 logEvent 만 막으면 Firebase 가 뒤에서 자동 수집하는 데이터는 계속
+ * 흐른다. 개인정보 신고에서 '사용자가 수집을 끌 수 있음'으로 선언하려면 이
+ * 자동 수집까지 멈춰야 한다. 이 설정은 네이티브에 영속되어 앱을 다시 켜도 유지된다.
+ */
+export const setFirebaseAnalyticsCollectionEnabled = async (
+  collectionEnabled: boolean,
+): Promise<void> => {
   if (!isNative) return;
+  try {
+    const { analytics, module } = getAnalyticsApi();
+    await module.setAnalyticsCollectionEnabled(analytics, collectionEnabled);
+  } catch (error) {
+    if (__DEV__) {
+      console.warn("[Analytics] setCollectionEnabled failed:", error);
+    }
+  }
+};
+
+export const logScreenViewEvent = async (screenName: string): Promise<void> => {
+  if (!isNative || !isTelemetryEnabled()) return;
   trackScreen(screenName);
   try {
     const { analytics, module } = getAnalyticsApi();

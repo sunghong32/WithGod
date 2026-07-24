@@ -85,9 +85,27 @@ const handleAppStateChange = (state: AppStateStatus): void => {
 
 export const isTelemetryEnabled = (): boolean => enabled;
 
+/**
+ * Firebase 자동 수집을 동의 상태에 맞춘다.
+ *
+ * analytics.ts 가 이미 telemetry 를 import 하므로 정적으로 되받으면 순환
+ * import 가 된다. 호출 시점 require 로 그 고리를 끊는다. best-effort.
+ */
+const syncFirebaseConsent = async (consented: boolean): Promise<void> => {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const analytics = require('@/shared/lib/analytics');
+    await analytics.setFirebaseAnalyticsCollectionEnabled(consented);
+  } catch {
+    // 분석 동기화 실패가 앱 흐름을 막지 않는다.
+  }
+};
+
 export const setTelemetryEnabled = async (next: boolean): Promise<void> => {
   enabled = next;
   await setStorageItem(ENABLED_KEY, next ? '1' : '0');
+  // 자체 수집과 Firebase 자동 수집을 함께 켜고 끈다.
+  void syncFirebaseConsent(next);
   if (next) {
     flushNow();
     return;
@@ -106,6 +124,9 @@ export const startTelemetry = async (): Promise<void> => {
   try {
     const stored = await getStorageItem(ENABLED_KEY);
     enabled = stored !== '0';
+    // 저장된 동의 상태를 Firebase 자동 수집에도 매 실행 반영한다. 특히 이전에
+    // 꺼둔 사용자는 이번 실행에서 Firebase 가 자동 수집을 시작하기 전에 꺼야 한다.
+    void syncFirebaseConsent(enabled);
     if (!enabled) {
       // 초기화가 끝나기 전 짧은 순간에 담긴 이벤트까지 정리한다.
       await clearQueue();
