@@ -21,6 +21,7 @@ import { WheelTimePicker } from "@/shared/components/WheelTimePicker";
 import { WidgetGuideModal } from "@/shared/components/WidgetGuideModal";
 import { baseFontFamily, colors, scaleFont } from "@/shared/styles";
 import { Ionicons } from "@expo/vector-icons";
+import Constants from "expo-constants";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -44,6 +45,10 @@ const formatTime = (hour: number, minute: number): string => {
 
 // 휠 연속 조작 시 서버 동기화를 마지막 변경만 보내기 위한 대기 시간
 const TIME_SYNC_DEBOUNCE_MS = 600;
+
+// 설치된 앱 버전. OTA 업데이트 중에도 스토어 빌드 기준 버전이 유지된다.
+const appVersion =
+  Constants.expoConfig?.version ?? Constants.nativeAppVersion ?? "-";
 
 export default function SettingsScreen() {
   const { insets } = useSafeAreaPadding();
@@ -304,6 +309,16 @@ export default function SettingsScreen() {
                   disabled={timeControlsDisabled}
                 />
               </View>
+
+              {/* 서버 저장 상태 — 알림 설정만 서버에 동기화되므로 이 카드 안에 둔다.
+                  토글 변경도 저장 대상이라 흐림(disabled) 영역 밖에 배치한다. */}
+              <Text style={styles.syncNote}>
+                {isSyncing
+                  ? "저장 중..."
+                  : syncFailed
+                    ? "서버에 반영하지 못했어요. 잠시 후 다시 시도해주세요."
+                    : "변경 사항은 자동으로 저장됩니다."}
+              </Text>
             </View>
 
             {/*
@@ -351,13 +366,8 @@ export default function SettingsScreen() {
               </View>
             </TouchableOpacity>
 
-            <Text style={styles.footerNote}>
-              {isSyncing
-                ? "저장 중..."
-                : syncFailed
-                  ? "서버에 반영하지 못했어요. 잠시 후 다시 시도해주세요."
-                  : "변경 사항은 자동으로 저장됩니다."}
-            </Text>
+            {/* 현재 앱 버전 — 업데이트 안내 팝업 도입으로 확인 수단이 필요해짐 */}
+            <Text style={styles.versionText}>버전 {appVersion}</Text>
           </>
         )}
       </ScrollView>
@@ -481,11 +491,18 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontFamily: baseFontFamily,
   },
-  footerNote: {
-    fontSize: scaleFont(13),
+  syncNote: {
+    fontSize: scaleFont(12),
     color: "#9CA3AF",
     fontFamily: baseFontFamily,
     textAlign: "center",
-    marginTop: 4,
+    marginTop: 12,
+  },
+  versionText: {
+    fontSize: scaleFont(13),
+    color: "#B0B5BD",
+    fontFamily: baseFontFamily,
+    textAlign: "center",
+    marginTop: 8,
   },
 });

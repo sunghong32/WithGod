@@ -83,7 +83,13 @@ export default function RootLayout() {
           <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
           <Stack screenOptions={{ headerShown: false }}>
             {/* 스플래시·메인은 스와이프 백 비활성 (스택 최하단이라 뒤로 갈 곳이 없음) */}
-            <Stack.Screen name="index" options={{ gestureEnabled: false }} />
+            {/* 스플래시는 router.back()(pop)으로 닫히는데, 네이티브 pop 기본
+                애니메이션이 '우측 슬라이드'라 밀려나가듯 보인다. 팝되는 화면의
+                animation 설정을 따르므로 fade 로 지정해 자연스럽게 사라지게 한다. */}
+            <Stack.Screen
+              name="index"
+              options={{ gestureEnabled: false, animation: 'fade' }}
+            />
             <Stack.Screen name="(tabs)" options={{ gestureEnabled: false }} />
             <Stack.Screen name="result" />
             <Stack.Screen name="settings" />
