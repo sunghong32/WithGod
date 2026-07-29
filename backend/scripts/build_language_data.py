@@ -73,7 +73,8 @@ BOOK_NAME_OVERRIDES = {
     "de": {"1CH": "1. Chronik"},  # 원본 오타 '1. Chonik'
     "it": {"JOS": "Giosuè"},  # 원본 'Giosué' — 본문 표기와 통일
     "es": {"MAT": "Mateo", "LUK": "Lucas"},  # 'San Mateo'만 San이 붙는 비일관
-    "pl": {"JDG": "Sędziów", "DEU": "Powtórzonego Prawa"},  # 소유격 단독형으로 통일
+    # 소유격 단독형으로 통일 + 시편은 폴란드어 인용 관례(Psalm 23:1)를 따른다
+    "pl": {"JDG": "Sędziów", "DEU": "Powtórzonego Prawa", "PSA": "Psalm"},
 }
 
 # deu1912 는 독일식 대체 절번호를 본문에 [1:5]/[1b] 로 병기한다 — 표시 노이즈.

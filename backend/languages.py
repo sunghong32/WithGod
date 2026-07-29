@@ -35,6 +35,13 @@ CONFIG_PATH = ROOT / "data" / "language_config.json"
 SUPPORTED_LANGUAGES = ("ko", "en", "es", "pt", "de", "fr", "it", "pl")
 DEFAULT_ENABLED = ["ko"]
 
+# 프롬프트 지시문용 언어 이름(영어) — 지시는 영어, 출력은 대상 언어가
+# 소형 모델에서 언어 준수가 가장 안정적이다(이슈 #11).
+LANGUAGE_NAMES_EN = {
+    "ko": "Korean", "en": "English", "es": "Spanish", "pt": "Portuguese",
+    "de": "German", "fr": "French", "it": "Italian", "pl": "Polish",
+}
+
 # 한국어 책 이름(운영 data/verses.csv 기준) ↔ USFM 3글자 코드.
 # 언어 간 구절 정렬(/random 의 '오늘의 말씀' 동일 구절 제공)에 쓴다.
 _KO_BOOKS = [
@@ -267,6 +274,56 @@ def find_aligned_verse(
     except Exception:
         log.exception("verse align 실패(%s) — 같은 번호 절로 폴백", lang)
         return store.find_verse(book_code, chapter, verse)
+
+
+# ---------- 추천 적합성 필터 ----------
+
+# 저지 검증(이슈 #11)이 확정했지만 자동 분류가 놓친 구절 + 같은 단락의 명백한
+# 이웃 절. 분류기를 재실행해도 유지되도록 코드에 둔다.
+_CURATED_UNSUITABLE = {
+    # 잠언 7:13-21 — 유혹하는 여인의 대사(경건해 보이는 7:14 포함)
+    *(f"PRO 7:{v}" for v in range(13, 22)),
+    # 이사야 63:1-6 — 포도주틀 심판 신탁
+    *(f"ISA 63:{v}" for v in range(1, 7)),
+    # 이사야 43:22-28 — 언약 소송의 책망(43:24 가 위로 카드로 검색된 사례)
+    *(f"ISA 43:{v}" for v in range(22, 29)),
+    # 예레미야 8:10-12 — 거짓 평강 규탄
+    *(f"JER 8:{v}" for v in range(10, 13)),
+    "GEN 27:7",    # 야곱의 속임 서사 중 한 절
+    "PRO 24:33", "PRO 24:34",  # 게으름뱅이 경고(빈궁이 강도같이 오리라)
+    "PHP 1:23",    # '떠나는 것이 더 낫다' — 우울·고립 사용자에게 위험
+}
+
+_unsuitable_refs: set[str] | None = None
+
+
+def _load_unsuitable() -> set[str]:
+    """scripts/classify_verse_suitability.py 산출물. 없으면 필터 없이 동작."""
+    global _unsuitable_refs
+    if _unsuitable_refs is None:
+        try:
+            data = json.loads(
+                (LANG_DIR / "unsuitable_refs.json").read_text(encoding="utf-8")
+            )
+            _unsuitable_refs = set(data.get("unsuitable", [])) | _CURATED_UNSUITABLE
+            log.info("추천 부적합 절 %d개 로드", len(_unsuitable_refs))
+        except FileNotFoundError:
+            _unsuitable_refs = set(_CURATED_UNSUITABLE)
+        except Exception:
+            log.exception("unsuitable_refs.json 로드 실패 — 큐레이션 목록만 사용")
+            _unsuitable_refs = set(_CURATED_UNSUITABLE)
+    return _unsuitable_refs
+
+
+def is_recommendable(book_code: str | None, chapter, verse) -> bool:
+    """위로 카드로 부적합한 절(심판 신탁·족보·악인의 대사 등)인지 검사.
+
+    좌표는 KJV식(영어 기준). 절번호가 밀리는 일부 장(fr 시편)에서는 어긋날 수
+    있으나 부적합 범주는 시편 밖에 몰려 있어 실용적으로 무해하다(이슈 #11).
+    """
+    if not book_code:
+        return True
+    return f"{book_code} {int(chapter)}:{int(verse)}" not in _load_unsuitable()
 
 
 # ---------- 라우터 ----------

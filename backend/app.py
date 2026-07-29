@@ -30,8 +30,10 @@ from app_version import router as app_version_router
 from embedding import load_query_embedder
 from languages import (
     KO_NAME_TO_CODE,
+    LANGUAGE_NAMES_EN,
     find_aligned_verse,
     get_store,
+    is_recommendable,
     register_ko_store,
     resolve_lang,
     router as languages_router,
@@ -314,23 +316,28 @@ def _resolve_user_key(request: Request) -> str:
 _init_daily_random_db()
 
 def _style_to_limits(style: str):
+    # comment_limit 는 한국어 프롬프트용(글자 수 기준), comment_limit_intl 은
+    # 비한국어 프롬프트용(문장 수 기준 — 언어마다 글자 수 감각이 달라서).
     style = (style or "medium").lower()
     if style == "short":
         return {
             "text_limit": "1문장(약 40–60자)",
             "comment_limit": "1문장(약 40–60자)",
+            "comment_limit_intl": "1 short sentence",
             "max_tokens": 300
         }
     if style == "long":
         return {
             "text_limit": "1–2문장(약 120–180자)",
             "comment_limit": "4–5문장(약 260–360자)",
+            "comment_limit_intl": "4–5 sentences (one warm paragraph)",
             "max_tokens": 1500
         }
     # default: medium
     return {
         "text_limit": "1–2문장(약 80–120자)",
         "comment_limit": "2문장(약 120–180자)",
+        "comment_limit_intl": "2 sentences",
         "max_tokens": 550
     }
 
@@ -346,6 +353,33 @@ _RECOMMEND_SYSTEM = (
     "- 훈계하듯 가르치지 말고, 곁에서 손잡아 주듯 부드럽게 말합니다.\n"
     "- 과장·단정적 단언·번영신학식 약속은 피하고 신학적으로 무난하게 씁니다."
 )
+
+
+def _recommend_system(lang: str) -> str:
+    """추천 코멘트 시스템 프롬프트 — ko 는 기존 그대로, 그 외는 영어 지시 +
+    출력 언어 강제(지시는 영어, 출력은 대상 언어가 소형 모델에서 가장 안정적)."""
+    if lang == "ko":
+        return _RECOMMEND_SYSTEM
+    name = LANGUAGE_NAMES_EN.get(lang, lang)
+    return (
+        f"You are a warm, wise pastor writing in {name}. "
+        "A believer has opened their heart to you; you respond with a short, "
+        "sermon-like reflection on a Bible verse.\n"
+        "Rules:\n"
+        f"- Write ONLY in {name}. Every word of your output, including tags, must be in {name}.\n"
+        "- First explain in plain words what the verse means (brief exposition).\n"
+        "- Then gently apply it to this person's situation as comfort.\n"
+        "- Speak tenderly, like holding their hand — never lecture or moralize.\n"
+        "- Avoid exaggeration, absolute promises, and prosperity-gospel claims; "
+        "stay theologically sound and modest."
+    )
+
+
+# 비한국어 프롬프트의 tag 예시(대상 언어로 줘야 tag 도 그 언어로 나온다).
+_TAG_EXAMPLES = {
+    "en": "Fear", "es": "Miedo", "pt": "Medo", "de": "Angst",
+    "fr": "Peur", "it": "Paura", "pl": "Lęk",
+}
 
 
 def _build_user_prompt(mood: str, candidates: List[dict], picks: int, style_limits: dict) -> str:
@@ -379,8 +413,36 @@ def _build_user_prompt(mood: str, candidates: List[dict], picks: int, style_limi
 """.strip()
 
 
-def _build_single_comment_prompt(mood: str, verse: dict, style_limits: dict) -> str:
+def _build_single_comment_prompt(
+    mood: str, verse: dict, style_limits: dict, lang: str = "ko"
+) -> str:
     """스트리밍용: 구절 1개에 대해 tag + comment(말씀 풀이+적용)를 생성하는 프롬프트"""
+    if lang != "ko":
+        name = LANGUAGE_NAMES_EN.get(lang, lang)
+        tag_ex = _TAG_EXAMPLES.get(lang, "Comfort")
+        return f"""
+Role: You are a warm, wise pastor. Write ONLY in {name}.
+
+Bible verse (already in {name} — quote it as-is, do not re-translate):
+{verse['ref']} :: {verse['text']}
+The believer's heart: "{mood}"
+
+Task: Write a short pastoral reflection as 'comment'.
+- Length: {style_limits['comment_limit_intl']}.
+- Weave these into ONE smooth paragraph, without numbering or headings:
+  (1) what this verse originally means, explained simply;
+  (2) how it gently comforts and applies to this person's situation.
+- Be honest about the verse: if it is a rebuke, judgment oracle, or warning,
+  do not twist it into unrelated comfort — explain its real meaning and find
+  the honest hope in or around it.
+- Vary your phrasing naturally; do not open with a formula like "In [ref], ...".
+- 'tag': 1–2 emotion themes, in {name} (e.g. "{tag_ex}").
+- Output exactly ONE JSON object, nothing else (keep key order):
+{{
+  "tag": "{tag_ex}",
+  "comment": "a pastoral comment in {name}"
+}}
+""".strip()
     return f"""
 역할: 당신은 따뜻한 한국인 목사님입니다. (반드시 한국어만 사용)
 
@@ -504,6 +566,8 @@ class CommentStreamIn(BaseModel):
     ref: str = Field(..., examples=["시편 23:1"])
     text: str = Field(..., examples=["여호와는 나의 목자시니 내게 부족함이 없으리로다."])
     index: Optional[int] = Field(0, examples=[0])
+    # 코멘트 언어(미지원/비활성은 ko 폴백)
+    lang: Optional[str] = Field(None, examples=["ko"])
 
 
 class VerseCandidate(BaseModel):
@@ -806,11 +870,13 @@ def send_daily_verse(inp: PushTokensIn):
 )
 def recommend(inp: RecommendIn):
     # ---------- Backend-only configuration ----------
-    TOP_K = 12               # 넓게 뽑아 LLM이 재순위/선택
     PICKS = 3
     COMMENT_STYLE = "long"   # short | medium | long
 
     lang = resolve_lang(inp.lang)
+    # 넓게 뽑아 LLM이 재순위/선택. 비한국어는 부적절 구절(심판·명단 등)을 거를
+    # 여지를 주기 위해 더 넓게 뽑는다(저지 검증 결과 반영, 이슈 #11).
+    TOP_K = 12 if lang == "ko" else 20
     store = get_store(lang)
     KOREAN_ONLY = lang == "ko"  # 한자/가나 제거는 한국어 본문에만 적용
 
@@ -821,41 +887,32 @@ def recommend(inp: RecommendIn):
 
     t = time.perf_counter()
 
-    # 1) RAG 검색 (감정/상황을 검색 키워드로 확장해 의미 매칭 정확도 향상)
-    # 쿼리 확장은 한국어 키워드를 뽑는 프롬프트라 ko 에만 적용한다(다른 언어의
-    # 확장·코멘트 언어는 이슈 #11 프롬프트 파라미터화에서).
-    search_query = _expand_search_query(inp.mood) if lang == "ko" else inp.mood
+    # 1) RAG 검색 (감정/상황을 검색 대상 언어의 키워드로 확장해 매칭 정확도 향상)
+    search_query = _expand_search_query(inp.mood, lang)
     _lap("expand", t)
     t = time.perf_counter()
     q = model.encode([f"query: {search_query}"])
     _lap("encode", t)
     t = time.perf_counter()
 
-    D, I = store.index.search(q, TOP_K)
+    # 필터로 빠지는 몫을 감안해 두 배로 뽑은 뒤 TOP_K 로 줄인다.
+    D, I = store.index.search(q, TOP_K * 2)
     _lap("faiss", t)
     t = time.perf_counter()
 
-    cands = []
-    for s, i in zip(D[0], I[0]):
-        # FAISS 검색 결과의 인덱스 i는 store.df의 행 번호와 1:1로 대응
-        r = store.df.iloc[int(i)]
-        cands.append({
-            "ref": f"{r['book']} {int(r['chapter'])}:{int(r['verse'])}",
-            "text": str(r["text"]),
-            "score": float(s)
-        })
+    cands = _collect_candidates(store, D[0], I[0], TOP_K)
     _lap("cands", t)
     t = time.perf_counter()
 
     # 2) OpenAI 생성
     limits = _style_to_limits(COMMENT_STYLE)
-    system = _RECOMMEND_SYSTEM
+    system = _recommend_system(lang)
 
     if lang != "ko":
         # 비한국어: 후보 전체를 GPT에 주고 ref/text/comment JSON 을 통째로 받으면
         # GPT가 구절을 한국어로 번역·변형해 되뱉는다(실측). 스트리밍 경로와 같은
         # 구조로 — 선별은 후보 '번호'로만 받고 ref/text 는 스토어 원문을 쓰며,
-        # 코멘트만 구절별로 생성한다(코멘트 언어 현지화는 이슈 #11).
+        # 코멘트만 구절별로 대상 언어로 생성한다.
         selected = _select_verses(inp.mood, cands, PICKS)
         _lap("select", t)
         t = time.perf_counter()
@@ -865,7 +922,7 @@ def recommend(inp: RecommendIn):
             item = {"ref": v["ref"], "text": str(v["text"]), "tag": "", "comment": ""}
             try:
                 parsed = json.loads(_call_openai_as_json(
-                    system, _build_single_comment_prompt(inp.mood, v, limits),
+                    system, _build_single_comment_prompt(inp.mood, v, limits, lang),
                     max_tokens=per_card_tokens,
                 ))
                 if isinstance(parsed, dict):
@@ -948,43 +1005,89 @@ def recommend(inp: RecommendIn):
     }
 
 
-def _search_candidates(mood: str, top_k: int, lang: str = "ko") -> List[dict]:
-    store = get_store(lang)
-    q = model.encode([f"query: {mood}"])
-    D, I = store.index.search(q, top_k)
-    cands = []
-    for s, i in zip(D[0], I[0]):
+def _collect_candidates(store, scores, ids, top_k: int) -> List[dict]:
+    """FAISS 결과에서 위로 부적합 절(심판 신탁·족보·악인의 대사 등)을 걸러
+    상위 top_k 후보를 만든다. 전부 걸러지는 극단엔 필터 없이 폴백한다."""
+    cands: List[dict] = []
+    dropped = 0
+    for s, i in zip(scores, ids):
         r = store.df.iloc[int(i)]
+        code = (
+            str(r["book_code"]) if "book_code" in r.index
+            else KO_NAME_TO_CODE.get(str(r["book"]))
+        )
+        if not is_recommendable(code, r["chapter"], r["verse"]):
+            dropped += 1
+            continue
         cands.append({
             "ref": f"{r['book']} {int(r['chapter'])}:{int(r['verse'])}",
             "text": str(r["text"]),
-            "score": float(s)
+            "score": float(s),
         })
+        if len(cands) >= top_k:
+            break
+    if dropped:
+        log.info("추천 후보에서 부적합 절 %d개 제외", dropped)
+    if not cands:
+        for s, i in zip(scores[:top_k], ids[:top_k]):
+            r = store.df.iloc[int(i)]
+            cands.append({
+                "ref": f"{r['book']} {int(r['chapter'])}:{int(r['verse'])}",
+                "text": str(r["text"]),
+                "score": float(s),
+            })
     return cands
 
 
-def _expand_search_query(mood: str) -> str:
+def _search_candidates(mood: str, top_k: int, lang: str = "ko") -> List[dict]:
+    store = get_store(lang)
+    q = model.encode([f"query: {mood}"])
+    # 필터로 빠지는 몫을 감안해 두 배로 뽑은 뒤 top_k 로 줄인다.
+    D, I = store.index.search(q, top_k * 2)
+    return _collect_candidates(store, D[0], I[0], top_k)
+
+
+def _expand_search_query(mood: str, lang: str = "ko") -> str:
     """사용자의 감정/상황 문장을 성경 검색에 적합한 '감정·주제 키워드'로 확장한다.
 
     성경 본문은 옛 문어체라 사용자의 일상어와 표면 어휘가 겹치지 않는다.
     LLM으로 핵심 감정 + 그에 응답하는 신앙 주제 키워드를 뽑아 원문에 덧붙여
-    임베딩 검색의 의미 매칭 정확도를 높인다. 실패 시 원문 그대로 검색(무중단).
+    임베딩 검색의 의미 매칭 정확도를 높인다. 키워드는 검색 대상 성경의 언어로
+    뽑는다(비한국어 인덱스는 그 언어 본문이므로). 실패 시 원문 그대로(무중단).
     """
     if not OPENAI_API_KEY:
         return mood
-    system = (
-        "너는 사용자의 감정/상황 문장을 성경 구절 검색용 한국어 키워드로 바꾸는 도우미다. "
-        "핵심 감정과, 그 감정에 성경이 건네는 위로/응답 주제를 함께 뽑아라. "
-        "설명 없이 쉼표로 구분한 키워드만 출력한다."
-    )
-    user = (
-        f'사용자 문장: "{mood}"\n\n'
-        "위 문장의 (1) 핵심 감정과 (2) 그 감정에 성경이 건네는 위로·응답 주제를 "
-        "한국어 키워드 6~10개로 확장해 쉼표로만 나열하라.\n"
-        '예: "요즘 너무 지치고 힘들어요" → 지침, 피곤, 번아웃, 안식, 쉼, 위로, 회복, 하나님의 돌보심'
-    )
+    if lang == "ko":
+        system = (
+            "너는 사용자의 감정/상황 문장을 성경 구절 검색용 한국어 키워드로 바꾸는 도우미다. "
+            "핵심 감정과, 그 감정에 성경이 건네는 위로/응답 주제를 함께 뽑아라. "
+            "설명 없이 쉼표로 구분한 키워드만 출력한다."
+        )
+        user = (
+            f'사용자 문장: "{mood}"\n\n'
+            "위 문장의 (1) 핵심 감정과 (2) 그 감정에 성경이 건네는 위로·응답 주제를 "
+            "한국어 키워드 6~10개로 확장해 쉼표로만 나열하라.\n"
+            '예: "요즘 너무 지치고 힘들어요" → 지침, 피곤, 번아웃, 안식, 쉼, 위로, 회복, 하나님의 돌보심'
+        )
+    else:
+        name = LANGUAGE_NAMES_EN.get(lang, lang)
+        system = (
+            f"You turn a user's emotional statement into {name} keywords for searching "
+            "Bible verses. Extract the core emotions AND the biblical comfort themes "
+            "that answer them. Output only comma-separated keywords, nothing else."
+        )
+        user = (
+            f'User statement: "{mood}"\n\n'
+            f"Expand it into 6–10 {name} keywords — (1) the core emotions, "
+            f"(2) the biblical themes of comfort that answer them. "
+            f"Comma-separated {name} keywords only.\n"
+            'Example: "I feel so tired lately" → weariness, exhaustion, burnout, '
+            "rest, comfort, renewal, God's care"
+        )
     try:
-        kws = _keep_korean_only(_call_openai_as_text(system, user, max_tokens=120)).strip()
+        kws = _call_openai_as_text(system, user, max_tokens=120).strip()
+        if lang == "ko":
+            kws = _keep_korean_only(kws).strip()
         return f"{mood} {kws}" if kws else mood
     except Exception:
         log.exception("query expansion failed; fallback to raw mood")
@@ -1006,7 +1109,11 @@ def _select_verses(mood: str, candidates: List[dict], picks: int) -> List[dict]:
     )
     system = (
         "너는 사용자의 감정/상황에 가장 잘 맞는 성경 구절을 고르는 목회적 도우미다. "
-        "표면 단어의 일치가 아니라 '의미와 정서'가 통하는 구절을 우선한다."
+        "표면 단어의 일치가 아니라 '의미와 정서'가 통하는 구절을 우선한다. "
+        # 저지 검증(이슈 #11)에서 확인된 실패 유형 — 임베딩 검색이 물어와도 걸러낸다.
+        "위로에 부적절한 구절은 다른 후보가 있는 한 피한다: 심판·진멸 신탁, "
+        "족보·명단·율법 조문, 악인이나 유혹자의 대사, 죽음을 소원하는 탄식, "
+        "게으름 책망. 후보가 한국어가 아닐 수도 있다."
     )
     user = (
         f'사용자 입력: "{mood}"\n\n'
@@ -1043,7 +1150,7 @@ def _prepare_recommendations(
     mood: str, search_k: int, picks: int, lang: str = "ko"
 ) -> List[dict]:
     """쿼리 확장 → 넓게 검색 → LLM 재순위 를 한 번에 수행(동기, executor용)."""
-    query = _expand_search_query(mood) if lang == "ko" else mood
+    query = _expand_search_query(mood, lang)
     candidates = _search_candidates(query, search_k, lang)
     return _select_verses(mood, candidates, picks)
 
@@ -1051,7 +1158,8 @@ def _prepare_recommendations(
 # ---------- /recommend/stream (SSE) ----------
 def _recommend_stream_response(mood: str, lang: str = "ko") -> StreamingResponse:
     # 넓게 뽑아(SEARCH_K) LLM이 재순위해서 PICKS개를 확정한다.
-    SEARCH_K = 15
+    # 비한국어는 부적절 구절을 거를 여지를 넓힌다(이슈 #11 저지 검증 반영).
+    SEARCH_K = 15 if lang == "ko" else 20
     PICKS = 3
     COMMENT_STYLE = "long"
     KOREAN_ONLY = lang == "ko"
@@ -1067,7 +1175,7 @@ def _recommend_stream_response(mood: str, lang: str = "ko") -> StreamingResponse
 
         loop = asyncio.get_event_loop()
         limits = _style_to_limits(COMMENT_STYLE)
-        system = _RECOMMEND_SYSTEM
+        system = _recommend_system(lang)
         per_card_tokens = max(300, limits["max_tokens"] // PICKS)
 
         # 준비 단계: 쿼리 확장 → 넓게 검색 → LLM 재순위. 진행 중엔 ping 으로 연결 유지.
@@ -1089,7 +1197,7 @@ def _recommend_stream_response(mood: str, lang: str = "ko") -> StreamingResponse
                 verse_data["text"] = _keep_korean_only(verse_data["text"])
             yield f"data: {json.dumps({'event': 'verse', 'index': idx, 'verse': verse_data}, ensure_ascii=False)}\n\n"
 
-            user = _build_single_comment_prompt(mood, selected, limits)
+            user = _build_single_comment_prompt(mood, selected, limits, lang)
             try:
                 async for token in _stream_openai(system, user, per_card_tokens):
                     yield f"data: {json.dumps({'event': 'token', 'index': idx, 'content': token}, ensure_ascii=False)}\n\n"
@@ -1202,12 +1310,13 @@ async def recommend_stream(inp: RecommendIn):
 
 def _comment_stream_response(inp: CommentStreamIn) -> StreamingResponse:
     COMMENT_STYLE = "long"
-    KOREAN_ONLY = True
+    lang = resolve_lang(inp.lang)
+    KOREAN_ONLY = lang == "ko"
 
     async def generate_sse():
         index_value = int(inp.index or 0)
         limits = _style_to_limits(COMMENT_STYLE)
-        system = _RECOMMEND_SYSTEM
+        system = _recommend_system(lang)
         verse = {"ref": inp.ref, "text": inp.text}
         if KOREAN_ONLY:
             verse["text"] = _keep_korean_only(verse["text"])
@@ -1222,7 +1331,7 @@ def _comment_stream_response(inp: CommentStreamIn) -> StreamingResponse:
         }
         yield f"data: {json.dumps(meta, ensure_ascii=False)}\n\n"
 
-        user = _build_single_comment_prompt(inp.mood, verse, limits)
+        user = _build_single_comment_prompt(inp.mood, verse, limits, lang)
         try:
             async for token in _stream_openai(system, user, limits["max_tokens"]):
                 yield f"data: {json.dumps({'event': 'token', 'index': index_value, 'content': token}, ensure_ascii=False)}\n\n"
