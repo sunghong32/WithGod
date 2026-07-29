@@ -1,5 +1,6 @@
 import { baseFontFamily, colors, scaleFont } from "@/shared/styles";
 import { Ionicons } from "@expo/vector-icons";
+import { useTranslation } from "react-i18next";
 import { Modal, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 type Props = {
@@ -16,6 +17,7 @@ type Props = {
  * 사용자가 '알림 받기'를 눌렀을 때만 시스템 팝업을 띄운다.
  */
 export function NotificationPrimingModal({ visible, onAccept, onLater }: Props) {
+  const { t } = useTranslation();
   return (
     <Modal
       visible={visible}
@@ -28,28 +30,25 @@ export function NotificationPrimingModal({ visible, onAccept, onLater }: Props) 
           <View style={styles.iconCircle}>
             <Ionicons name="notifications-outline" size={28} color={colors.primary} />
           </View>
-          <Text style={styles.title}>매일 말씀 알림</Text>
-          <Text style={styles.description}>
-            매일 원하는 시간에 오늘의 말씀과{"\n"}따뜻한 풀이를 보내드려요.
-            {"\n"}알림을 받아보시겠어요?
-          </Text>
+          <Text style={styles.title}>{t("notifPriming.title")}</Text>
+          <Text style={styles.description}>{t("notifPriming.body")}</Text>
           <TouchableOpacity
             style={styles.acceptButton}
             activeOpacity={0.8}
             onPress={onAccept}
             accessibilityRole="button"
-            accessibilityLabel="알림 받기"
+            accessibilityLabel={t("notifPriming.acceptA11y")}
           >
-            <Text style={styles.acceptButtonText}>좋아요, 알림 받을게요</Text>
+            <Text style={styles.acceptButtonText}>{t("notifPriming.accept")}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.laterButton}
             activeOpacity={0.6}
             onPress={onLater}
             accessibilityRole="button"
-            accessibilityLabel="나중에 받기"
+            accessibilityLabel={t("notifPriming.laterA11y")}
           >
-            <Text style={styles.laterButtonText}>나중에요</Text>
+            <Text style={styles.laterButtonText}>{t("notifPriming.later")}</Text>
           </TouchableOpacity>
         </View>
       </View>

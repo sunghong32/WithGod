@@ -4,6 +4,8 @@
 
 import { FlexWidget, TextWidget } from "react-native-android-widget";
 
+import { t } from "@/shared/lib/i18n";
+
 export interface DailyVerseWidgetProps {
   reference: string;
   text: string;
@@ -54,7 +56,7 @@ export function DailyVerseWidget({
           }}
         />
         <TextWidget
-          text="오늘의 말씀"
+          text={t("widget.headerLabel")}
           style={{ fontSize: 12, color: labelColor }}
         />
       </FlexWidget>

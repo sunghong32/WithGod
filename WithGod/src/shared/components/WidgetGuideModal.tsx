@@ -1,5 +1,6 @@
 import { baseFontFamily, colors, scaleFont } from "@/shared/styles";
 import { Image } from "expo-image";
+import { useTranslation } from "react-i18next";
 import {
   Modal,
   Platform,
@@ -17,15 +18,15 @@ type Props = {
 };
 
 const IOS_STEPS = [
-  "홈 화면의 빈 곳을 길게 눌러요",
-  "왼쪽 위 '편집' → '위젯 추가'를 눌러요",
-  "'신과함께'를 찾아 위젯을 추가해요",
+  "widgetGuide.ios1",
+  "widgetGuide.ios2",
+  "widgetGuide.ios3",
 ];
 
 const ANDROID_STEPS = [
-  "홈 화면의 빈 곳을 길게 눌러요",
-  "'위젯'을 선택해요",
-  "'신과함께'의 오늘의 말씀을 홈 화면에 놓아요",
+  "widgetGuide.android1",
+  "widgetGuide.android2",
+  "widgetGuide.android3",
 ];
 
 /**
@@ -34,6 +35,7 @@ const ANDROID_STEPS = [
  * 방법을 단계별로 안내한다.
  */
 export function WidgetGuideModal({ visible, onClose }: Props) {
+  const { t } = useTranslation();
   const steps = Platform.OS === "ios" ? IOS_STEPS : ANDROID_STEPS;
 
   return (
@@ -45,16 +47,14 @@ export function WidgetGuideModal({ visible, onClose }: Props) {
     >
       <View style={styles.backdrop}>
         <View style={styles.card}>
-          <Text style={styles.title}>홈 화면에서 만나는{"\n"}오늘의 말씀</Text>
-          <Text style={styles.description}>
-            앱을 열지 않아도 홈 화면 위젯으로{"\n"}매일 새로운 말씀을 볼 수 있어요.
-          </Text>
+          <Text style={styles.title}>{t("widgetGuide.title")}</Text>
+          <Text style={styles.description}>{t("widgetGuide.body")}</Text>
 
           <Image
             source={WIDGET_PREVIEW}
             style={styles.preview}
             contentFit="contain"
-            accessibilityLabel="오늘의 말씀 위젯 미리보기"
+            accessibilityLabel={t("widgetGuide.previewA11y")}
           />
 
           <View style={styles.steps}>
@@ -63,7 +63,7 @@ export function WidgetGuideModal({ visible, onClose }: Props) {
                 <View style={styles.stepBadge}>
                   <Text style={styles.stepBadgeText}>{index + 1}</Text>
                 </View>
-                <Text style={styles.stepText}>{step}</Text>
+                <Text style={styles.stepText}>{t(step)}</Text>
               </View>
             ))}
           </View>
@@ -73,9 +73,9 @@ export function WidgetGuideModal({ visible, onClose }: Props) {
             activeOpacity={0.8}
             onPress={onClose}
             accessibilityRole="button"
-            accessibilityLabel="안내 닫기"
+            accessibilityLabel={t("widgetGuide.closeA11y")}
           >
-            <Text style={styles.confirmButtonText}>확인했어요</Text>
+            <Text style={styles.confirmButtonText}>{t("widgetGuide.confirm")}</Text>
           </TouchableOpacity>
         </View>
       </View>

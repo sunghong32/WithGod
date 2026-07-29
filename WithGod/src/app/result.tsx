@@ -14,6 +14,7 @@ import { useSafeAreaPadding } from "@/shared/hooks";
 import { baseFontFamily, colors, scaleFont } from "@/shared/styles";
 import { useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   ActivityIndicator,
   type LayoutChangeEvent,
@@ -42,6 +43,7 @@ type VerseTypingTask = {
 };
 
 export default function ResultScreen() {
+  const { t } = useTranslation();
   const { mood } = useLocalSearchParams<{ mood: string }>();
   const { insets } = useSafeAreaPadding();
   const [results, setResults] = useState<RecommendItem[]>([]);
@@ -487,7 +489,7 @@ export default function ResultScreen() {
           console.log("Current draft:", draftRef.current);
           console.groupEnd();
         }
-        setStreamError("말씀을 불러오지 못했어요");
+        setStreamError(t("result.loadFailed"));
         setIsStreaming(false);
         return;
       }
@@ -509,7 +511,7 @@ export default function ResultScreen() {
       finalizeResults(extracted);
       setIsStreaming(false);
     },
-    [extractResults, finalizeResults],
+    [extractResults, finalizeResults, t],
   );
 
   const tryFinalizePendingDone = useCallback(() => {
@@ -775,7 +777,7 @@ export default function ResultScreen() {
         onDone: handleStreamDone,
         onError: (message, context) => {
           if (!isMountedRef.current) return;
-          setStreamError(message || "말씀을 불러오지 못했어요");
+          setStreamError(message || t("result.loadFailed"));
           setIsStreaming(false);
           if (__DEV__) {
             const now = Date.now();
@@ -817,6 +819,7 @@ export default function ResultScreen() {
     stopTyping,
     stopVerseTyping,
     stopIndexedTokenPump,
+    t,
   ]);
 
   const refetch = useCallback(() => {
@@ -882,12 +885,12 @@ export default function ResultScreen() {
     (!!streamError && visibleResults.length === 0);
 
   const errorMessage =
-    streamError ?? (hasError ? "말씀을 불러오지 못했어요" : null);
+    streamError ?? (hasError ? t("result.loadFailed") : null);
 
   return (
     <View style={styles.container}>
       {/* Header - 위로의 말씀 */}
-      <ScreenHeader title="위로의 말씀" />
+      <ScreenHeader title={t("result.headerTitle")} />
 
       <ScrollView
         ref={scrollViewRef}
@@ -912,7 +915,7 @@ export default function ResultScreen() {
           </View>
 
           {/* 당신을 위한 말씀 섹션 */}
-          <Text style={styles.sectionTitle}>당신을 위한 말씀</Text>
+          <Text style={styles.sectionTitle}>{t("result.sectionTitle")}</Text>
 
           {showLoading ? (
             // 로딩 중: 유저 메시지 아래에 로딩 표시
@@ -922,7 +925,9 @@ export default function ResultScreen() {
                 color={colors.primary}
                 style={styles.loadingIndicator}
               />
-              <Text style={styles.loadingCardText}>말씀을 찾고 있어요...</Text>
+              <Text style={styles.loadingCardText}>
+                {t("result.searching")}
+              </Text>
             </View>
           ) : hasError ? (
             <TouchableOpacity
@@ -932,7 +937,7 @@ export default function ResultScreen() {
             >
               <Text style={styles.errorTitle}>{errorMessage}</Text>
               <Text style={styles.errorDescription}>
-                탭하여 다시 시도해주세요
+                {t("result.tapToRetry")}
               </Text>
             </TouchableOpacity>
           ) : (
@@ -971,7 +976,7 @@ export default function ResultScreen() {
                   activeOpacity={0.7}
                 >
                   <Text style={styles.searchAgainButtonText}>
-                    다시 검색하기
+                    {t("result.searchAgain")}
                   </Text>
                 </TouchableOpacity>
               )}

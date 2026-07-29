@@ -3,10 +3,12 @@ import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useNavigation, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function SplashScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
@@ -77,11 +79,11 @@ export default function SplashScreen() {
               source={require('@/shared/assets/images/Logo.png')}
               style={styles.logo}
               contentFit="contain"
-              accessibilityLabel="신과함께 앱 로고"
+              accessibilityLabel={t('splash.logoA11y')}
             />
           </View>
-          <Text style={styles.title}>신과함께</Text>
-          <Text style={styles.subtitle}>당신의 마음에 위로를 전해요</Text>
+          <Text style={styles.title}>{t('common.appName')}</Text>
+          <Text style={styles.subtitle}>{t('splash.subtitle')}</Text>
         </View>
       </SafeAreaView>
     </View>

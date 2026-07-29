@@ -1,0 +1,149 @@
+{
+  "common": {
+    "appName": "WithGod",
+    "cancel": "Annuler",
+    "close": "Fermer",
+    "ok": "OK"
+  },
+  "splash": {
+    "logoA11y": "Logo de l'application WithGod",
+    "subtitle": "Un peu de réconfort pour ton cœur"
+  },
+  "nav": {
+    "backA11y": "Revenir en arrière"
+  },
+  "home": {
+    "logoA11y": "Logo WithGod",
+    "openBookmarksA11y": "Voir les versets gardés dans ton cœur",
+    "openSettingsA11y": "Ouvrir les réglages",
+    "dailyVerseTitle": "Verset du jour",
+    "tapToRetry": "Touche pour réessayer",
+    "loadingVerse": "Chargement du verset…",
+    "dailySaveA11y": "Garder le verset du jour dans ton cœur",
+    "dailyUnsaveA11y": "Retirer le verset du jour de ton cœur",
+    "widgetBannerA11y": "Voir le guide du widget d'écran d'accueil",
+    "widgetBannerTitle": "Le widget d'écran d'accueil est arrivé",
+    "widgetBannerSubtitle": "Retrouve un verset chaque jour, sans même ouvrir l'app",
+    "widgetBannerCloseA11y": "Fermer l'annonce du widget",
+    "moodTitle": "Comment va ton cœur aujourd'hui ?",
+    "moodSubtitle": "Confie-toi en toute simplicité, et tu recevras le verset qu'il te faut.",
+    "moodPlaceholder": "Partage ce que tu as sur le cœur",
+    "sendA11y": "Envoyer ce que tu as sur le cœur",
+    "sendIconA11y": "Icône d'envoi"
+  },
+  "result": {
+    "headerTitle": "Verset de réconfort",
+    "sectionTitle": "Un verset pour toi",
+    "searching": "Nous cherchons un verset pour toi…",
+    "loadFailed": "Impossible de charger le verset",
+    "tapToRetry": "Touche pour réessayer",
+    "searchAgain": "Chercher à nouveau"
+  },
+  "settings": {
+    "headerTitle": "Réglages",
+    "am": "AM",
+    "pm": "PM",
+    "permBannerTitle": "Les notifications sont désactivées",
+    "permBannerDesc": "Pour recevoir les notifications, active-les dans les réglages du système.",
+    "permBannerButton": "Activer dans les réglages",
+    "permBannerButtonA11y": "Ouvrir les réglages du système",
+    "notifTitle": "Recevoir les notifications",
+    "notifSubtitle": "Reçois chaque jour un verset de réconfort",
+    "notifTime": "Heure de la notification",
+    "saving": "Enregistrement…",
+    "syncFailed": "Impossible de synchroniser avec le serveur. Réessaie dans un instant.",
+    "autoSaved": "Tes modifications sont enregistrées automatiquement.",
+    "telemetryTitle": "Partager les statistiques d'utilisation",
+    "telemetrySubtitle": "Nous mesurons de façon anonyme quelles fonctionnalités sont utiles. Ce que tu confies n'est jamais envoyé",
+    "widgetCardTitle": "Widget d'écran d'accueil",
+    "widgetCardSubtitle": "Retrouve le verset du jour sur ton écran d'accueil, sans même ouvrir l'app",
+    "widgetCardA11y": "Voir comment ajouter le widget d'écran d'accueil",
+    "version": "Version {{version}}"
+  },
+  "bookmarks": {
+    "headerTitle": "Versets gardés dans ton cœur",
+    "filterAll": "Tous",
+    "sourceDaily": "Verset du jour",
+    "sourceRecommend": "Verset de réconfort",
+    "filterA11y": "Voir {{label}}",
+    "emptyFilteredTitle": "Aucun verset gardé dans cette catégorie",
+    "emptyTitle": "Tu n'as pas encore gardé de verset",
+    "emptyDesc": "Touche le cœur d'une carte de verset pour le garder ici",
+    "removeTitle": "Retirer de ton cœur",
+    "removeBody": "Retirer le verset {{reference}} de la liste ?",
+    "removeConfirm": "Retirer",
+    "unsaveA11y": "Retirer {{reference}} de ton cœur"
+  },
+  "verseActions": {
+    "shareDialogTitle": "Partager le verset",
+    "copyA11y": "Copier le verset {{reference}}",
+    "shareA11y": "Partager le verset {{reference}} en image",
+    "saveA11y": "Garder {{reference}} dans ton cœur",
+    "unsaveA11y": "Retirer {{reference}} de ton cœur"
+  },
+  "consent": {
+    "title": "Statistiques d'utilisation",
+    "body1": "Pour améliorer le service, WithGod collecte des statistiques d'utilisation anonymes (écrans visités, fonctionnalités utilisées, etc.).",
+    "body2": "Nous ne collectons aucune donnée permettant de t'identifier (nom, e-mail), ni le contenu de ce que tu confies. Si tu refuses, toutes les fonctionnalités restent disponibles, et tu peux changer d'avis à tout moment dans les réglages.",
+    "agree": "Accepter",
+    "agreeA11y": "Accepter la collecte des statistiques d'utilisation",
+    "decline": "Refuser",
+    "declineA11y": "Refuser la collecte des statistiques d'utilisation"
+  },
+  "update": {
+    "forcedTitle": "Mise à jour nécessaire",
+    "optionalTitle": "Une nouvelle version est disponible",
+    "forcedBody": "Pour profiter pleinement de l'app, installe la dernière version. Tu pourras continuer juste après la mise à jour.",
+    "optionalBody": "Découvre un WithGod encore meilleur. La dernière version t'attend sur le store.",
+    "update": "Mettre à jour",
+    "updateA11y": "Mettre à jour depuis le store",
+    "later": "Plus tard",
+    "laterA11y": "Mettre à jour plus tard"
+  },
+  "widgetGuide": {
+    "title": "Le verset du jour,\nsur ton écran d'accueil",
+    "body": "Sans même ouvrir l'app, le widget t'apporte\nchaque jour un nouveau verset.",
+    "ios1": "Appuie longuement sur un espace vide de l'écran d'accueil",
+    "ios2": "Touche « Modifier » en haut à gauche, puis « Ajouter un widget »",
+    "ios3": "Cherche « WithGod » et ajoute le widget",
+    "android1": "Appuie longuement sur un espace vide de l'écran d'accueil",
+    "android2": "Choisis « Widgets »",
+    "android3": "Dépose le widget Verset du jour de « WithGod » sur ton écran d'accueil",
+    "previewA11y": "Aperçu du widget Verset du jour",
+    "confirm": "J'ai compris",
+    "closeA11y": "Fermer le guide"
+  },
+  "notifPriming": {
+    "title": "Un verset chaque jour",
+    "body": "Chaque jour, à l'heure de ton choix,\nreçois le verset du jour et sa douce méditation.\nSouhaites-tu recevoir ces notifications ?",
+    "accept": "Oui, avec plaisir",
+    "acceptA11y": "Recevoir les notifications",
+    "later": "Plus tard",
+    "laterA11y": "Recevoir plus tard"
+  },
+  "push": {
+    "fallbackTitle": "Un nouveau verset t'attend",
+    "fallbackBody": "Viens découvrir le verset",
+    "view": "Voir le verset"
+  },
+  "widget": {
+    "headerLabel": "Verset du jour",
+    "placeholderRef": "WithGod",
+    "placeholderText": "Ouvre l'app pour recevoir le verset du jour."
+  },
+  "errors": {
+    "network": "Vérifie ta connexion Internet",
+    "timeout": "Le serveur met trop de temps à répondre. Réessaie dans un instant",
+    "server": "Un problème est survenu sur le serveur. Réessaie dans un instant",
+    "validation": "Vérifie ta saisie",
+    "parse": "Un problème est survenu lors du traitement des données",
+    "unknown": "Une erreur inconnue est survenue",
+    "sseServer": "Une erreur serveur est survenue",
+    "sseParse": "Impossible d'interpréter la réponse",
+    "sseHttp": "Une erreur serveur est survenue ({{status}})",
+    "sseIncomplete": "La réponse est arrivée incomplète. Réessaie",
+    "sseTimeout": "Le délai de réponse est dépassé. Réessaie",
+    "sseStart": "Impossible d'envoyer la requête",
+    "moodRequired": "Écris d'abord ce que tu ressens"
+  }
+}

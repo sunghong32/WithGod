@@ -1,5 +1,6 @@
 import type { WidgetTaskHandlerProps } from "react-native-android-widget";
 
+import { t } from "@/shared/lib/i18n";
 import { getStorageItem, setStorageItem } from "@/shared/lib/storage";
 
 import { DailyVerseWidget } from "./DailyVerseWidget";
@@ -98,10 +99,10 @@ export const getDailyVerseWithCache = async (): Promise<{
   }
 };
 
-const PLACEHOLDER = {
-  reference: "신과함께",
-  text: "앱을 열어 오늘의 말씀을 받아보세요.",
-};
+const getPlaceholder = () => ({
+  reference: t("widget.placeholderRef"),
+  text: t("widget.placeholderText"),
+});
 
 export async function widgetTaskHandler(
   props: WidgetTaskHandlerProps,
@@ -115,7 +116,7 @@ export async function widgetTaskHandler(
     case "WIDGET_ADDED":
     case "WIDGET_UPDATE":
     case "WIDGET_RESIZED": {
-      const verse = (await getDailyVerseWithCache()) ?? PLACEHOLDER;
+      const verse = (await getDailyVerseWithCache()) ?? getPlaceholder();
       props.renderWidget({
         light: <DailyVerseWidget reference={verse.reference} text={verse.text} />,
         dark: (

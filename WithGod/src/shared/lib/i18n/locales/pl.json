@@ -1,0 +1,149 @@
+{
+  "common": {
+    "appName": "WithGod",
+    "cancel": "Anuluj",
+    "close": "Zamknij",
+    "ok": "OK"
+  },
+  "splash": {
+    "logoA11y": "Logo aplikacji WithGod",
+    "subtitle": "Ukojenie dla Twojego serca"
+  },
+  "nav": {
+    "backA11y": "Wstecz"
+  },
+  "home": {
+    "logoA11y": "Logo WithGod",
+    "openBookmarksA11y": "Zobacz wersety zachowane w sercu",
+    "openSettingsA11y": "Ustawienia",
+    "dailyVerseTitle": "Werset dnia",
+    "tapToRetry": "Dotknij, aby spróbować ponownie",
+    "loadingVerse": "Wczytywanie wersetu...",
+    "dailySaveA11y": "Zachowaj werset dnia w sercu",
+    "dailyUnsaveA11y": "Usuń werset dnia z serca",
+    "widgetBannerA11y": "Zobacz informacje o widżecie na ekran główny",
+    "widgetBannerTitle": "Mamy widżet na ekran główny",
+    "widgetBannerSubtitle": "Codziennie nowy werset bez otwierania aplikacji",
+    "widgetBannerCloseA11y": "Zamknij informację o widżecie",
+    "moodTitle": "Jak się dziś ma Twoje serce?",
+    "moodSubtitle": "Podziel się śmiało, a znajdziemy werset w sam raz dla Ciebie.",
+    "moodPlaceholder": "Opowiedz, co czujesz lub co Cię trapi",
+    "sendA11y": "Wyślij",
+    "sendIconA11y": "Ikona wysyłania"
+  },
+  "result": {
+    "headerTitle": "Słowo pociechy",
+    "sectionTitle": "Werset dla Ciebie",
+    "searching": "Szukamy wersetu dla Ciebie...",
+    "loadFailed": "Nie udało się wczytać wersetu",
+    "tapToRetry": "Dotknij, aby spróbować ponownie",
+    "searchAgain": "Szukaj ponownie"
+  },
+  "settings": {
+    "headerTitle": "Ustawienia",
+    "am": "AM",
+    "pm": "PM",
+    "permBannerTitle": "Powiadomienia są wyłączone",
+    "permBannerDesc": "Aby otrzymywać powiadomienia, włącz je w ustawieniach systemu.",
+    "permBannerButton": "Włącz w ustawieniach",
+    "permBannerButtonA11y": "Otwórz ustawienia systemu",
+    "notifTitle": "Otrzymuj powiadomienia",
+    "notifSubtitle": "Codziennie słowo pociechy prosto do Ciebie",
+    "notifTime": "Godzina powiadomienia",
+    "saving": "Zapisywanie...",
+    "syncFailed": "Nie udało się zapisać na serwerze. Spróbuj ponownie za chwilę.",
+    "autoSaved": "Zmiany zapisują się automatycznie.",
+    "telemetryTitle": "Wysyłaj statystyki użytkowania",
+    "telemetrySubtitle": "Anonimowo sprawdzamy, które funkcje są pomocne. Nie wysyłamy tego, co wpisujesz",
+    "widgetCardTitle": "Widżet na ekranie głównym",
+    "widgetCardSubtitle": "Werset dnia na ekranie głównym — bez otwierania aplikacji",
+    "widgetCardA11y": "Zobacz, jak dodać widżet na ekran główny",
+    "version": "Wersja {{version}}"
+  },
+  "bookmarks": {
+    "headerTitle": "Zachowane w sercu",
+    "filterAll": "Wszystkie",
+    "sourceDaily": "Werset dnia",
+    "sourceRecommend": "Słowo pociechy",
+    "filterA11y": "Pokaż {{label}}",
+    "emptyFilteredTitle": "Brak zachowanych wersetów w tej kategorii",
+    "emptyTitle": "Nie masz jeszcze wersetów zachowanych w sercu",
+    "emptyDesc": "Dotknij serduszka na karcie wersetu, a zachowamy go tutaj",
+    "removeTitle": "Usuń z serca",
+    "removeBody": "Usunąć werset {{reference}} z listy?",
+    "removeConfirm": "Usuń",
+    "unsaveA11y": "Usuń {{reference}} z serca"
+  },
+  "verseActions": {
+    "shareDialogTitle": "Udostępnij werset",
+    "copyA11y": "Skopiuj werset {{reference}}",
+    "shareA11y": "Udostępnij werset {{reference}} jako obraz",
+    "saveA11y": "Zachowaj {{reference}} w sercu",
+    "unsaveA11y": "Usuń {{reference}} z serca"
+  },
+  "consent": {
+    "title": "Zgoda na zbieranie statystyk użytkowania",
+    "body1": "WithGod zbiera anonimowe statystyki użytkowania aplikacji (przejścia między ekranami, korzystanie z funkcji), aby ulepszać usługę.",
+    "body2": "Nie zbieramy danych osobowych, takich jak imię czy e-mail, ani treści, które wpisujesz. Bez zgody nadal możesz korzystać ze wszystkich funkcji, a decyzję zmienisz w każdej chwili w ustawieniach.",
+    "agree": "Zgadzam się",
+    "agreeA11y": "Zgadzam się na zbieranie statystyk użytkowania",
+    "decline": "Nie zgadzam się",
+    "declineA11y": "Nie zgadzam się na zbieranie statystyk użytkowania"
+  },
+  "update": {
+    "forcedTitle": "Potrzebna jest aktualizacja",
+    "optionalTitle": "Dostępna jest nowa wersja",
+    "forcedBody": "Aby wszystko działało sprawnie, zaktualizuj aplikację do najnowszej wersji. Po aktualizacji możesz dalej korzystać z aplikacji.",
+    "optionalBody": "Poznaj jeszcze lepszą wersję WithGod. Aktualizację znajdziesz w sklepie.",
+    "update": "Aktualizuj",
+    "updateA11y": "Zaktualizuj w sklepie",
+    "later": "Później",
+    "laterA11y": "Zaktualizuj później"
+  },
+  "widgetGuide": {
+    "title": "Werset dnia\nna Twoim ekranie głównym",
+    "body": "Dzięki widżetowi codziennie zobaczysz\nnowy werset bez otwierania aplikacji.",
+    "ios1": "Przytrzymaj puste miejsce na ekranie głównym",
+    "ios2": "Dotknij „Edycja” w lewym górnym rogu → „Dodaj widżet”",
+    "ios3": "Znajdź „WithGod” i dodaj widżet",
+    "android1": "Przytrzymaj puste miejsce na ekranie głównym",
+    "android2": "Wybierz „Widżety”",
+    "android3": "Umieść widżet „Werset dnia” aplikacji WithGod na ekranie głównym",
+    "previewA11y": "Podgląd widżetu Werset dnia",
+    "confirm": "Rozumiem",
+    "closeA11y": "Zamknij instrukcję"
+  },
+  "notifPriming": {
+    "title": "Codzienne powiadomienie z wersetem",
+    "body": "Codziennie o wybranej porze wyślemy Ci\nwerset dnia z ciepłym rozważaniem.\nChcesz otrzymywać powiadomienia?",
+    "accept": "Tak, chcę powiadomienia",
+    "acceptA11y": "Otrzymuj powiadomienia",
+    "later": "Może później",
+    "laterA11y": "Włącz później"
+  },
+  "push": {
+    "fallbackTitle": "Nowy werset dla Ciebie",
+    "fallbackBody": "Przeczytaj nowy werset",
+    "view": "Zobacz werset"
+  },
+  "widget": {
+    "headerLabel": "Werset dnia",
+    "placeholderRef": "WithGod",
+    "placeholderText": "Otwórz aplikację, aby zobaczyć werset dnia."
+  },
+  "errors": {
+    "network": "Sprawdź połączenie z internetem",
+    "timeout": "Serwer odpowiada zbyt długo. Spróbuj ponownie za chwilę",
+    "server": "Wystąpił problem z serwerem. Spróbuj ponownie za chwilę",
+    "validation": "Sprawdź wprowadzone dane",
+    "parse": "Wystąpił problem podczas przetwarzania danych",
+    "unknown": "Wystąpił nieznany błąd",
+    "sseServer": "Wystąpił błąd serwera",
+    "sseParse": "Nie udało się odczytać odpowiedzi",
+    "sseHttp": "Wystąpił błąd serwera ({{status}})",
+    "sseIncomplete": "Odpowiedź nie dotarła w całości. Spróbuj ponownie",
+    "sseTimeout": "Upłynął czas oczekiwania na odpowiedź. Spróbuj ponownie",
+    "sseStart": "Nie udało się rozpocząć żądania",
+    "moodRequired": "Napisz, jak się czujesz"
+  }
+}

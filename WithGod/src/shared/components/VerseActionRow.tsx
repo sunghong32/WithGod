@@ -4,6 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Clipboard from "expo-clipboard";
 import * as Sharing from "expo-sharing";
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   StyleSheet,
   Text,
@@ -57,6 +58,7 @@ export function VerseActionRow({
   saveLabel,
   style,
 }: VerseActionRowProps) {
+  const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
   const shareViewRef = useRef<View>(null);
@@ -106,7 +108,7 @@ export function VerseActionRow({
         });
         await Sharing.shareAsync(uri, {
           mimeType: "image/png",
-          dialogTitle: "말씀 공유",
+          dialogTitle: t("verseActions.shareDialogTitle"),
         });
         void logAnalyticsEvent("verse_share", {
           source: analyticsSource,
@@ -131,7 +133,7 @@ export function VerseActionRow({
           hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}
           activeOpacity={0.7}
           accessibilityRole="button"
-          accessibilityLabel={`${reference} 말씀 복사`}
+          accessibilityLabel={t("verseActions.copyA11y", { reference })}
         >
           <Ionicons
             name={copied ? "checkmark" : "copy-outline"}
@@ -145,7 +147,7 @@ export function VerseActionRow({
           hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}
           activeOpacity={0.7}
           accessibilityRole="button"
-          accessibilityLabel={`${reference} 말씀 이미지로 공유`}
+          accessibilityLabel={t("verseActions.shareA11y", { reference })}
         >
           <Ionicons
             name={isSharing ? "hourglass-outline" : "share-outline"}
@@ -161,8 +163,8 @@ export function VerseActionRow({
           accessibilityLabel={
             saveLabel ??
             (isSaved
-              ? `${reference} 마음에서 빼기`
-              : `${reference} 마음에 담기`)
+              ? t("verseActions.unsaveA11y", { reference })
+              : t("verseActions.saveA11y", { reference }))
           }
         >
           <Ionicons

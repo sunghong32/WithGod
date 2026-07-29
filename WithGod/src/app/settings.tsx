@@ -19,10 +19,12 @@ import {
 import { ScreenHeader } from "@/shared/components/ScreenHeader";
 import { WheelTimePicker } from "@/shared/components/WheelTimePicker";
 import { WidgetGuideModal } from "@/shared/components/WidgetGuideModal";
+import { t } from "@/shared/lib/i18n";
 import { baseFontFamily, colors, scaleFont } from "@/shared/styles";
 import { Ionicons } from "@expo/vector-icons";
 import Constants from "expo-constants";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   ActivityIndicator,
   AppState,
@@ -37,7 +39,7 @@ import {
 } from "react-native";
 
 const formatTime = (hour: number, minute: number): string => {
-  const period = hour < 12 ? "오전" : "오후";
+  const period = hour < 12 ? t("settings.am") : t("settings.pm");
   const displayHour = hour % 12 === 0 ? 12 : hour % 12;
   const mm = String(minute).padStart(2, "0");
   return `${period} ${displayHour}:${mm}`;
@@ -51,6 +53,7 @@ const appVersion =
   Constants.expoConfig?.version ?? Constants.nativeAppVersion ?? "-";
 
 export default function SettingsScreen() {
+  const { t } = useTranslation();
   const { insets } = useSafeAreaPadding();
 
   const [settings, setSettings] = useState<NotificationSettings>(
@@ -227,7 +230,7 @@ export default function SettingsScreen() {
 
   return (
     <View style={styles.container}>
-      <ScreenHeader title="설정" />
+      <ScreenHeader title={t("settings.headerTitle")} />
 
       <ScrollView
         contentContainerStyle={[
@@ -253,21 +256,21 @@ export default function SettingsScreen() {
                     style={styles.permissionIcon}
                   />
                   <Text style={styles.permissionTitle}>
-                    알림이 꺼져 있어요
+                    {t("settings.permBannerTitle")}
                   </Text>
                 </View>
                 <Text style={styles.permissionDescription}>
-                  알림을 받으려면 시스템 설정에서 알림 권한을 켜주세요.
+                  {t("settings.permBannerDesc")}
                 </Text>
                 <TouchableOpacity
                   style={styles.permissionButton}
                   onPress={openSystemSettings}
                   activeOpacity={0.7}
                   accessibilityRole="button"
-                  accessibilityLabel="시스템 설정 열기"
+                  accessibilityLabel={t("settings.permBannerButtonA11y")}
                 >
                   <Text style={styles.permissionButtonText}>
-                    설정에서 켜기
+                    {t("settings.permBannerButton")}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -277,9 +280,9 @@ export default function SettingsScreen() {
             <View style={styles.card}>
               <View style={styles.cardRow}>
                 <View style={styles.cardRowText}>
-                  <Text style={styles.cardTitle}>알림 받기</Text>
+                  <Text style={styles.cardTitle}>{t("settings.notifTitle")}</Text>
                   <Text style={styles.cardSubtitle}>
-                    매일 위로의 말씀을 받아보세요
+                    {t("settings.notifSubtitle")}
                   </Text>
                 </View>
                 <Switch
@@ -296,7 +299,7 @@ export default function SettingsScreen() {
               {/* 알림이 꺼져 있으면 시간 영역만 흐리게 — 토글은 항상 조작 가능해야 한다 */}
               <View style={timeControlsDisabled ? styles.cardDisabled : null}>
                 <View style={styles.timeHeaderRow}>
-                  <Text style={styles.cardTitle}>알림 시간</Text>
+                  <Text style={styles.cardTitle}>{t("settings.notifTime")}</Text>
                   <Text style={styles.timeValue}>
                     {formatTime(settings.scheduleHour, settings.scheduleMinute)}
                   </Text>
@@ -314,10 +317,10 @@ export default function SettingsScreen() {
                   토글 변경도 저장 대상이라 흐림(disabled) 영역 밖에 배치한다. */}
               <Text style={styles.syncNote}>
                 {isSyncing
-                  ? "저장 중..."
+                  ? t("settings.saving")
                   : syncFailed
-                    ? "서버에 반영하지 못했어요. 잠시 후 다시 시도해주세요."
-                    : "변경 사항은 자동으로 저장됩니다."}
+                    ? t("settings.syncFailed")
+                    : t("settings.autoSaved")}
               </Text>
             </View>
 
@@ -330,10 +333,11 @@ export default function SettingsScreen() {
               <View style={styles.card}>
                 <View style={styles.cardRow}>
                   <View style={styles.cardRowText}>
-                    <Text style={styles.cardTitle}>사용 통계 보내기</Text>
+                    <Text style={styles.cardTitle}>
+                      {t("settings.telemetryTitle")}
+                    </Text>
                     <Text style={styles.cardSubtitle}>
-                      어떤 기능이 도움이 되는지 익명으로 집계해요. 입력하신 마음은
-                      보내지 않아요
+                      {t("settings.telemetrySubtitle")}
                     </Text>
                   </View>
                   <Switch
@@ -353,13 +357,15 @@ export default function SettingsScreen() {
               activeOpacity={0.8}
               onPress={() => setShowWidgetGuide(true)}
               accessibilityRole="button"
-              accessibilityLabel="홈 화면 위젯 추가 방법 보기"
+              accessibilityLabel={t("settings.widgetCardA11y")}
             >
               <View style={styles.cardRow}>
                 <View style={styles.cardRowText}>
-                  <Text style={styles.cardTitle}>홈 화면 위젯</Text>
+                  <Text style={styles.cardTitle}>
+                    {t("settings.widgetCardTitle")}
+                  </Text>
                   <Text style={styles.cardSubtitle}>
-                    앱을 열지 않아도 홈 화면에서 오늘의 말씀을 볼 수 있어요
+                    {t("settings.widgetCardSubtitle")}
                   </Text>
                 </View>
                 <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
@@ -367,7 +373,9 @@ export default function SettingsScreen() {
             </TouchableOpacity>
 
             {/* 현재 앱 버전 — 업데이트 안내 팝업 도입으로 확인 수단이 필요해짐 */}
-            <Text style={styles.versionText}>버전 {appVersion}</Text>
+            <Text style={styles.versionText}>
+              {t("settings.version", { version: appVersion })}
+            </Text>
           </>
         )}
       </ScrollView>

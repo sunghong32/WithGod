@@ -1,5 +1,6 @@
 import { apiClient } from "@/shared/api/client";
 import { parseError, logError, ApiError } from "@/shared/api/errors";
+import { t } from "@/shared/lib/i18n";
 import {
   DailyVerseResponseSchema,
   type DailyVerse,
@@ -120,7 +121,7 @@ const handleSsePayload = (
       const message =
         typeof data?.message === "string"
           ? data.message
-          : "서버 오류가 발생했어요";
+          : t("errors.sseServer");
       handlers.onError?.(message, {
         source: "event",
         eventName,
@@ -143,7 +144,7 @@ const handleSsePayload = (
         // fall through
       }
     }
-    handlers.onError?.("응답을 해석하지 못했어요", {
+    handlers.onError?.(t("errors.sseParse"), {
       source: "parse",
       eventName,
       payload: trimmed,
@@ -222,7 +223,7 @@ export const verseApi = {
     xhr.onload = () => {
       if (closed) return;
       if (xhr.status >= 400) {
-        handlers.onError?.(`서버 오류가 발생했어요 (${xhr.status})`, {
+        handlers.onError?.(t("errors.sseHttp", { status: xhr.status }), {
           source: "http",
           status: xhr.status,
           readyState: xhr.readyState,
@@ -236,7 +237,7 @@ export const verseApi = {
         buffer = "";
       }
       if (!doneReceived) {
-        handlers.onError?.("응답이 완전히 도착하지 않았어요. 다시 시도해주세요", {
+        handlers.onError?.(t("errors.sseIncomplete"), {
           source: "parse",
           status: xhr.status,
           readyState: xhr.readyState,
@@ -248,7 +249,7 @@ export const verseApi = {
 
     xhr.ontimeout = () => {
       if (closed) return;
-      handlers.onError?.("응답 시간이 초과됐어요. 다시 시도해주세요", {
+      handlers.onError?.(t("errors.sseTimeout"), {
         source: "network",
         status: xhr.status,
         readyState: xhr.readyState,
@@ -258,7 +259,7 @@ export const verseApi = {
 
     xhr.onerror = () => {
       if (closed) return;
-      handlers.onError?.("인터넷 연결을 확인해주세요", {
+      handlers.onError?.(t("errors.network"), {
         source: "network",
         status: xhr.status,
         readyState: xhr.readyState,
@@ -275,7 +276,7 @@ export const verseApi = {
       xhr.setRequestHeader("Accept", "text/event-stream");
       xhr.send(JSON.stringify(input));
     } catch (error) {
-      handlers.onError?.("요청을 시작하지 못했어요", {
+      handlers.onError?.(t("errors.sseStart"), {
         source: "network",
         readyState: xhr.readyState,
         status: xhr.status,

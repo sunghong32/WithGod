@@ -1,6 +1,8 @@
 import { AxiosError } from "axios";
 import { ZodError } from "zod";
 
+import { t } from "@/shared/lib/i18n";
+
 // 에러 타입 정의
 export type ApiErrorType =
   | "NETWORK_ERROR"
@@ -33,17 +35,17 @@ export class ApiError extends Error {
   get userMessage(): string {
     switch (this.type) {
       case "NETWORK_ERROR":
-        return "인터넷 연결을 확인해주세요";
+        return t("errors.network");
       case "TIMEOUT_ERROR":
-        return "서버 응답이 너무 오래 걸려요. 잠시 후 다시 시도해주세요";
+        return t("errors.timeout");
       case "SERVER_ERROR":
-        return "서버에 문제가 발생했어요. 잠시 후 다시 시도해주세요";
+        return t("errors.server");
       case "VALIDATION_ERROR":
-        return "입력값을 확인해주세요";
+        return t("errors.validation");
       case "PARSE_ERROR":
-        return "데이터를 처리하는 중 문제가 발생했어요";
+        return t("errors.parse");
       default:
-        return "알 수 없는 오류가 발생했어요";
+        return t("errors.unknown");
     }
   }
 

@@ -1,5 +1,6 @@
 import { baseFontFamily, colors, scaleFont } from "@/shared/styles";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Linking, Modal, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 import { checkForUpdate, type UpdateStatus } from "@/shared/lib/appUpdate";
@@ -13,6 +14,7 @@ import { checkForUpdate, type UpdateStatus } from "@/shared/lib/appUpdate";
  * 서버 미응답이면 아무것도 뜨지 않는다(checkForUpdate 가 none 반환).
  */
 export function UpdatePromptModal() {
+  const { t } = useTranslation();
   const [status, setStatus] = useState<UpdateStatus>({ type: "none" });
 
   useEffect(() => {
@@ -50,13 +52,11 @@ export function UpdatePromptModal() {
       <View style={styles.backdrop}>
         <View style={styles.card}>
           <Text style={styles.title}>
-            {forced ? "업데이트가 필요해요" : "새로운 버전이 있어요"}
+            {forced ? t("update.forcedTitle") : t("update.optionalTitle")}
           </Text>
 
           <Text style={styles.description}>
-            {forced
-              ? "원활한 이용을 위해 최신 버전으로 업데이트해 주세요. 업데이트 후 계속 이용하실 수 있어요."
-              : "더 나아진 신과함께를 만나보세요. 스토어에서 최신 버전으로 업데이트할 수 있어요."}
+            {forced ? t("update.forcedBody") : t("update.optionalBody")}
           </Text>
 
           <TouchableOpacity
@@ -64,9 +64,9 @@ export function UpdatePromptModal() {
             onPress={openStore}
             activeOpacity={0.8}
             accessibilityRole="button"
-            accessibilityLabel="스토어에서 업데이트"
+            accessibilityLabel={t("update.updateA11y")}
           >
-            <Text style={styles.primaryButtonText}>업데이트</Text>
+            <Text style={styles.primaryButtonText}>{t("update.update")}</Text>
           </TouchableOpacity>
 
           {!forced && (
@@ -75,9 +75,9 @@ export function UpdatePromptModal() {
               onPress={dismiss}
               activeOpacity={0.7}
               accessibilityRole="button"
-              accessibilityLabel="나중에 업데이트"
+              accessibilityLabel={t("update.laterA11y")}
             >
-              <Text style={styles.secondaryButtonText}>나중에</Text>
+              <Text style={styles.secondaryButtonText}>{t("update.later")}</Text>
             </TouchableOpacity>
           )}
         </View>

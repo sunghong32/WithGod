@@ -1,0 +1,149 @@
+{
+  "common": {
+    "appName": "WithGod",
+    "cancel": "Cancel",
+    "close": "Close",
+    "ok": "OK"
+  },
+  "splash": {
+    "logoA11y": "WithGod app logo",
+    "subtitle": "Bringing comfort to your heart"
+  },
+  "nav": {
+    "backA11y": "Go back"
+  },
+  "home": {
+    "logoA11y": "WithGod logo",
+    "openBookmarksA11y": "View saved verses",
+    "openSettingsA11y": "Settings",
+    "dailyVerseTitle": "Today's Verse",
+    "tapToRetry": "Tap to try again",
+    "loadingVerse": "Loading today's verse...",
+    "dailySaveA11y": "Save today's verse",
+    "dailyUnsaveA11y": "Remove today's verse from saved verses",
+    "widgetBannerA11y": "See home screen widget guide",
+    "widgetBannerTitle": "Home screen widget is here",
+    "widgetBannerSubtitle": "Meet a new verse every day without opening the app",
+    "widgetBannerCloseA11y": "Dismiss widget banner",
+    "moodTitle": "How is your heart today?",
+    "moodSubtitle": "Share what's on your mind, and we'll find just the right verse for you.",
+    "moodPlaceholder": "Tell us what's on your heart",
+    "sendA11y": "Send",
+    "sendIconA11y": "Send"
+  },
+  "result": {
+    "headerTitle": "Words of Comfort",
+    "sectionTitle": "A Verse for You",
+    "searching": "Finding a verse for you...",
+    "loadFailed": "Couldn't load the verse",
+    "tapToRetry": "Tap to try again",
+    "searchAgain": "Search again"
+  },
+  "settings": {
+    "headerTitle": "Settings",
+    "am": "AM",
+    "pm": "PM",
+    "permBannerTitle": "Notifications are off",
+    "permBannerDesc": "To receive notifications, please allow them in your device settings.",
+    "permBannerButton": "Open Settings",
+    "permBannerButtonA11y": "Open system settings",
+    "notifTitle": "Notifications",
+    "notifSubtitle": "Receive daily words of comfort",
+    "notifTime": "Notification time",
+    "saving": "Saving...",
+    "syncFailed": "Couldn't sync with the server. Please try again in a moment.",
+    "autoSaved": "Changes are saved automatically.",
+    "telemetryTitle": "Share usage statistics",
+    "telemetrySubtitle": "Anonymous stats help us learn which features are helpful. What you share about your heart is never sent",
+    "widgetCardTitle": "Home screen widget",
+    "widgetCardSubtitle": "See today's verse right on your home screen without opening the app",
+    "widgetCardA11y": "See how to add the home screen widget",
+    "version": "Version {{version}}"
+  },
+  "bookmarks": {
+    "headerTitle": "Saved Verses",
+    "filterAll": "All",
+    "sourceDaily": "Today's Verse",
+    "sourceRecommend": "Words of Comfort",
+    "filterA11y": "Show {{label}}",
+    "emptyFilteredTitle": "No saved verses in this category",
+    "emptyTitle": "No saved verses yet",
+    "emptyDesc": "Tap the heart on a verse card to save it here",
+    "removeTitle": "Remove Verse",
+    "removeBody": "Remove {{reference}} from your saved verses?",
+    "removeConfirm": "Remove",
+    "unsaveA11y": "Remove {{reference}} from saved verses"
+  },
+  "verseActions": {
+    "shareDialogTitle": "Share Verse",
+    "copyA11y": "Copy {{reference}}",
+    "shareA11y": "Share {{reference}} as an image",
+    "saveA11y": "Save {{reference}}",
+    "unsaveA11y": "Remove {{reference}} from saved verses"
+  },
+  "consent": {
+    "title": "Share Usage Statistics",
+    "body1": "WithGod collects anonymous app usage statistics (such as screen views and feature usage) to improve the service.",
+    "body2": "We never collect personally identifiable information like your name or email, or anything you share about your heart. You can use every feature without consenting, and you can change this anytime in Settings.",
+    "agree": "Agree",
+    "agreeA11y": "Agree to usage statistics collection",
+    "decline": "Decline",
+    "declineA11y": "Decline usage statistics collection"
+  },
+  "update": {
+    "forcedTitle": "Update Required",
+    "optionalTitle": "Update Available",
+    "forcedBody": "Please update to the latest version to keep things running smoothly. You can continue right after updating.",
+    "optionalBody": "Discover an even better WithGod. You can update to the latest version in the store.",
+    "update": "Update",
+    "updateA11y": "Update in the store",
+    "later": "Later",
+    "laterA11y": "Update later"
+  },
+  "widgetGuide": {
+    "title": "Today's Verse,\nright on your home screen",
+    "body": "With the home screen widget, you can see\na new verse every day without opening the app.",
+    "ios1": "Touch and hold an empty area on your home screen",
+    "ios2": "Tap 'Edit' in the top left, then 'Add Widget'",
+    "ios3": "Find 'WithGod' and add the widget",
+    "android1": "Touch and hold an empty area on your home screen",
+    "android2": "Select 'Widgets'",
+    "android3": "Place the WithGod Today's Verse widget on your home screen",
+    "previewA11y": "Today's Verse widget preview",
+    "confirm": "Got it",
+    "closeA11y": "Close guide"
+  },
+  "notifPriming": {
+    "title": "Daily Verse Notifications",
+    "body": "Every day at the time you choose, we'll send\ntoday's verse with a warm reflection.\nWould you like to receive notifications?",
+    "accept": "Yes, notify me",
+    "acceptA11y": "Enable notifications",
+    "later": "Maybe later",
+    "laterA11y": "Decide later"
+  },
+  "push": {
+    "fallbackTitle": "A New Verse Awaits",
+    "fallbackBody": "Take a moment to read today's verse",
+    "view": "View verse"
+  },
+  "widget": {
+    "headerLabel": "Today's Verse",
+    "placeholderRef": "WithGod",
+    "placeholderText": "Open the app to receive today's verse."
+  },
+  "errors": {
+    "network": "Please check your internet connection",
+    "timeout": "The server is taking too long to respond. Please try again in a moment",
+    "server": "Something went wrong on the server. Please try again in a moment",
+    "validation": "Please check your input",
+    "parse": "There was a problem processing the data",
+    "unknown": "An unknown error occurred",
+    "sseServer": "A server error occurred",
+    "sseParse": "Couldn't read the response",
+    "sseHttp": "A server error occurred ({{status}})",
+    "sseIncomplete": "The response didn't arrive completely. Please try again",
+    "sseTimeout": "The response timed out. Please try again",
+    "sseStart": "Couldn't start the request",
+    "moodRequired": "Please tell us how you're feeling"
+  }
+}

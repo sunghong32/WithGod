@@ -3,6 +3,7 @@ import { baseFontFamily, colors, scaleFont } from "@/shared/styles";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 const BACK_ICON = require("../assets/images/chevron-right.png");
@@ -15,6 +16,7 @@ interface ScreenHeaderProps {
 
 /** 뒤로가기 + 타이틀 + 우측 슬롯으로 구성된 공용 화면 헤더 */
 export function ScreenHeader({ title, right }: ScreenHeaderProps) {
+  const { t } = useTranslation();
   const router = useRouter();
   const { headerPaddingTop } = useSafeAreaPadding();
 
@@ -25,7 +27,7 @@ export function ScreenHeader({ title, right }: ScreenHeaderProps) {
         onPress={() => router.back()}
         activeOpacity={0.7}
         accessibilityRole="button"
-        accessibilityLabel="뒤로 가기"
+        accessibilityLabel={t("nav.backA11y")}
       >
         <Image
           source={BACK_ICON}

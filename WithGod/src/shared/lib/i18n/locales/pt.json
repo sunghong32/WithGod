@@ -1,0 +1,149 @@
+{
+  "common": {
+    "appName": "WithGod",
+    "cancel": "Cancelar",
+    "close": "Fechar",
+    "ok": "OK"
+  },
+  "splash": {
+    "logoA11y": "Logotipo do app WithGod",
+    "subtitle": "Levando conforto ao seu coração"
+  },
+  "nav": {
+    "backA11y": "Voltar"
+  },
+  "home": {
+    "logoA11y": "Logotipo do WithGod",
+    "openBookmarksA11y": "Ver versículos guardados no coração",
+    "openSettingsA11y": "Configurações",
+    "dailyVerseTitle": "Versículo do dia",
+    "tapToRetry": "Toque para tentar novamente",
+    "loadingVerse": "Carregando o versículo...",
+    "dailySaveA11y": "Guardar o versículo do dia no coração",
+    "dailyUnsaveA11y": "Remover o versículo do dia do coração",
+    "widgetBannerA11y": "Ver instruções do widget da tela inicial",
+    "widgetBannerTitle": "Chegou o widget da tela inicial",
+    "widgetBannerSubtitle": "Veja um versículo todos os dias sem abrir o app",
+    "widgetBannerCloseA11y": "Fechar aviso do widget",
+    "moodTitle": "Como está o seu coração hoje?",
+    "moodSubtitle": "Compartilhe à vontade, e traremos o versículo certo para você.",
+    "moodPlaceholder": "Conte como você se sente ou o que te preocupa",
+    "sendA11y": "Enviar o que você sente",
+    "sendIconA11y": "Ícone de enviar"
+  },
+  "result": {
+    "headerTitle": "Versículo de conforto",
+    "sectionTitle": "Um versículo para você",
+    "searching": "Buscando o versículo...",
+    "loadFailed": "Não foi possível carregar o versículo",
+    "tapToRetry": "Toque para tentar novamente",
+    "searchAgain": "Buscar novamente"
+  },
+  "settings": {
+    "headerTitle": "Configurações",
+    "am": "AM",
+    "pm": "PM",
+    "permBannerTitle": "As notificações estão desativadas",
+    "permBannerDesc": "Para receber notificações, ative a permissão nas configurações do sistema.",
+    "permBannerButton": "Ativar nas configurações",
+    "permBannerButtonA11y": "Abrir configurações do sistema",
+    "notifTitle": "Receber notificações",
+    "notifSubtitle": "Receba um versículo de conforto todos os dias",
+    "notifTime": "Horário da notificação",
+    "saving": "Salvando...",
+    "syncFailed": "Não foi possível sincronizar com o servidor. Tente novamente em instantes.",
+    "autoSaved": "As alterações são salvas automaticamente.",
+    "telemetryTitle": "Enviar estatísticas de uso",
+    "telemetrySubtitle": "Coletamos dados anônimos para saber quais recursos ajudam mais. O que você escreve nunca é enviado",
+    "widgetCardTitle": "Widget da tela inicial",
+    "widgetCardSubtitle": "Veja o versículo do dia na tela inicial sem precisar abrir o app",
+    "widgetCardA11y": "Ver como adicionar o widget à tela inicial",
+    "version": "Versão {{version}}"
+  },
+  "bookmarks": {
+    "headerTitle": "Versículos no coração",
+    "filterAll": "Todos",
+    "sourceDaily": "Versículo do dia",
+    "sourceRecommend": "Versículo de conforto",
+    "filterA11y": "Ver {{label}}",
+    "emptyFilteredTitle": "Nenhum versículo guardado nesta categoria",
+    "emptyTitle": "Você ainda não guardou nenhum versículo",
+    "emptyDesc": "Toque no coração de um versículo para guardá-lo aqui",
+    "removeTitle": "Remover do coração",
+    "removeBody": "Remover o versículo {{reference}} da lista?",
+    "removeConfirm": "Remover",
+    "unsaveA11y": "Remover {{reference}} do coração"
+  },
+  "verseActions": {
+    "shareDialogTitle": "Compartilhar versículo",
+    "copyA11y": "Copiar o versículo {{reference}}",
+    "shareA11y": "Compartilhar o versículo {{reference}} como imagem",
+    "saveA11y": "Guardar {{reference}} no coração",
+    "unsaveA11y": "Remover {{reference}} do coração"
+  },
+  "consent": {
+    "title": "Consentimento para estatísticas de uso",
+    "body1": "O WithGod coleta estatísticas anônimas de uso do app (navegação entre telas, uso de recursos etc.) para melhorar o serviço.",
+    "body2": "Não coletamos dados pessoais como nome ou e-mail, nem o que você escreve sobre seus sentimentos. Mesmo sem concordar, você pode usar todos os recursos normalmente e mudar sua escolha nas configurações a qualquer momento.",
+    "agree": "Concordo",
+    "agreeA11y": "Concordar com a coleta de estatísticas de uso",
+    "decline": "Não concordo",
+    "declineA11y": "Não concordar com a coleta de estatísticas de uso"
+  },
+  "update": {
+    "forcedTitle": "Atualização necessária",
+    "optionalTitle": "Nova versão disponível",
+    "forcedBody": "Para continuar usando o app sem problemas, atualize para a versão mais recente. Depois da atualização, você poderá continuar normalmente.",
+    "optionalBody": "Conheça um WithGod ainda melhor. Você pode atualizar para a versão mais recente na loja.",
+    "update": "Atualizar",
+    "updateA11y": "Atualizar na loja",
+    "later": "Mais tarde",
+    "laterA11y": "Atualizar mais tarde"
+  },
+  "widgetGuide": {
+    "title": "O versículo do dia\nna sua tela inicial",
+    "body": "Sem abrir o app, veja um novo versículo\ntodos os dias no widget da tela inicial.",
+    "ios1": "Toque e segure um espaço vazio na tela inicial",
+    "ios2": "Toque em 'Editar' no canto superior esquerdo e depois em 'Adicionar Widget'",
+    "ios3": "Procure 'WithGod' e adicione o widget",
+    "android1": "Toque e segure um espaço vazio na tela inicial",
+    "android2": "Selecione 'Widgets'",
+    "android3": "Coloque o Versículo do dia do 'WithGod' na tela inicial",
+    "previewA11y": "Prévia do widget do versículo do dia",
+    "confirm": "Entendi",
+    "closeA11y": "Fechar instruções"
+  },
+  "notifPriming": {
+    "title": "Receba o versículo do dia",
+    "body": "Todos os dias, no horário que você escolher,\nenviamos o versículo do dia com uma reflexão acolhedora.\nQuer receber as notificações?",
+    "accept": "Sim, quero receber",
+    "acceptA11y": "Receber notificações",
+    "later": "Agora não",
+    "laterA11y": "Receber mais tarde"
+  },
+  "push": {
+    "fallbackTitle": "Novo versículo para você",
+    "fallbackBody": "Confira o versículo",
+    "view": "Ver versículo"
+  },
+  "widget": {
+    "headerLabel": "Versículo do dia",
+    "placeholderRef": "WithGod",
+    "placeholderText": "Abra o app para receber o versículo do dia."
+  },
+  "errors": {
+    "network": "Verifique sua conexão com a internet",
+    "timeout": "O servidor está demorando para responder. Tente novamente em instantes",
+    "server": "Ocorreu um problema no servidor. Tente novamente em instantes",
+    "validation": "Verifique os dados informados",
+    "parse": "Ocorreu um problema ao processar os dados",
+    "unknown": "Ocorreu um erro desconhecido",
+    "sseServer": "Ocorreu um erro no servidor",
+    "sseParse": "Não foi possível interpretar a resposta",
+    "sseHttp": "Ocorreu um erro no servidor ({{status}})",
+    "sseIncomplete": "A resposta chegou incompleta. Tente novamente",
+    "sseTimeout": "O tempo de resposta se esgotou. Tente novamente",
+    "sseStart": "Não foi possível iniciar a solicitação",
+    "moodRequired": "Escreva como você está se sentindo"
+  }
+}

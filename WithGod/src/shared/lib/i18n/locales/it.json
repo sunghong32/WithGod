@@ -1,0 +1,149 @@
+{
+  "common": {
+    "appName": "WithGod",
+    "cancel": "Annulla",
+    "close": "Chiudi",
+    "ok": "OK"
+  },
+  "splash": {
+    "logoA11y": "Logo dell'app WithGod",
+    "subtitle": "Un conforto per il tuo cuore"
+  },
+  "nav": {
+    "backA11y": "Indietro"
+  },
+  "home": {
+    "logoA11y": "Logo WithGod",
+    "openBookmarksA11y": "Vedi i versetti nel cuore",
+    "openSettingsA11y": "Impostazioni",
+    "dailyVerseTitle": "Versetto del giorno",
+    "tapToRetry": "Tocca per riprovare",
+    "loadingVerse": "Caricamento del versetto...",
+    "dailySaveA11y": "Custodisci nel cuore il versetto del giorno",
+    "dailyUnsaveA11y": "Togli dal cuore il versetto del giorno",
+    "widgetBannerA11y": "Vedi la guida al widget della schermata Home",
+    "widgetBannerTitle": "È arrivato il widget per la schermata Home",
+    "widgetBannerSubtitle": "Ricevi ogni giorno un versetto senza aprire l'app",
+    "widgetBannerCloseA11y": "Chiudi l'avviso del widget",
+    "moodTitle": "Come sta il tuo cuore oggi?",
+    "moodSubtitle": "Raccontacelo con calma: troveremo il versetto giusto per te.",
+    "moodPlaceholder": "Raccontaci come ti senti o cosa ti preoccupa",
+    "sendA11y": "Invia i tuoi pensieri",
+    "sendIconA11y": "Icona di invio"
+  },
+  "result": {
+    "headerTitle": "Parole di conforto",
+    "sectionTitle": "Un versetto per te",
+    "searching": "Stiamo cercando il versetto...",
+    "loadFailed": "Non siamo riusciti a caricare il versetto",
+    "tapToRetry": "Tocca per riprovare",
+    "searchAgain": "Cerca di nuovo"
+  },
+  "settings": {
+    "headerTitle": "Impostazioni",
+    "am": "AM",
+    "pm": "PM",
+    "permBannerTitle": "Le notifiche sono disattivate",
+    "permBannerDesc": "Per ricevere le notifiche, attiva il permesso nelle impostazioni di sistema.",
+    "permBannerButton": "Attiva nelle impostazioni",
+    "permBannerButtonA11y": "Apri le impostazioni di sistema",
+    "notifTitle": "Ricevi notifiche",
+    "notifSubtitle": "Ricevi ogni giorno una parola di conforto",
+    "notifTime": "Orario della notifica",
+    "saving": "Salvataggio...",
+    "syncFailed": "Non siamo riusciti a salvare sul server. Riprova tra poco.",
+    "autoSaved": "Le modifiche vengono salvate automaticamente.",
+    "telemetryTitle": "Invia statistiche di utilizzo",
+    "telemetrySubtitle": "Rileviamo in forma anonima quali funzioni sono più utili. I pensieri che scrivi non vengono inviati",
+    "widgetCardTitle": "Widget della schermata Home",
+    "widgetCardSubtitle": "Puoi vedere il versetto del giorno nella schermata Home senza aprire l'app",
+    "widgetCardA11y": "Vedi come aggiungere il widget alla schermata Home",
+    "version": "Versione {{version}}"
+  },
+  "bookmarks": {
+    "headerTitle": "Versetti nel cuore",
+    "filterAll": "Tutti",
+    "sourceDaily": "Versetto del giorno",
+    "sourceRecommend": "Parole di conforto",
+    "filterA11y": "Mostra {{label}}",
+    "emptyFilteredTitle": "Nessun versetto in questa categoria",
+    "emptyTitle": "Non hai ancora versetti nel cuore",
+    "emptyDesc": "Tocca il cuore su una scheda e il versetto sarà custodito qui",
+    "removeTitle": "Togli dal cuore",
+    "removeBody": "Vuoi togliere il versetto {{reference}} dalla lista?",
+    "removeConfirm": "Togli",
+    "unsaveA11y": "Togli {{reference}} dal cuore"
+  },
+  "verseActions": {
+    "shareDialogTitle": "Condividi il versetto",
+    "copyA11y": "Copia il versetto {{reference}}",
+    "shareA11y": "Condividi il versetto {{reference}} come immagine",
+    "saveA11y": "Custodisci {{reference}} nel cuore",
+    "unsaveA11y": "Togli {{reference}} dal cuore"
+  },
+  "consent": {
+    "title": "Consenso alla raccolta di statistiche",
+    "body1": "Per migliorare il servizio, WithGod raccoglie in forma anonima statistiche sull'uso dell'app (navigazione tra le schermate, funzioni usate, ecc.).",
+    "body2": "Non raccogliamo dati che ti identificano, come nome o email, né i pensieri che scrivi. Anche senza il tuo consenso puoi usare tutte le funzioni, e puoi cambiare idea in qualsiasi momento dalle impostazioni.",
+    "agree": "Accetto",
+    "agreeA11y": "Accetta la raccolta delle statistiche di utilizzo",
+    "decline": "Non accetto",
+    "declineA11y": "Rifiuta la raccolta delle statistiche di utilizzo"
+  },
+  "update": {
+    "forcedTitle": "Serve un aggiornamento",
+    "optionalTitle": "È disponibile una nuova versione",
+    "forcedBody": "Per usare l'app senza problemi, aggiorna all'ultima versione. Dopo l'aggiornamento potrai continuare subito.",
+    "optionalBody": "Scopri un WithGod ancora migliore. Puoi aggiornare all'ultima versione dallo store.",
+    "update": "Aggiorna",
+    "updateA11y": "Aggiorna dallo store",
+    "later": "Più tardi",
+    "laterA11y": "Aggiorna più tardi"
+  },
+  "widgetGuide": {
+    "title": "Il versetto del giorno\nsulla tua schermata Home",
+    "body": "Con il widget puoi vedere ogni giorno\nun nuovo versetto senza aprire l'app.",
+    "ios1": "Tieni premuto uno spazio vuoto della schermata Home",
+    "ios2": "Tocca 'Modifica' in alto a sinistra → 'Aggiungi widget'",
+    "ios3": "Cerca 'WithGod' e aggiungi il widget",
+    "android1": "Tieni premuto uno spazio vuoto della schermata Home",
+    "android2": "Seleziona 'Widget'",
+    "android3": "Trascina il Versetto del giorno di 'WithGod' sulla schermata Home",
+    "previewA11y": "Anteprima del widget Versetto del giorno",
+    "confirm": "Ho capito",
+    "closeA11y": "Chiudi la guida"
+  },
+  "notifPriming": {
+    "title": "Un versetto ogni giorno",
+    "body": "Ogni giorno, all'orario che preferisci,\nti inviamo il versetto del giorno con una breve riflessione.\nVuoi ricevere le notifiche?",
+    "accept": "Sì, volentieri",
+    "acceptA11y": "Attiva le notifiche",
+    "later": "Più tardi",
+    "laterA11y": "Ricevi le notifiche più tardi"
+  },
+  "push": {
+    "fallbackTitle": "Un nuovo versetto per te",
+    "fallbackBody": "Prenditi un momento per il versetto di oggi",
+    "view": "Leggi il versetto"
+  },
+  "widget": {
+    "headerLabel": "Versetto del giorno",
+    "placeholderRef": "WithGod",
+    "placeholderText": "Apri l'app per ricevere il versetto del giorno."
+  },
+  "errors": {
+    "network": "Controlla la connessione a Internet",
+    "timeout": "Il server impiega troppo tempo a rispondere. Riprova tra poco",
+    "server": "Si è verificato un problema sul server. Riprova tra poco",
+    "validation": "Controlla i dati inseriti",
+    "parse": "Si è verificato un problema durante l'elaborazione dei dati",
+    "unknown": "Si è verificato un errore sconosciuto",
+    "sseServer": "Si è verificato un errore del server",
+    "sseParse": "Non siamo riusciti a interpretare la risposta",
+    "sseHttp": "Si è verificato un errore del server ({{status}})",
+    "sseIncomplete": "La risposta non è arrivata completa. Riprova",
+    "sseTimeout": "Tempo di risposta scaduto. Riprova",
+    "sseStart": "Non siamo riusciti ad avviare la richiesta",
+    "moodRequired": "Scrivi come ti senti"
+  }
+}

@@ -1,5 +1,6 @@
 import { baseFontFamily } from "@/shared/styles";
 import { useEffect, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import {
   NativeScrollEvent,
   NativeSyntheticEvent,
@@ -14,7 +15,6 @@ const VISIBLE_ROWS = 3;
 const PAD_ROWS = (VISIBLE_ROWS - 1) / 2;
 const WRAP_HEIGHT = ITEM_HEIGHT * VISIBLE_ROWS;
 
-const PERIODS = ["오전", "오후"];
 const HOURS = Array.from({ length: 12 }, (_, i) => String(i + 1));
 const MINUTES = Array.from({ length: 60 }, (_, i) =>
   String(i).padStart(2, "0"),
@@ -117,6 +117,8 @@ type Props = {
  * 네이티브 모듈 없이 ScrollView snap 으로 구현 — 위아래로 굴려서 시간 설정.
  */
 export function WheelTimePicker({ hour, minute, onChange, disabled }: Props) {
+  const { t } = useTranslation();
+  const periods = [t("settings.am"), t("settings.pm")];
   const periodIndex = hour < 12 ? 0 : 1;
   const hour12 = hour % 12 === 0 ? 12 : hour % 12;
   const hourIndex = hour12 - 1;
@@ -134,7 +136,7 @@ export function WheelTimePicker({ hour, minute, onChange, disabled }: Props) {
       <View style={styles.band} pointerEvents="none" />
       <View style={styles.row}>
         <WheelColumn
-          items={PERIODS}
+          items={periods}
           index={periodIndex}
           width={62}
           disabled={disabled}

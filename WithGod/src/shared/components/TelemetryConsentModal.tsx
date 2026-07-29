@@ -1,5 +1,6 @@
 import { baseFontFamily, colors, scaleFont } from "@/shared/styles";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Modal, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 import {
@@ -18,6 +19,7 @@ import {
  * 하나를 반드시 고르게 한다 — 배경 탭이나 뒤로가기로 닫히지 않는다.
  */
 export function TelemetryConsentModal() {
+  const { t } = useTranslation();
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
@@ -46,26 +48,19 @@ export function TelemetryConsentModal() {
     >
       <View style={styles.backdrop}>
         <View style={styles.card}>
-          <Text style={styles.title}>사용 통계 수집 동의</Text>
+          <Text style={styles.title}>{t("consent.title")}</Text>
 
-          <Text style={styles.description}>
-            신과함께는 서비스 개선을 위해 익명으로 앱 사용 통계(화면 이동, 기능
-            사용 등)를 수집합니다.
-          </Text>
-          <Text style={styles.description}>
-            이름·이메일 같은 개인 식별 정보나 입력하신 마음 내용은 수집하지
-            않습니다. 동의하지 않으셔도 모든 기능을 그대로 이용하실 수 있고,
-            설정에서 언제든 바꿀 수 있어요.
-          </Text>
+          <Text style={styles.description}>{t("consent.body1")}</Text>
+          <Text style={styles.description}>{t("consent.body2")}</Text>
 
           <TouchableOpacity
             style={styles.primaryButton}
             onPress={() => decide(true)}
             activeOpacity={0.8}
             accessibilityRole="button"
-            accessibilityLabel="사용 통계 수집에 동의"
+            accessibilityLabel={t("consent.agreeA11y")}
           >
-            <Text style={styles.primaryButtonText}>동의</Text>
+            <Text style={styles.primaryButtonText}>{t("consent.agree")}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -73,9 +68,11 @@ export function TelemetryConsentModal() {
             onPress={() => decide(false)}
             activeOpacity={0.7}
             accessibilityRole="button"
-            accessibilityLabel="사용 통계 수집에 동의하지 않음"
+            accessibilityLabel={t("consent.declineA11y")}
           >
-            <Text style={styles.secondaryButtonText}>동의 안 함</Text>
+            <Text style={styles.secondaryButtonText}>
+              {t("consent.decline")}
+            </Text>
           </TouchableOpacity>
         </View>
       </View>

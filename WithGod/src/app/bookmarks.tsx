@@ -7,9 +7,11 @@ import {
 import { ScreenHeader } from "@/shared/components/ScreenHeader";
 import { VerseActionRow } from "@/shared/components/VerseActionRow";
 import { useSafeAreaPadding } from "@/shared/hooks";
+import { getAppLanguage } from "@/shared/lib/i18n";
 import { baseFontFamily, colors, scaleFont } from "@/shared/styles";
 import { Ionicons } from "@expo/vector-icons";
 import { useCallback, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   ActivityIndicator,
   Alert,
@@ -21,29 +23,31 @@ import {
   View,
 } from "react-native";
 
-const SOURCE_LABELS: Record<BookmarkSource, string> = {
-  daily: "오늘의 말씀",
-  recommend: "위로의 말씀",
+const SOURCE_LABEL_KEYS: Record<BookmarkSource, string> = {
+  daily: "bookmarks.sourceDaily",
+  recommend: "bookmarks.sourceRecommend",
 };
 
 type Filter = "all" | BookmarkSource;
 
-const FILTERS: { key: Filter; label: string }[] = [
-  { key: "all", label: "전체" },
-  { key: "daily", label: "오늘의 말씀" },
-  { key: "recommend", label: "위로의 말씀" },
+const FILTERS: { key: Filter; labelKey: string }[] = [
+  { key: "all", labelKey: "bookmarks.filterAll" },
+  { key: "daily", labelKey: "bookmarks.sourceDaily" },
+  { key: "recommend", labelKey: "bookmarks.sourceRecommend" },
 ];
 
 function formatSavedDate(iso: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return "";
-  const monthDay = `${date.getMonth() + 1}월 ${date.getDate()}일`;
-  return date.getFullYear() === new Date().getFullYear()
-    ? monthDay
-    : `${date.getFullYear()}년 ${monthDay}`;
+  const options: Intl.DateTimeFormatOptions =
+    date.getFullYear() === new Date().getFullYear()
+      ? { month: "long", day: "numeric" }
+      : { year: "numeric", month: "long", day: "numeric" };
+  return new Intl.DateTimeFormat(getAppLanguage(), options).format(date);
 }
 
 export default function BookmarksScreen() {
+  const { t } = useTranslation();
   const { insets } = useSafeAreaPadding();
   const { data: bookmarks, isLoading } = useBookmarks();
   const removeBookmark = useRemoveBookmark();
@@ -58,7 +62,7 @@ export default function BookmarksScreen() {
   // 지난 추천 코멘트는 다시 만들 수 없으므로 목록에서의 해제는 한 번 확인을 거친다
   const handleRemove = useCallback(
     (item: Bookmark) => {
-      const message = `${item.reference} 말씀을 목록에서 뺄까요?`;
+      const message = t("bookmarks.removeBody", { reference: item.reference });
       const confirmRemove = () =>
         removeBookmark.mutate({
           reference: item.reference,
@@ -71,12 +75,16 @@ export default function BookmarksScreen() {
         }
         return;
       }
-      Alert.alert("마음에서 빼기", message, [
-        { text: "취소", style: "cancel" },
-        { text: "빼기", style: "destructive", onPress: confirmRemove },
+      Alert.alert(t("bookmarks.removeTitle"), message, [
+        { text: t("common.cancel"), style: "cancel" },
+        {
+          text: t("bookmarks.removeConfirm"),
+          style: "destructive",
+          onPress: confirmRemove,
+        },
       ]);
     },
-    [removeBookmark],
+    [removeBookmark, t],
   );
 
   const renderItem = useCallback(
@@ -102,7 +110,7 @@ export default function BookmarksScreen() {
         )}
         <View style={styles.bottomRow}>
           <Text style={styles.metaText}>
-            {SOURCE_LABELS[item.source]}
+            {t(SOURCE_LABEL_KEYS[item.source])}
             {" · "}
             {formatSavedDate(item.createdAt)}
           </Text>
@@ -114,7 +122,9 @@ export default function BookmarksScreen() {
             analyticsSource={item.source}
             // 위로의 말씀 코멘트에는 사용자가 입력한 마음이 인용돼 있어 제외
             note={item.source === "daily" ? item.note : undefined}
-            saveLabel={`${item.reference} 마음에서 빼기`}
+            saveLabel={t("bookmarks.unsaveA11y", {
+              reference: item.reference,
+            })}
           />
         </View>
         {!!item.mood && (
@@ -126,18 +136,19 @@ export default function BookmarksScreen() {
         )}
       </View>
     ),
-    [handleRemove],
+    [handleRemove, t],
   );
 
   const hasAnyBookmark = (bookmarks?.length ?? 0) > 0;
 
   return (
     <View style={styles.container}>
-      <ScreenHeader title="마음에 담은 말씀" />
+      <ScreenHeader title={t("bookmarks.headerTitle")} />
 
       <View style={styles.filterRow}>
-        {FILTERS.map(({ key, label }) => {
+        {FILTERS.map(({ key, labelKey }) => {
           const isActive = filter === key;
+          const label = t(labelKey);
           return (
             <TouchableOpacity
               key={key}
@@ -147,7 +158,7 @@ export default function BookmarksScreen() {
               hitSlop={{ top: 6, bottom: 6, left: 2, right: 2 }}
               accessibilityRole="button"
               accessibilityState={{ selected: isActive }}
-              accessibilityLabel={`${label} 보기`}
+              accessibilityLabel={t("bookmarks.filterA11y", { label })}
             >
               <Text
                 style={[
@@ -184,12 +195,12 @@ export default function BookmarksScreen() {
               <Ionicons name="heart-outline" size={44} color="#D1D5DC" />
               <Text style={styles.emptyTitle}>
                 {hasAnyBookmark
-                  ? "이 분류에 담은 말씀이 없어요"
-                  : "아직 마음에 담은 말씀이 없어요"}
+                  ? t("bookmarks.emptyFilteredTitle")
+                  : t("bookmarks.emptyTitle")}
               </Text>
               {!hasAnyBookmark && (
                 <Text style={styles.emptyDescription}>
-                  말씀 카드의 하트를 누르면 여기에 담아드려요
+                  {t("bookmarks.emptyDesc")}
                 </Text>
               )}
             </View>

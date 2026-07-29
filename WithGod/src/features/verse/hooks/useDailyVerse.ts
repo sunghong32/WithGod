@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { AppState } from "react-native";
 import { verseApi, ApiError } from "../api";
 import { verseKeys } from "./keys";
@@ -10,6 +11,7 @@ function kstToday(): string {
 }
 
 export function useDailyVerse() {
+  const { t } = useTranslation();
   const [today, setToday] = useState(kstToday);
 
   // 백그라운드에 있다가 돌아왔을 때 날짜가 바뀌었으면 쿼리 키가 바뀌어 새로 불러온다.
@@ -40,7 +42,7 @@ export function useDailyVerse() {
   const errorMessage =
     query.error instanceof ApiError
       ? query.error.userMessage
-      : "알 수 없는 오류가 발생했어요";
+      : t("errors.unknown");
 
   return {
     ...query,

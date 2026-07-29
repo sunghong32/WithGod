@@ -1,0 +1,149 @@
+{
+  "common": {
+    "appName": "WithGod",
+    "cancel": "Abbrechen",
+    "close": "Schließen",
+    "ok": "OK"
+  },
+  "splash": {
+    "logoA11y": "WithGod-App-Logo",
+    "subtitle": "Trost für dein Herz"
+  },
+  "nav": {
+    "backA11y": "Zurück"
+  },
+  "home": {
+    "logoA11y": "WithGod-Logo",
+    "openBookmarksA11y": "Verse in deinem Herzen ansehen",
+    "openSettingsA11y": "Einstellungen",
+    "dailyVerseTitle": "Vers des Tages",
+    "tapToRetry": "Tippe, um es erneut zu versuchen",
+    "loadingVerse": "Vers wird geladen …",
+    "dailySaveA11y": "Vers des Tages ins Herz schließen",
+    "dailyUnsaveA11y": "Vers des Tages aus dem Herzen entfernen",
+    "widgetBannerA11y": "Infos zum Startbildschirm-Widget ansehen",
+    "widgetBannerTitle": "Neu: Widget für den Startbildschirm",
+    "widgetBannerSubtitle": "Jeden Tag ein Vers – ganz ohne die App zu öffnen",
+    "widgetBannerCloseA11y": "Widget-Hinweis schließen",
+    "moodTitle": "Wie geht es deinem Herzen heute?",
+    "moodSubtitle": "Erzähl es uns ganz offen – wir finden den Vers, der zu dir passt.",
+    "moodPlaceholder": "Erzähl, was dir auf dem Herzen liegt",
+    "sendA11y": "Dein Anliegen senden",
+    "sendIconA11y": "Senden-Symbol"
+  },
+  "result": {
+    "headerTitle": "Worte des Trostes",
+    "sectionTitle": "Ein Vers für dich",
+    "searching": "Wir suchen einen Vers für dich …",
+    "loadFailed": "Der Vers konnte nicht geladen werden",
+    "tapToRetry": "Tippe, um es erneut zu versuchen",
+    "searchAgain": "Erneut suchen"
+  },
+  "settings": {
+    "headerTitle": "Einstellungen",
+    "am": "vorm.",
+    "pm": "nachm.",
+    "permBannerTitle": "Benachrichtigungen sind deaktiviert",
+    "permBannerDesc": "Um Benachrichtigungen zu erhalten, erlaube sie bitte in den Systemeinstellungen.",
+    "permBannerButton": "In den Einstellungen aktivieren",
+    "permBannerButtonA11y": "Systemeinstellungen öffnen",
+    "notifTitle": "Benachrichtigungen erhalten",
+    "notifSubtitle": "Empfange jeden Tag Worte des Trostes",
+    "notifTime": "Uhrzeit der Benachrichtigung",
+    "saving": "Wird gespeichert …",
+    "syncFailed": "Die Änderung konnte nicht übertragen werden. Bitte versuche es später noch einmal.",
+    "autoSaved": "Änderungen werden automatisch gespeichert.",
+    "telemetryTitle": "Nutzungsstatistiken senden",
+    "telemetrySubtitle": "Wir erfassen anonym, welche Funktionen hilfreich sind. Was du uns anvertraust, wird nicht übermittelt",
+    "widgetCardTitle": "Startbildschirm-Widget",
+    "widgetCardSubtitle": "Sieh den Vers des Tages direkt auf deinem Startbildschirm – ohne die App zu öffnen",
+    "widgetCardA11y": "Anleitung zum Hinzufügen des Widgets ansehen",
+    "version": "Version {{version}}"
+  },
+  "bookmarks": {
+    "headerTitle": "Verse in deinem Herzen",
+    "filterAll": "Alle",
+    "sourceDaily": "Vers des Tages",
+    "sourceRecommend": "Worte des Trostes",
+    "filterA11y": "{{label}} anzeigen",
+    "emptyFilteredTitle": "In dieser Kategorie sind noch keine Verse",
+    "emptyTitle": "Du hast noch keine Verse in deinem Herzen",
+    "emptyDesc": "Tippe auf das Herz einer Verskarte – wir bewahren den Vers hier für dich auf",
+    "removeTitle": "Aus dem Herzen entfernen",
+    "removeBody": "Möchtest du {{reference}} aus deiner Liste entfernen?",
+    "removeConfirm": "Entfernen",
+    "unsaveA11y": "{{reference}} aus dem Herzen entfernen"
+  },
+  "verseActions": {
+    "shareDialogTitle": "Vers teilen",
+    "copyA11y": "{{reference}} kopieren",
+    "shareA11y": "{{reference}} als Bild teilen",
+    "saveA11y": "{{reference}} ins Herz schließen",
+    "unsaveA11y": "{{reference}} aus dem Herzen entfernen"
+  },
+  "consent": {
+    "title": "Einwilligung zu Nutzungsstatistiken",
+    "body1": "WithGod erhebt anonyme Nutzungsstatistiken (z. B. Bildschirmwechsel und Funktionsnutzung), um den Dienst zu verbessern.",
+    "body2": "Persönliche Daten wie Name oder E-Mail-Adresse sowie das, was du uns anvertraust, werden nicht erfasst. Auch ohne Einwilligung kannst du alle Funktionen uneingeschränkt nutzen – und deine Entscheidung jederzeit in den Einstellungen ändern.",
+    "agree": "Einverstanden",
+    "agreeA11y": "In die Erhebung von Nutzungsstatistiken einwilligen",
+    "decline": "Nicht einverstanden",
+    "declineA11y": "Erhebung von Nutzungsstatistiken ablehnen"
+  },
+  "update": {
+    "forcedTitle": "Update erforderlich",
+    "optionalTitle": "Eine neue Version ist da",
+    "forcedBody": "Bitte aktualisiere auf die neueste Version, damit alles reibungslos läuft. Nach dem Update kannst du direkt weitermachen.",
+    "optionalBody": "Entdecke das verbesserte WithGod. Im Store kannst du auf die neueste Version aktualisieren.",
+    "update": "Aktualisieren",
+    "updateA11y": "Im Store aktualisieren",
+    "later": "Später",
+    "laterA11y": "Später aktualisieren"
+  },
+  "widgetGuide": {
+    "title": "Der Vers des Tages –\ndirekt auf deinem Startbildschirm",
+    "body": "Ohne die App zu öffnen, zeigt dir das Widget\njeden Tag einen neuen Vers.",
+    "ios1": "Halte eine freie Stelle auf dem Startbildschirm gedrückt",
+    "ios2": "Tippe oben links auf „Bearbeiten“ → „Widget hinzufügen“",
+    "ios3": "Suche nach „WithGod“ und füge das Widget hinzu",
+    "android1": "Halte eine freie Stelle auf dem Startbildschirm gedrückt",
+    "android2": "Wähle „Widgets“",
+    "android3": "Ziehe den Vers des Tages von „WithGod“ auf deinen Startbildschirm",
+    "previewA11y": "Vorschau des Widgets „Vers des Tages“",
+    "confirm": "Verstanden",
+    "closeA11y": "Anleitung schließen"
+  },
+  "notifPriming": {
+    "title": "Dein täglicher Vers",
+    "body": "Wir senden dir jeden Tag zu deiner Wunschzeit\nden Vers des Tages mit einer warmen Auslegung.\nMöchtest du Benachrichtigungen erhalten?",
+    "accept": "Ja, benachrichtige mich",
+    "acceptA11y": "Benachrichtigungen aktivieren",
+    "later": "Vielleicht später",
+    "laterA11y": "Später entscheiden"
+  },
+  "push": {
+    "fallbackTitle": "Ein neuer Vers für dich",
+    "fallbackBody": "Schau dir den Vers an",
+    "view": "Vers ansehen"
+  },
+  "widget": {
+    "headerLabel": "Vers des Tages",
+    "placeholderRef": "WithGod",
+    "placeholderText": "Öffne die App, um den Vers des Tages zu empfangen."
+  },
+  "errors": {
+    "network": "Bitte überprüfe deine Internetverbindung",
+    "timeout": "Die Antwort des Servers dauert zu lange. Bitte versuche es später noch einmal",
+    "server": "Auf dem Server ist ein Problem aufgetreten. Bitte versuche es später noch einmal",
+    "validation": "Bitte überprüfe deine Eingabe",
+    "parse": "Beim Verarbeiten der Daten ist ein Problem aufgetreten",
+    "unknown": "Ein unbekannter Fehler ist aufgetreten",
+    "sseServer": "Ein Serverfehler ist aufgetreten",
+    "sseParse": "Die Antwort konnte nicht verarbeitet werden",
+    "sseHttp": "Ein Serverfehler ist aufgetreten ({{status}})",
+    "sseIncomplete": "Die Antwort ist unvollständig angekommen. Bitte versuche es noch einmal",
+    "sseTimeout": "Die Antwort hat zu lange gedauert. Bitte versuche es noch einmal",
+    "sseStart": "Die Anfrage konnte nicht gestartet werden",
+    "moodRequired": "Bitte erzähl zuerst, wie es dir geht"
+  }
+}

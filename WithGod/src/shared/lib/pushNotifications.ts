@@ -3,6 +3,7 @@ import type { Href } from 'expo-router';
 import { Alert, PermissionsAndroid, Platform } from 'react-native';
 
 import { pushApi } from '@/shared/api';
+import { t } from '@/shared/lib/i18n';
 
 import {
   getNotificationSettings,
@@ -214,18 +215,18 @@ const showForegroundAlert = (
   const title =
     getStringValue(remoteMessage.notification?.title) ??
     getStringValue(remoteMessage.data?.title) ??
-    '새로운 말씀 알림';
+    t('push.fallbackTitle');
   const body =
     getStringValue(remoteMessage.notification?.body) ??
     getStringValue(remoteMessage.data?.body) ??
-    '말씀을 확인해보세요';
+    t('push.fallbackBody');
 
   const buttons = href
     ? [
-        { text: '닫기', style: 'cancel' as const },
-        { text: '말씀 보기', onPress: () => openRoute(href) },
+        { text: t('common.close'), style: 'cancel' as const },
+        { text: t('push.view'), onPress: () => openRoute(href) },
       ]
-    : [{ text: '확인', style: 'default' as const }];
+    : [{ text: t('common.ok'), style: 'default' as const }];
 
   Alert.alert(title, body, buttons);
 };

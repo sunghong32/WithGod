@@ -22,6 +22,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   ActivityIndicator,
   Keyboard,
@@ -39,6 +40,7 @@ const LOGO_IMAGE = require("../../shared/assets/images/Logo.png");
 const SEND_ICON = require("../../shared/assets/images/send.png");
 
 export default function HomeScreen() {
+  const { t } = useTranslation();
   const [message, setMessage] = useState("");
   const [showPriming, setShowPriming] = useState(false);
   const [showWidgetPromo, setShowWidgetPromo] = useState(false);
@@ -187,16 +189,16 @@ export default function HomeScreen() {
               source={LOGO_IMAGE}
               style={styles.headerLogo}
               contentFit="contain"
-              accessibilityLabel="신과함께 로고"
+              accessibilityLabel={t("home.logoA11y")}
             />
           </View>
-          <Text style={styles.headerTitle}>신과함께</Text>
+          <Text style={styles.headerTitle}>{t("common.appName")}</Text>
           <TouchableOpacity
             style={styles.headerIconButton}
             onPress={() => router.push("/bookmarks")}
             activeOpacity={0.7}
             accessibilityRole="button"
-            accessibilityLabel="마음에 담은 말씀 보기"
+            accessibilityLabel={t("home.openBookmarksA11y")}
           >
             <Ionicons name="heart-outline" size={24} color="#1E2939" />
           </TouchableOpacity>
@@ -205,7 +207,7 @@ export default function HomeScreen() {
             onPress={() => router.push("/settings")}
             activeOpacity={0.7}
             accessibilityRole="button"
-            accessibilityLabel="설정"
+            accessibilityLabel={t("home.openSettingsA11y")}
           >
             <Ionicons name="settings-outline" size={24} color="#1E2939" />
           </TouchableOpacity>
@@ -218,7 +220,7 @@ export default function HomeScreen() {
           <View style={styles.todayCard}>
             <View style={styles.todayHeader}>
               <View style={styles.todayAccent} />
-              <Text style={styles.todayTitle}>오늘의 말씀</Text>
+              <Text style={styles.todayTitle}>{t("home.dailyVerseTitle")}</Text>
             </View>
 
             <View style={styles.verseCard}>
@@ -228,12 +230,12 @@ export default function HomeScreen() {
               ) : isError ? (
                 <TouchableOpacity onPress={() => refetch()} activeOpacity={0.7}>
                   <Text style={styles.errorText}>{errorMessage}</Text>
-                  <Text style={styles.retryText}>탭하여 다시 시도</Text>
+                  <Text style={styles.retryText}>{t("home.tapToRetry")}</Text>
                 </TouchableOpacity>
               ) : (
                 <>
                   <Text style={styles.verseText}>
-                    {dailyVerse?.text ?? "말씀을 불러오는 중..."}
+                    {dailyVerse?.text ?? t("home.loadingVerse")}
                   </Text>
                   <Text style={styles.verseReference}>
                     {dailyVerse?.reference ?? ""}
@@ -262,8 +264,8 @@ export default function HomeScreen() {
                       analyticsSource="daily"
                       saveLabel={
                         isDailyBookmarked
-                          ? "오늘의 말씀 마음에서 빼기"
-                          : "오늘의 말씀 마음에 담기"
+                          ? t("home.dailyUnsaveA11y")
+                          : t("home.dailySaveA11y")
                       }
                       style={styles.dailyActionRow}
                     />
@@ -279,15 +281,15 @@ export default function HomeScreen() {
               activeOpacity={0.85}
               onPress={handleWidgetPromoOpen}
               accessibilityRole="button"
-              accessibilityLabel="홈 화면 위젯 안내 보기"
+              accessibilityLabel={t("home.widgetBannerA11y")}
             >
               <View style={styles.widgetPromoIcon}>
                 <Ionicons name="grid-outline" size={16} color={colors.primary} />
               </View>
               <View style={styles.widgetPromoTextWrap}>
-                <Text style={styles.widgetPromoTitle}>홈 화면 위젯이 생겼어요</Text>
+                <Text style={styles.widgetPromoTitle}>{t("home.widgetBannerTitle")}</Text>
                 <Text style={styles.widgetPromoSubtitle}>
-                  앱을 열지 않아도 매일 말씀을 만나보세요
+                  {t("home.widgetBannerSubtitle")}
                 </Text>
               </View>
               <TouchableOpacity
@@ -295,7 +297,7 @@ export default function HomeScreen() {
                 onPress={handleWidgetPromoDismiss}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 accessibilityRole="button"
-                accessibilityLabel="위젯 안내 닫기"
+                accessibilityLabel={t("home.widgetBannerCloseA11y")}
               >
                 <Ionicons name="close" size={16} color="#9CA3AF" />
               </TouchableOpacity>
@@ -303,14 +305,14 @@ export default function HomeScreen() {
           )}
 
           <View style={styles.shareSection}>
-            <Text style={styles.shareTitle}>오늘 당신의 마음은 어떤가요?</Text>
+            <Text style={styles.shareTitle}>{t("home.moodTitle")}</Text>
             <Text
               style={styles.shareDescription}
               numberOfLines={1}
               adjustsFontSizeToFit
               minimumFontScale={0.8}
             >
-              편히 들려주시면 꼭 맞는 말씀을 전해드릴게요.
+              {t("home.moodSubtitle")}
             </Text>
           </View>
         </ScrollView>
@@ -318,7 +320,7 @@ export default function HomeScreen() {
         <View style={[styles.inputBar, { paddingTop: inputBarPaddingTop, paddingBottom: inputBarPaddingBottom }]}>
           <TextInput
             style={styles.textInput}
-            placeholder="지금 마음이나 고민을 들려주세요"
+            placeholder={t("home.moodPlaceholder")}
             placeholderTextColor={colors.textSecondary}
             value={message}
             onChangeText={setMessage}
@@ -337,13 +339,13 @@ export default function HomeScreen() {
             onPress={handleSend}
             disabled={!trimmedMessage}
             accessibilityRole="button"
-            accessibilityLabel="마음 전송 버튼"
+            accessibilityLabel={t("home.sendA11y")}
           >
             <Image
               source={SEND_ICON}
               style={styles.sendIcon}
               contentFit="contain"
-              accessibilityLabel="마음 전송 아이콘"
+              accessibilityLabel={t("home.sendIconA11y")}
             />
           </TouchableOpacity>
         </View>

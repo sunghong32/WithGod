@@ -10,6 +10,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useColorScheme } from '@/shared/hooks/use-color-scheme';
 import { logScreenViewEvent } from '@/shared/lib/analytics';
 import { QueryProvider } from '@/shared/lib/QueryProvider';
+import { initAppLanguage } from '@/shared/lib/i18n';
 import { setupPushNotificationsAsync } from '@/shared/lib/pushNotifications';
 import { startTelemetry, stopTelemetry } from '@/shared/lib/telemetry';
 import { TelemetryConsentModal } from '@/shared/components/TelemetryConsentModal';
@@ -28,6 +29,11 @@ export default function RootLayout() {
 
   useEffect(() => {
     SplashScreen.hideAsync();
+  }, []);
+
+  // 저장된 언어/기기 언어를 반영 (동기 초기화는 ko 로 이미 완료 — 여기선 보정만).
+  useEffect(() => {
+    void initAppLanguage();
   }, []);
 
   // 자체 지표 수집 시작. 화면 추적보다 먼저 켜져야 첫 screen_view 가 잡힌다.

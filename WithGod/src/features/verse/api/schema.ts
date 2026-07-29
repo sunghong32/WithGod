@@ -24,6 +24,8 @@ export type DailyVerseResponse = z.infer<typeof DailyVerseResponseSchema>;
 // ==================== Recommend ====================
 
 export const RecommendInSchema = z.object({
+  // 이 메시지는 현재 parse() 호출처가 없어 사용자에게 노출되지 않는다(타입 추론용).
+  // 노출 경로가 생기면 i18n(errors.moodRequired) 로 교체할 것.
   mood: z.string().min(1, "기분을 입력해주세요"),
 });
 
