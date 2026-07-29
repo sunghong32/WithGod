@@ -35,16 +35,20 @@ class _SplitOnnxEmbedder:
 
     EMBEDS_INPUT = "/embeddings/word_embeddings/Gather_output_0"
 
+    # XLM-R(fairseq) 특수 토큰: <s>=0, <pad>=1, </s>=2, <unk>=3, 일반 = sp_id+1.
+    # HF tokenizers(tokenizer.json)와의 ID 완전 일치는 다국어 14종 샘플로 검증됨
+    # — tokenizers 는 25만 vocab 로드에 ~286MB 를 쓰지만 sentencepiece 는 ~수십MB.
+    BOS, PAD, EOS, UNK, OFFSET = 0, 1, 2, 3, 1
+
     def __init__(self, model_dir: Path) -> None:
         import json
 
         import onnxruntime as ort
-        from tokenizers import Tokenizer
+        import sentencepiece as spm
 
-        self.tokenizer = Tokenizer.from_file(str(model_dir / "tokenizer.json"))
-        self.tokenizer.enable_truncation(max_length=512)
-        pad_id = self.tokenizer.token_to_id("<pad>") or 0
-        self.tokenizer.enable_padding(pad_id=pad_id, pad_token="<pad>")
+        self.sp = spm.SentencePieceProcessor(
+            model_file=str(model_dir / "sentencepiece.bpe.model")
+        )
 
         meta = json.loads((model_dir / "word_embeddings_meta.json").read_text())
         self.scale = float(meta["scale"])
@@ -56,10 +60,19 @@ class _SplitOnnxEmbedder:
         )
         self._input_names = {i.name for i in self.session.get_inputs()}
 
+    def _tokenize(self, text: str) -> list[int]:
+        raw = self.sp.encode(text, out_type=int)
+        mapped = [self.UNK if i == self.sp.unk_id() else i + self.OFFSET for i in raw]
+        return [self.BOS] + mapped[:510] + [self.EOS]
+
     def encode(self, texts: list[str]) -> np.ndarray:
-        encs = self.tokenizer.encode_batch(texts)
-        input_ids = np.array([e.ids for e in encs], dtype=np.int64)
-        attention_mask = np.array([e.attention_mask for e in encs], dtype=np.int64)
+        seqs = [self._tokenize(t) for t in texts]
+        longest = max(len(s) for s in seqs)
+        input_ids = np.full((len(seqs), longest), self.PAD, dtype=np.int64)
+        attention_mask = np.zeros((len(seqs), longest), dtype=np.int64)
+        for row, seq in enumerate(seqs):
+            input_ids[row, : len(seq)] = seq
+            attention_mask[row, : len(seq)] = 1
         # DequantizeLinear 재현: (uint8 - zero_point) * scale
         embeds = (self.table[input_ids].astype(np.float32) - self.zero_point) * self.scale
         inputs = {
