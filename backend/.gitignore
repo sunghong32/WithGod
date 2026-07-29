@@ -38,3 +38,4 @@ data/langs/*/verses.faiss
 data/langs/*/verses.npy
 data/langs/*/verses_meta.parquet
 data_raw/*.zip
+data/language_config.json

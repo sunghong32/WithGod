@@ -19,6 +19,7 @@ import {
 
 import { ActiveUsersChart } from "./components/ActiveUsersChart";
 import { AppVersionControl } from "./components/AppVersionControl";
+import { LanguageControl } from "./components/LanguageControl";
 import { BreakdownList } from "./components/BreakdownList";
 import { ChartCard } from "./components/ChartCard";
 import { EventTable } from "./components/EventTable";
@@ -246,6 +247,8 @@ export function Dashboard() {
             </div>
 
             <AppVersionControl />
+
+            <LanguageControl />
           </div>
         ) : null}
       </main>

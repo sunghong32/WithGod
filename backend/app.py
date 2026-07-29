@@ -28,6 +28,15 @@ from analytics.routes import router as analytics_router
 from analytics.scheduler import AnalyticsRollupScheduler
 from app_version import router as app_version_router
 from embedding import load_query_embedder
+from languages import (
+    KO_NAME_TO_CODE,
+    find_aligned_verse,
+    get_store,
+    register_ko_store,
+    resolve_lang,
+    router as languages_router,
+    set_encoder as languages_set_encoder,
+)
 from notifications.jobs import build_notification_manager
 from notifications.manager import DailyVerseNotificationManager
 from notifications.scheduler import DailyVerseScheduler
@@ -81,6 +90,12 @@ except Exception:
 # 쿼리 임베더 — int8 ONNX(~118MB) 우선, 없으면 sentence-transformers(~560MB) 폴백.
 # 산출·검증 절차는 embedding.py / scripts/build_quantized_model.py 참고.
 model = load_query_embedder()
+
+# 다국어 스토어 — ko 는 위에서 로드한 df/index 를 그대로 등록하고, 다른 언어는
+# 첫 요청 때 lazy 로드한다(languages.py). 임베더는 다국어 모델이라 공유하며,
+# '오늘의 말씀' 언어 간 구절 정렬의 내용 검증에도 쓰인다.
+register_ko_store(df, index)
+languages_set_encoder(model.encode)
 
 
 # =========================================================
@@ -480,6 +495,8 @@ async def _stream_openai(system: str, user: str, max_tokens: int) -> AsyncGenera
 # ---------- /recommend ----------
 class RecommendIn(BaseModel):
     mood: str = Field(..., examples=["오늘 너무 힘들어요"])
+    # 구절 검색·본문 언어(코멘트 언어는 이슈 #11에서). 미지원/비활성 언어는 ko 폴백.
+    lang: Optional[str] = Field(None, examples=["ko"])
 
 
 class CommentStreamIn(BaseModel):
@@ -606,19 +623,53 @@ def require_push_admin(
         }
     }
 )
-def random_verse(request: Request, day_offset: int = Query(0, ge=0, le=30)):
-    # ---------- Backend-only configuration ----------
-    # API 요청 파라미터로 받지 않고, 서버 코드에서만 고정으로 조정하는 옵션
-    KOREAN_ONLY = True  # 한자/가나 제거 여부
-
+def random_verse(
+    request: Request,
+    day_offset: int = Query(0, ge=0, le=30),
+    lang: Optional[str] = Query(None, description="구절 언어(미지원/비활성은 ko 폴백)"),
+):
+    resolved = resolve_lang(lang)
     try:
-        # /random은 사용자별이 아니라 하루에 모두 같은 말씀을 반환한다.
-        user_key = "global-daily-random"
         target_day = _day_str(day_offset)
+        ko_pick = _get_or_create_ko_daily_pick(target_day)
+        if resolved == "ko":
+            return ko_pick
 
-        # 같은 날짜(day_offset/day 조합)에는 모든 사용자가 같은 말씀을 받는다.
+        # 언어별 캐시 — 같은 날 같은 언어는 같은 말씀(한국어 픽과 같은 구절).
+        lang_key = f"global-daily-random:{resolved}"
         with _daily_random_lock:
-            cached = _get_daily_random_from_db(user_key, target_day)
+            cached = _get_daily_random_from_db(lang_key, target_day)
+        if cached:
+            return cached
+
+        localized = _localize_ko_ref(resolved, ko_pick["ref"], ko_pick["text"])
+        if localized is None:
+            # 절번호 정렬 실패(판본 차이 등) 시 한국어 본문이라도 반환한다.
+            return ko_pick
+
+        with _daily_random_lock:
+            _save_daily_random_to_db(
+                lang_key, target_day, localized["ref"], localized["text"]
+            )
+        return localized
+
+    except Exception as e:
+        # 예외가 나면 에러 형태로 반환
+        # (현재 스타일에 맞춰 200으로 에러를 담아 반환)
+        return {"error": f"랜덤 구절 생성 실패: {e}"}
+
+
+def _get_or_create_ko_daily_pick(target_day: str) -> dict:
+    """오늘의 한국어 말씀(전 사용자 공통)을 캐시에서 얻거나 새로 뽑는다.
+
+    읽기~쓰기 사이에 락을 계속 쥐어, 동시에 들어온 첫 요청들이 서로 다른
+    구절을 뽑아 덮어쓰는(그날 언어별 캐시가 서로 어긋나는) 일을 막는다.
+    """
+    user_key = "global-daily-random"
+
+    # 같은 날짜(day_offset/day 조합)에는 모든 사용자가 같은 말씀을 받는다.
+    with _daily_random_lock:
+        cached = _get_daily_random_from_db(user_key, target_day)
         if cached:
             return cached
 
@@ -632,25 +683,32 @@ def random_verse(request: Request, day_offset: int = Query(0, ge=0, le=30)):
             ref = _build_ref(str(r["book"]), int(r["chapter"]), int(r["verse"]))
             text = str(r["text"])
 
-        # 한자/가나 제거 옵션이 켜져 있으면 후처리
-        if KOREAN_ONLY:
-            text = _keep_korean_only(text)
+        # 한자/가나 제거 후처리(한국어 본문 전용)
+        text = _keep_korean_only(text)
 
-        payload = {
-            "ref": ref,
-            "text": text
-        }
+        payload = {"ref": ref, "text": text}
+        _save_daily_random_to_db(user_key, target_day, ref, text)
+    return payload
 
-        with _daily_random_lock:
-            _save_daily_random_to_db(user_key, target_day, ref, text)
 
-        # 정상 응답 반환
-        return payload
+_RE_KO_REF = re.compile(r"^(.+?)\s+(\d+):(\d+)$")
 
-    except Exception as e:
-        # 예외가 나면 에러 형태로 반환
-        # (현재 스타일에 맞춰 200으로 에러를 담아 반환)
-        return {"error": f"랜덤 구절 생성 실패: {e}"}
+
+def _localize_ko_ref(lang: str, ko_ref: str, ko_text: str) -> Optional[dict]:
+    """'시편 23:1' 같은 한국어 ref 를 해당 언어의 같은 구절로 바꾼다."""
+    m = _RE_KO_REF.match(ko_ref.strip())
+    if not m:
+        return None
+    code = KO_NAME_TO_CODE.get(m.group(1))
+    if not code:
+        return None
+    found = find_aligned_verse(lang, code, int(m.group(2)), int(m.group(3)), ko_text)
+    if not found:
+        return None
+    return {
+        "ref": f"{found['book']} {found['chapter']}:{found['verse']}",
+        "text": found["text"],
+    }
 
 
 @app.get("/daily-verse")
@@ -751,7 +809,10 @@ def recommend(inp: RecommendIn):
     TOP_K = 12               # 넓게 뽑아 LLM이 재순위/선택
     PICKS = 3
     COMMENT_STYLE = "long"   # short | medium | long
-    KOREAN_ONLY = True       # 한자/가나 제거 여부
+
+    lang = resolve_lang(inp.lang)
+    store = get_store(lang)
+    KOREAN_ONLY = lang == "ko"  # 한자/가나 제거는 한국어 본문에만 적용
 
     # ---------- Perf logging ----------
     t0 = time.perf_counter()
@@ -761,22 +822,23 @@ def recommend(inp: RecommendIn):
     t = time.perf_counter()
 
     # 1) RAG 검색 (감정/상황을 검색 키워드로 확장해 의미 매칭 정확도 향상)
-    search_query = _expand_search_query(inp.mood)
+    # 쿼리 확장은 한국어 키워드를 뽑는 프롬프트라 ko 에만 적용한다(다른 언어의
+    # 확장·코멘트 언어는 이슈 #11 프롬프트 파라미터화에서).
+    search_query = _expand_search_query(inp.mood) if lang == "ko" else inp.mood
     _lap("expand", t)
     t = time.perf_counter()
     q = model.encode([f"query: {search_query}"])
     _lap("encode", t)
     t = time.perf_counter()
 
-    D, I = index.search(q, TOP_K)
+    D, I = store.index.search(q, TOP_K)
     _lap("faiss", t)
     t = time.perf_counter()
 
     cands = []
     for s, i in zip(D[0], I[0]):
-        # FAISS 검색 결과의 인덱스 i는 df의 행 번호와 1:1로 대응
-        # 따라서 df.iloc[i]로 실제 성경 본문 데이터를 조회
-        r = df.iloc[int(i)]
+        # FAISS 검색 결과의 인덱스 i는 store.df의 행 번호와 1:1로 대응
+        r = store.df.iloc[int(i)]
         cands.append({
             "ref": f"{r['book']} {int(r['chapter'])}:{int(r['verse'])}",
             "text": str(r["text"]),
@@ -788,6 +850,39 @@ def recommend(inp: RecommendIn):
     # 2) OpenAI 생성
     limits = _style_to_limits(COMMENT_STYLE)
     system = _RECOMMEND_SYSTEM
+
+    if lang != "ko":
+        # 비한국어: 후보 전체를 GPT에 주고 ref/text/comment JSON 을 통째로 받으면
+        # GPT가 구절을 한국어로 번역·변형해 되뱉는다(실측). 스트리밍 경로와 같은
+        # 구조로 — 선별은 후보 '번호'로만 받고 ref/text 는 스토어 원문을 쓰며,
+        # 코멘트만 구절별로 생성한다(코멘트 언어 현지화는 이슈 #11).
+        selected = _select_verses(inp.mood, cands, PICKS)
+        _lap("select", t)
+        t = time.perf_counter()
+        per_card_tokens = max(300, limits["max_tokens"] // PICKS)
+        results = []
+        for v in selected:
+            item = {"ref": v["ref"], "text": str(v["text"]), "tag": "", "comment": ""}
+            try:
+                parsed = json.loads(_call_openai_as_json(
+                    system, _build_single_comment_prompt(inp.mood, v, limits),
+                    max_tokens=per_card_tokens,
+                ))
+                if isinstance(parsed, dict):
+                    item["tag"] = str(parsed.get("tag", ""))
+                    item["comment"] = str(parsed.get("comment", ""))
+            except Exception:
+                log.exception("/recommend 코멘트 생성 실패 (%s)", v["ref"])
+            results.append(item)
+        _lap("openai", t)
+        log.info("/recommend total=%.3fs", time.perf_counter() - t0)
+        return {
+            "mood": inp.mood,
+            "model": OPENAI_MODEL,
+            "style": COMMENT_STYLE,
+            "results": results,
+        }
+
     user = _build_user_prompt(inp.mood, cands, PICKS, limits)
     _lap("prompt", t)
     t = time.perf_counter()
@@ -853,12 +948,13 @@ def recommend(inp: RecommendIn):
     }
 
 
-def _search_candidates(mood: str, top_k: int) -> List[dict]:
+def _search_candidates(mood: str, top_k: int, lang: str = "ko") -> List[dict]:
+    store = get_store(lang)
     q = model.encode([f"query: {mood}"])
-    D, I = index.search(q, top_k)
+    D, I = store.index.search(q, top_k)
     cands = []
     for s, i in zip(D[0], I[0]):
-        r = df.iloc[int(i)]
+        r = store.df.iloc[int(i)]
         cands.append({
             "ref": f"{r['book']} {int(r['chapter'])}:{int(r['verse'])}",
             "text": str(r["text"]),
@@ -943,20 +1039,22 @@ def _select_verses(mood: str, candidates: List[dict], picks: int) -> List[dict]:
         return fallback
 
 
-def _prepare_recommendations(mood: str, search_k: int, picks: int) -> List[dict]:
+def _prepare_recommendations(
+    mood: str, search_k: int, picks: int, lang: str = "ko"
+) -> List[dict]:
     """쿼리 확장 → 넓게 검색 → LLM 재순위 를 한 번에 수행(동기, executor용)."""
-    query = _expand_search_query(mood)
-    candidates = _search_candidates(query, search_k)
+    query = _expand_search_query(mood) if lang == "ko" else mood
+    candidates = _search_candidates(query, search_k, lang)
     return _select_verses(mood, candidates, picks)
 
 
 # ---------- /recommend/stream (SSE) ----------
-def _recommend_stream_response(mood: str) -> StreamingResponse:
+def _recommend_stream_response(mood: str, lang: str = "ko") -> StreamingResponse:
     # 넓게 뽑아(SEARCH_K) LLM이 재순위해서 PICKS개를 확정한다.
     SEARCH_K = 15
     PICKS = 3
     COMMENT_STYLE = "long"
-    KOREAN_ONLY = True
+    KOREAN_ONLY = lang == "ko"
 
     async def generate_sse():
         meta = {
@@ -974,7 +1072,7 @@ def _recommend_stream_response(mood: str) -> StreamingResponse:
 
         # 준비 단계: 쿼리 확장 → 넓게 검색 → LLM 재순위. 진행 중엔 ping 으로 연결 유지.
         prep_task = loop.run_in_executor(
-            None, _prepare_recommendations, mood, SEARCH_K, PICKS
+            None, _prepare_recommendations, mood, SEARCH_K, PICKS, lang
         )
         while not prep_task.done():
             yield f"data: {json.dumps({'event': 'ping'}, ensure_ascii=False)}\n\n"
@@ -1099,7 +1197,7 @@ es.addEventListener('message', (e) => {
 )
 async def recommend_stream(inp: RecommendIn):
     """POST 바디 기반 카드 순차 SSE 스트리밍."""
-    return _recommend_stream_response(inp.mood)
+    return _recommend_stream_response(inp.mood, resolve_lang(inp.lang))
 
 
 def _comment_stream_response(inp: CommentStreamIn) -> StreamingResponse:
@@ -1189,6 +1287,8 @@ async def comment_stream(inp: CommentStreamIn):
 app.include_router(analytics_router)
 # 앱 버전 게이팅: GET /app-version (업데이트 안내 팝업용)
 app.include_router(app_version_router)
+# 다국어: GET /languages (클라이언트 게이트) + POST /admin/languages (대시보드)
+app.include_router(languages_router)
 
 
 @app.on_event("startup")

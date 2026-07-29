@@ -34,8 +34,12 @@ export function AppVersionControl() {
 
   useEffect(() => {
     void fetch("/api/admin/app-version", { cache: "no-store" })
-      .then((r) => r.json())
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
       .then((data: VersionConfig) => {
+        // 502/401 시 {error} JSON 이 그대로 캐스팅되지 않도록 형태를 검증한다.
+        if (typeof data.latest !== "string" || typeof data.min_supported !== "string") {
+          throw new Error("invalid_shape");
+        }
         setConfig(data);
         setLatest(data.latest);
         setMinSupported(data.min_supported);
