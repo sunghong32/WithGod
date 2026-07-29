@@ -24,6 +24,59 @@ ONNX_DIR = ROOT / "models" / "e5-small-int8"
 MODEL_ID = "intfloat/multilingual-e5-small"
 
 
+class _SplitOnnxEmbedder:
+    """임베딩 테이블 분리형 — 테이블은 memmap, 트랜스포머만 ONNX.
+
+    통짜 int8 ONNX 는 ORT 세션이 ~370MB 를 상주시킨다(실측). 96MB 테이블을
+    numpy memmap 으로 빼면 파일 기반 페이지라 익명 RSS 가 거의 0 이고, ONNX
+    세션은 22MB 트랜스포머만 든다. 역양자화 (x-zp)*scale 을 numpy 로 동일
+    재현하므로 결과는 통짜 모델과 일치한다(scripts/split_onnx_embedding.py).
+    """
+
+    EMBEDS_INPUT = "/embeddings/word_embeddings/Gather_output_0"
+
+    def __init__(self, model_dir: Path) -> None:
+        import json
+
+        import onnxruntime as ort
+        from tokenizers import Tokenizer
+
+        self.tokenizer = Tokenizer.from_file(str(model_dir / "tokenizer.json"))
+        self.tokenizer.enable_truncation(max_length=512)
+        pad_id = self.tokenizer.token_to_id("<pad>") or 0
+        self.tokenizer.enable_padding(pad_id=pad_id, pad_token="<pad>")
+
+        meta = json.loads((model_dir / "word_embeddings_meta.json").read_text())
+        self.scale = float(meta["scale"])
+        self.zero_point = float(meta["zero_point"])
+        self.table = np.load(model_dir / "word_embeddings_uint8.npy", mmap_mode="r")
+
+        self.session = ort.InferenceSession(
+            str(model_dir / "model_int8_noemb.onnx"), providers=["CPUExecutionProvider"]
+        )
+        self._input_names = {i.name for i in self.session.get_inputs()}
+
+    def encode(self, texts: list[str]) -> np.ndarray:
+        encs = self.tokenizer.encode_batch(texts)
+        input_ids = np.array([e.ids for e in encs], dtype=np.int64)
+        attention_mask = np.array([e.attention_mask for e in encs], dtype=np.int64)
+        # DequantizeLinear 재현: (uint8 - zero_point) * scale
+        embeds = (self.table[input_ids].astype(np.float32) - self.zero_point) * self.scale
+        inputs = {
+            "input_ids": input_ids,
+            "attention_mask": attention_mask,
+            self.EMBEDS_INPUT: embeds,
+        }
+        if "token_type_ids" in self._input_names:
+            inputs["token_type_ids"] = np.zeros_like(input_ids)
+        inputs = {k: v for k, v in inputs.items() if k in self._input_names}
+        hidden = self.session.run(None, inputs)[0]
+        mask = attention_mask[..., None].astype(np.float32)
+        pooled = (hidden * mask).sum(axis=1) / np.clip(mask.sum(axis=1), 1e-9, None)
+        pooled = pooled / np.linalg.norm(pooled, axis=1, keepdims=True)
+        return pooled.astype("float32")
+
+
 class _OnnxEmbedder:
     def __init__(self, model_dir: Path) -> None:
         import onnxruntime as ort
@@ -71,11 +124,21 @@ class _SentenceTransformerEmbedder:
 
 
 def load_query_embedder():
-    """int8 ONNX 가 준비돼 있으면 그것을, 아니면 sentence-transformers 를 쓴다."""
+    """분리형 int8 → 통짜 int8 → sentence-transformers 순으로 시도한다."""
+    if (ONNX_DIR / "model_int8_noemb.onnx").exists() and (
+        ONNX_DIR / "word_embeddings_uint8.npy"
+    ).exists():
+        try:
+            embedder = _SplitOnnxEmbedder(ONNX_DIR)
+            embedder.encode(["query: warmup"])  # 워밍업 겸 자가 점검
+            log.info("query embedder: int8 ONNX 분리형(memmap 테이블) (%s)", ONNX_DIR)
+            return embedder
+        except Exception:
+            log.exception("분리형 ONNX 로드 실패 — 통짜 int8 로 폴백")
     if (ONNX_DIR / "model_int8.onnx").exists():
         try:
             embedder = _OnnxEmbedder(ONNX_DIR)
-            embedder.encode(["query: warmup"])  # 워밍업 겸 자가 점검
+            embedder.encode(["query: warmup"])
             log.info("query embedder: int8 ONNX (%s)", ONNX_DIR)
             return embedder
         except Exception:
