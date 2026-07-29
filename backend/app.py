@@ -107,6 +107,14 @@ languages_set_encoder(model.encode)
 from openai import OpenAI
 
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")  # 빠르고 저렴한 기본값
+
+# 언어별 코멘트 생성 모델 오버라이드 — 저지 검증(이슈 #11)에서 4o-mini 가
+# 이탈리아어 조어 실수('incomprensi' 류 비단어)를 내는 것이 확인돼 it 만 상향.
+_COMMENT_MODEL_BY_LANG = {"it": os.getenv("OPENAI_MODEL_IT", "gpt-4o")}
+
+
+def _comment_model(lang: str) -> str | None:
+    return _COMMENT_MODEL_BY_LANG.get(lang)
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 APP_SETTINGS = AppSettings.from_env()
 
@@ -467,10 +475,12 @@ Task: Write a short pastoral reflection as 'comment'.
 """.strip()
 
 
-def _call_openai_as_json(system: str, user: str, max_tokens: int) -> str:
+def _call_openai_as_json(
+    system: str, user: str, max_tokens: int, model: str | None = None
+) -> str:
     client = OpenAI(api_key=OPENAI_API_KEY)
     resp = client.chat.completions.create(
-        model=OPENAI_MODEL,
+        model=model or OPENAI_MODEL,
         temperature=0.4,              # 약간 풍부하게
         max_tokens=max_tokens,        # 스타일에 따라 증가
         response_format={"type": "json_object"},
@@ -482,11 +492,13 @@ def _call_openai_as_json(system: str, user: str, max_tokens: int) -> str:
     return resp.choices[0].message.content.strip()
 
 
-def _call_openai_as_text(system: str, user: str, max_tokens: int) -> str:
+def _call_openai_as_text(
+    system: str, user: str, max_tokens: int, model: str | None = None
+) -> str:
     """_call_openai_as_json 과 동형이지만 JSON 강제 없이 평문(풀이 본문)만 받는 헬퍼."""
     client = OpenAI(api_key=OPENAI_API_KEY)
     resp = client.chat.completions.create(
-        model=OPENAI_MODEL,
+        model=model or OPENAI_MODEL,
         temperature=0.5,
         max_tokens=max_tokens,
         messages=[
@@ -551,14 +563,16 @@ def _generate_verse_interpretation(reference: str, text: str, lang: str = "ko") 
         f"Verse: {reference}\nText: {text}\n\n"
         f"Explain it gently in {name} (max 2 sentences, explanation only):"
     )
-    return _call_openai_as_text(system, user, max_tokens=200)
+    return _call_openai_as_text(system, user, max_tokens=200, model=_comment_model(lang))
 
 
-async def _stream_openai(system: str, user: str, max_tokens: int) -> AsyncGenerator[str, None]:
+async def _stream_openai(
+    system: str, user: str, max_tokens: int, model: str | None = None
+) -> AsyncGenerator[str, None]:
     """OpenAI API를 스트리밍으로 호출하여 토큰 단위로 yield"""
     client = OpenAI(api_key=OPENAI_API_KEY)
     stream = client.chat.completions.create(
-        model=OPENAI_MODEL,
+        model=model or OPENAI_MODEL,
         temperature=0.4,
         max_tokens=max_tokens,
         response_format={"type": "json_object"},
@@ -927,6 +941,7 @@ def recommend(inp: RecommendIn):
                 parsed = json.loads(_call_openai_as_json(
                     system, _build_single_comment_prompt(inp.mood, v, limits, lang),
                     max_tokens=per_card_tokens,
+                    model=_comment_model(lang),
                 ))
                 if isinstance(parsed, dict):
                     item["tag"] = str(parsed.get("tag", ""))
@@ -1202,7 +1217,7 @@ def _recommend_stream_response(mood: str, lang: str = "ko") -> StreamingResponse
 
             user = _build_single_comment_prompt(mood, selected, limits, lang)
             try:
-                async for token in _stream_openai(system, user, per_card_tokens):
+                async for token in _stream_openai(system, user, per_card_tokens, _comment_model(lang)):
                     yield f"data: {json.dumps({'event': 'token', 'index': idx, 'content': token}, ensure_ascii=False)}\n\n"
             except Exception as e:
                 log.exception("streaming error for card %d", idx)
@@ -1336,7 +1351,7 @@ def _comment_stream_response(inp: CommentStreamIn) -> StreamingResponse:
 
         user = _build_single_comment_prompt(inp.mood, verse, limits, lang)
         try:
-            async for token in _stream_openai(system, user, limits["max_tokens"]):
+            async for token in _stream_openai(system, user, limits["max_tokens"], _comment_model(lang)):
                 yield f"data: {json.dumps({'event': 'token', 'index': index_value, 'content': token}, ensure_ascii=False)}\n\n"
         except Exception as e:
             log.exception("comment streaming error for card %d", index_value)

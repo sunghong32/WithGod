@@ -29,9 +29,9 @@ import pt from './locales/pt.json';
 export const SUPPORTED_LANGUAGES = ['ko', 'en', 'es', 'pt', 'de', 'fr', 'it', 'pl'] as const;
 export type AppLanguage = (typeof SUPPORTED_LANGUAGES)[number];
 
-// 품질 검증을 통과해 사용자에게 노출해도 되는 언어. 이슈 #10 에서 서버
-// enabled_languages 로 대체 예정. ko 만 있는 동안은 기존 사용자 체감 무변화.
-const ENABLED_LANGUAGES: readonly AppLanguage[] = ['ko'];
+// 품질 검증(이슈 #11 저지 파이프라인)을 통과해 사용자에게 노출하는 언어.
+// 2026-07-29 전 언어 오픈(v1.3.0) — 서버 enabled_languages 스위치와 함께 켠다.
+const ENABLED_LANGUAGES: readonly AppLanguage[] = [...SUPPORTED_LANGUAGES];
 
 const LANGUAGE_KEY = 'withgod.language';
 // 검증·개발용: 게이트를 무시하고 강제할 언어 (일반 사용자 경로에서는 쓰지 않음)
