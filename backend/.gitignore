@@ -31,3 +31,10 @@ data/verse_interpretations.json
 secrets/*.json
 data/app_version.json
 models/
+
+# 다국어 파이프라인 — CSV(원천 데이터)만 커밋하고 무거운 산출물은 제외.
+# 재현: scripts/build_language_data.py + scripts/build_language_index.py
+data/langs/*/verses.faiss
+data/langs/*/verses.npy
+data/langs/*/verses_meta.parquet
+data_raw/*.zip
