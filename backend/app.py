@@ -14,7 +14,6 @@ from fastapi.responses import StreamingResponse
 from pydantic import AliasChoices, BaseModel, Field
 import pandas as pd
 import faiss
-from sentence_transformers import SentenceTransformer
 from pathlib import Path
 from typing import List, Optional, Union, Literal, AsyncGenerator
 from datetime import datetime, timedelta
@@ -28,6 +27,7 @@ from analytics.db import init_db as init_analytics_db
 from analytics.routes import router as analytics_router
 from analytics.scheduler import AnalyticsRollupScheduler
 from app_version import router as app_version_router
+from embedding import load_query_embedder
 from notifications.jobs import build_notification_manager
 from notifications.manager import DailyVerseNotificationManager
 from notifications.scheduler import DailyVerseScheduler
@@ -70,15 +70,17 @@ else:
     df = pd.read_csv(CSV)
     df["clean"] = df["text"].astype(str).str.split().str.join(" ")
 
-# FAISS 인덱스 로드
-index = faiss.read_index(IDX)
-
-# Apple Silicon 가속(MPS). 없으면 CPU로 자동 폴백.
+# FAISS 인덱스 로드 — mmap 으로 열어 힙 대신 페이지 캐시를 쓴다.
+# 다국어 인덱스가 늘어나도(언어당 ~50MB) 메모리 압박 시 OS 가 콜드 페이지를
+# 회수할 수 있어 1GB 서버에서 안전하다. 실패 시 기존 방식으로 폴백.
 try:
-    model = SentenceTransformer("intfloat/multilingual-e5-small", device="mps")
-    model.encode(["query: warmup"], normalize_embeddings=True)  # 워밍업
+    index = faiss.read_index(IDX, faiss.IO_FLAG_MMAP | faiss.IO_FLAG_READ_ONLY)
 except Exception:
-    model = SentenceTransformer("intfloat/multilingual-e5-small")
+    index = faiss.read_index(IDX)
+
+# 쿼리 임베더 — int8 ONNX(~118MB) 우선, 없으면 sentence-transformers(~560MB) 폴백.
+# 산출·검증 절차는 embedding.py / scripts/build_quantized_model.py 참고.
+model = load_query_embedder()
 
 
 # =========================================================
@@ -762,7 +764,7 @@ def recommend(inp: RecommendIn):
     search_query = _expand_search_query(inp.mood)
     _lap("expand", t)
     t = time.perf_counter()
-    q = model.encode([f"query: {search_query}"], normalize_embeddings=True).astype("float32")
+    q = model.encode([f"query: {search_query}"])
     _lap("encode", t)
     t = time.perf_counter()
 
@@ -852,7 +854,7 @@ def recommend(inp: RecommendIn):
 
 
 def _search_candidates(mood: str, top_k: int) -> List[dict]:
-    q = model.encode([f"query: {mood}"], normalize_embeddings=True).astype("float32")
+    q = model.encode([f"query: {mood}"])
     D, I = index.search(q, top_k)
     cands = []
     for s, i in zip(D[0], I[0]):

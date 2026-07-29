@@ -30,3 +30,4 @@ data/verse_interpretations.json
 # Secrets
 secrets/*.json
 data/app_version.json
+models/
