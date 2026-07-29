@@ -27,24 +27,30 @@ MODEL_ID = "intfloat/multilingual-e5-small"
 class _OnnxEmbedder:
     def __init__(self, model_dir: Path) -> None:
         import onnxruntime as ort
-        from transformers import AutoTokenizer
+        # transformers.AutoTokenizer 는 torch 를 끌고 들어와 RSS 를 ~300MB 이상
+        # 잡아먹는다(실측). 경량 Rust 구현인 tokenizers 를 직접 쓴다.
+        from tokenizers import Tokenizer
 
-        self.tokenizer = AutoTokenizer.from_pretrained(str(model_dir))
+        self.tokenizer = Tokenizer.from_file(str(model_dir / "tokenizer.json"))
+        self.tokenizer.enable_truncation(max_length=512)
+        pad_id = self.tokenizer.token_to_id("<pad>") or 0
+        self.tokenizer.enable_padding(pad_id=pad_id, pad_token="<pad>")
         self.session = ort.InferenceSession(
             str(model_dir / "model_int8.onnx"), providers=["CPUExecutionProvider"]
         )
         self._input_names = {i.name for i in self.session.get_inputs()}
 
     def encode(self, texts: list[str]) -> np.ndarray:
-        enc = self.tokenizer(
-            texts, padding=True, truncation=True, max_length=512, return_tensors="np"
-        )
-        inputs = {k: v for k, v in enc.items() if k in self._input_names}
+        encs = self.tokenizer.encode_batch(texts)
+        input_ids = np.array([e.ids for e in encs], dtype=np.int64)
+        attention_mask = np.array([e.attention_mask for e in encs], dtype=np.int64)
+        inputs = {"input_ids": input_ids, "attention_mask": attention_mask}
         # XLM-R 토크나이저는 token_type_ids 를 안 주지만 그래프가 요구할 수 있다.
-        if "token_type_ids" in self._input_names and "token_type_ids" not in inputs:
-            inputs["token_type_ids"] = np.zeros_like(enc["input_ids"])
+        if "token_type_ids" in self._input_names:
+            inputs["token_type_ids"] = np.zeros_like(input_ids)
+        inputs = {k: v for k, v in inputs.items() if k in self._input_names}
         hidden = self.session.run(None, inputs)[0]  # (B, T, H)
-        mask = enc["attention_mask"][..., None].astype(np.float32)
+        mask = attention_mask[..., None].astype(np.float32)
         pooled = (hidden * mask).sum(axis=1) / np.clip(mask.sum(axis=1), 1e-9, None)
         pooled = pooled / np.linalg.norm(pooled, axis=1, keepdims=True)
         return pooled.astype("float32")
