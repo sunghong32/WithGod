@@ -75,7 +75,7 @@ class VerseInterpretationStore:
 class VerseInterpreter:
     """'오늘의 말씀 풀이'의 캐시 조회 → LLM 생성 → 폴백을 담당한다.
 
-    generate_fn 은 (reference, text) -> 풀이 문자열 을 반환하는 콜러블로,
+    generate_fn 은 (reference, text, lang) -> 풀이 문자열 을 반환하는 콜러블로,
     운영에서는 app.py 의 OpenAI 백엔드 함수를 주입한다(테스트에서는 mock 을 주입).
     어떤 경우에도 예외를 밖으로 던지지 않는다 — 풀이가 없어도 말씀은 항상 반환한다.
     """
@@ -83,21 +83,23 @@ class VerseInterpreter:
     def __init__(
         self,
         store: VerseInterpretationStore,
-        generate_fn: Callable[[str, str], str],
+        generate_fn: Callable[[str, str, str], str],
     ) -> None:
         self._store = store
         self._generate = generate_fn
 
-    def interpret(self, verse: DailyVerse) -> str:
+    def interpret(self, verse: DailyVerse, lang: str = "ko") -> str:
+        # 캐시 키: 한국어는 기존 verse_id 그대로(하위호환), 그 외는 언어를 붙인다.
+        cache_key = verse.verse_id if lang == "ko" else f"{verse.verse_id}:{lang}"
         try:
-            cached = self._store.get(verse.verse_id)
+            cached = self._store.get(cache_key)
         except Exception:
             cached = ""
         if cached:
             return cached
 
         try:
-            generated = self._generate(verse.reference, verse.text)
+            generated = self._generate(verse.reference, verse.text, lang)
             text = (generated or "").strip()
         except Exception:
             # 키 없음/네트워크/파싱 등 어떤 예외든 풀이 없이도 말씀은 반환한다.
@@ -108,7 +110,7 @@ class VerseInterpreter:
             return verse.reflection or ""
 
         try:
-            self._store.set(verse.verse_id, text)
+            self._store.set(cache_key, text)
         except Exception:
             # 캐시 저장 실패해도 생성된 풀이는 그대로 반환한다.
             pass

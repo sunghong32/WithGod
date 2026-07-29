@@ -22,9 +22,12 @@ from settings import AppSettings
 class FakePushGateway(PushGateway):
     def __init__(self) -> None:
         self.sent_batches: list[list[str]] = []
+        # (devices, payload) 원본 — 언어별 그룹 발송 검증용
+        self.calls: list[tuple[list, object]] = []
 
     def send(self, devices, payload):
         self.sent_batches.append([device.token for device in devices])
+        self.calls.append((list(devices), payload))
         return PushDispatchResult(
             success_count=len(devices),
             failure_count=0,
@@ -282,7 +285,7 @@ class NotificationFeatureTest(unittest.TestCase):
         verse = manager.get_daily_verse(now=now)
 
         # (a) 첫 호출 시 LLM 이 1회 호출되어 풀이가 생성된다.
-        generate.assert_called_once_with(verse["reference"], verse["text"])
+        generate.assert_called_once_with(verse["reference"], verse["text"], "ko")
         self.assertEqual(verse["interpretation"], "풀이 첫 문장이에요. 두 번째 문장이에요.")
         # verse_id -> interpretation 이 파일 캐시에 영속되어야 한다.
         cached = json.loads(self.interpretation_store_path.read_text(encoding="utf-8"))
@@ -315,3 +318,65 @@ class NotificationFeatureTest(unittest.TestCase):
         self.assertEqual(verse["interpretation"], verse["reflection"])
         # 폴백 값은 캐시에 저장하지 않는다(다음 요청에서 LLM 재시도).
         self.assertFalse(self.interpretation_store_path.exists())
+
+
+class LanguageFeatureTest(NotificationFeatureTest):
+    """기기 언어 필드 + 언어별 푸시 발송 (이슈 #12)."""
+
+    def test_register_device_persists_language(self) -> None:
+        self.manager.register_device(
+            token="tok-lang", platform="ios", language="EN"
+        )
+        stored = self.store.list_devices()[-1]
+        self.assertEqual(stored.language, "en")  # 정규화되어 저장
+
+    def test_register_device_defaults_language_to_ko(self) -> None:
+        self.manager.register_device(token="tok-nolang", platform="ios")
+        stored = self.store.list_devices()[-1]
+        self.assertEqual(stored.language, "ko")
+
+    def test_legacy_store_record_defaults_language_to_ko(self) -> None:
+        # language 필드가 없던 기존 저장 파일도 ko 로 읽혀야 한다.
+        self.manager.register_device(token="tok-legacy", platform="ios")
+        raw = json.loads(self.store.path.read_text(encoding="utf-8"))
+        for item in raw:
+            item.pop("language", None)
+        self.store.path.write_text(json.dumps(raw), encoding="utf-8")
+        stored = self.store.list_devices()[-1]
+        self.assertEqual(stored.language, "ko")
+
+    def test_send_groups_devices_by_language(self) -> None:
+        from unittest.mock import patch
+
+        self.manager.register_device(token="tok-ko", platform="ios", language="ko")
+        self.manager.register_device(token="tok-en", platform="android", language="en")
+
+        localized = {"ref": "Psalms 23:1", "text": "The LORD is my shepherd."}
+        with patch("notifications.manager.resolve_lang", side_effect=lambda l: l or "ko"), \
+             patch("notifications.manager.localize_ko_ref", return_value=localized):
+            self.manager.send_daily_verse_now(now=datetime(2026, 4, 21, 9, 0))
+
+        # 언어 그룹별로 별도 페이로드가 발송된다.
+        self.assertEqual(len(self.gateway.calls), 2)
+        by_title = {payload.title.split(" | ")[0]: devices
+                    for devices, payload in self.gateway.calls}
+        self.assertIn("오늘의 말씀", by_title)
+        self.assertIn("Today's Verse", by_title)
+        en_devices, en_payload = next(
+            (d, p) for d, p in self.gateway.calls if p.title.startswith("Today's Verse")
+        )
+        self.assertEqual([d.token for d in en_devices], ["tok-en"])
+        self.assertEqual(en_payload.body, "The LORD is my shepherd.")
+        self.assertEqual(en_payload.data["ref"], "Psalms 23:1")
+
+    def test_send_falls_back_to_korean_when_localization_fails(self) -> None:
+        from unittest.mock import patch
+
+        self.manager.register_device(token="tok-en2", platform="ios", language="en")
+        with patch("notifications.manager.resolve_lang", side_effect=lambda l: l or "ko"), \
+             patch("notifications.manager.localize_ko_ref", return_value=None):
+            self.manager.send_daily_verse_now(now=datetime(2026, 4, 21, 9, 0))
+        # 정렬 실패 시 한국어 본문이라도 발송된다(제목은 해당 언어).
+        devices, payload = self.gateway.calls[-1]
+        self.assertTrue(payload.title.startswith("Today's Verse"))
+        self.assertNotEqual(payload.body, "")

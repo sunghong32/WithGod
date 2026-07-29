@@ -28,6 +28,9 @@ class DeviceRegistration:
     device_id: str = ""
     app_version: str = ""
     os_version: str = ""
+    # 앱 표시 언어(ko/en/es/pt/de/fr/it/pl) — 푸시 본문·제목 현지화용.
+    # 발송 시점에 resolve_lang 으로 활성 여부를 거른다(비활성이면 ko).
+    language: str = "ko"
     enabled: bool = True
     schedule_hour: int | None = None
     schedule_minute: int | None = None

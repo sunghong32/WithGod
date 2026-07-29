@@ -1,6 +1,6 @@
 import type { WidgetTaskHandlerProps } from "react-native-android-widget";
 
-import { t } from "@/shared/lib/i18n";
+import { getAppLanguage, t } from "@/shared/lib/i18n";
 import { getStorageItem, setStorageItem } from "@/shared/lib/storage";
 
 import { DailyVerseWidget } from "./DailyVerseWidget";
@@ -53,7 +53,11 @@ const fetchDailyVerse = async (): Promise<{
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   try {
-    const response = await fetch(API_URL, { signal: controller.signal });
+    // 언어 파라미터 — 서버가 미지원/비활성 언어는 ko 로 폴백한다(이슈 #12)
+    const response = await fetch(
+      `${API_URL}?lang=${encodeURIComponent(getAppLanguage())}`,
+      { signal: controller.signal },
+    );
     if (!response.ok) {
       throw new Error(`daily-verse HTTP ${response.status}`);
     }

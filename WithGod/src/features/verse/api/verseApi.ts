@@ -1,6 +1,6 @@
 import { apiClient } from "@/shared/api/client";
 import { parseError, logError, ApiError } from "@/shared/api/errors";
-import { t } from "@/shared/lib/i18n";
+import { getAppLanguage, t } from "@/shared/lib/i18n";
 import {
   DailyVerseResponseSchema,
   type DailyVerse,
@@ -157,7 +157,9 @@ export const verseApi = {
   // 오늘의 말씀 조회 (풀이 interpretation 포함)
   getDailyVerse: async (): Promise<DailyVerse> => {
     try {
-      const { data } = await apiClient.get("/daily-verse");
+      const { data } = await apiClient.get("/daily-verse", {
+        params: { lang: getAppLanguage() },
+      });
       const { daily_verse } = DailyVerseResponseSchema.parse(data);
       return daily_verse;
     } catch (error) {
@@ -274,7 +276,8 @@ export const verseApi = {
       xhr.timeout = 90000;
       xhr.setRequestHeader("Content-Type", "application/json");
       xhr.setRequestHeader("Accept", "text/event-stream");
-      xhr.send(JSON.stringify(input));
+      // 구절·코멘트 언어 — 서버가 미지원/비활성 언어는 ko 로 폴백한다
+      xhr.send(JSON.stringify({ ...input, lang: getAppLanguage() }));
     } catch (error) {
       handlers.onError?.(t("errors.sseStart"), {
         source: "network",

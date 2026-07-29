@@ -1,6 +1,8 @@
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 
+import { getAppLanguage } from '@/shared/lib/i18n';
+
 import { parseError, logError } from './errors';
 import { apiClient } from './client';
 
@@ -20,6 +22,8 @@ export interface RegisterPushDevicePayload {
   platform: 'ios' | 'android';
   timezone: string;
   enabled: boolean;
+  // 앱 표시 언어 — 오늘의 말씀 푸시 제목·본문 현지화용(이슈 #12)
+  language: string;
   // 공유 API 규약(snake_case)
   device_id?: string;
   schedule_hour?: number;
@@ -89,6 +93,7 @@ export const pushApi = {
       platform: getPlatform(),
       timezone: timezone || getTimezone(),
       enabled,
+      language: getAppLanguage(),
       // 공유 규약(snake_case)
       device_id: deviceId,
       schedule_hour: resolvedHour,

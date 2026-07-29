@@ -4,8 +4,9 @@ from dataclasses import asdict
 from datetime import datetime
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+from languages import DAILY_VERSE_TITLES, localize_ko_ref, normalize_lang, resolve_lang
 from notifications.device_store import DeviceStore
-from notifications.models import DeviceRegistration, MobilePlatform, PushDispatchResult, PushPayload
+from notifications.models import DailyVerse, DeviceRegistration, MobilePlatform, PushDispatchResult, PushPayload
 from notifications.push_service import PushGateway
 from notifications.verse_provider import DailyVerseProvider, VerseInterpreter
 from settings import AppSettings
@@ -27,13 +28,33 @@ class DailyVerseNotificationManager:
         # None 이면 interpretation 은 빈 문자열로 남는다(푸시 배치 경로 등 풀이가 필요 없는 경우).
         self.verse_interpreter = verse_interpreter
 
-    def get_daily_verse(self, now: datetime | None = None) -> dict[str, str]:
+    def get_daily_verse(self, now: datetime | None = None, lang: str = "ko") -> dict[str, str]:
         # naive now(또는 None)가 그대로 흘러가면 서버 OS 타임존(UTC 등) 기준 날짜가
         # 되므로, 항상 push_default_timezone 기준으로 normalize 해서 넘긴다.
         verse = self.verse_provider.get_daily_verse(now=self._normalize_now(now))
+        verse = self._localize_verse(verse, lang)
         if self.verse_interpreter is not None:
-            verse.interpretation = self.verse_interpreter.interpret(verse)
+            verse.interpretation = self.verse_interpreter.interpret(verse, lang)
         return asdict(verse)
+
+    @staticmethod
+    def _localize_verse(verse: DailyVerse, lang: str) -> DailyVerse:
+        """큐레이션된 한국어 오늘의 말씀을 해당 언어의 같은 구절로 바꾼다.
+
+        reflection 은 한국어 큐레이션이라 비한국어에서는 비운다(풀이는
+        VerseInterpreter 가 언어별로 생성·캐시). 정렬 실패 시 한국어 그대로.
+        """
+        if lang == "ko":
+            return verse
+        found = localize_ko_ref(lang, verse.reference, verse.text)
+        if not found:
+            return verse
+        return DailyVerse(
+            verse_id=verse.verse_id,
+            reference=found["ref"],
+            text=found["text"],
+            reflection="",
+        )
 
     def list_devices(self) -> list[dict[str, str | bool]]:
         return [asdict(device) for device in self.device_store.list_devices()]
@@ -46,6 +67,7 @@ class DailyVerseNotificationManager:
         device_id: str = "",
         app_version: str = "",
         os_version: str = "",
+        language: str | None = None,
         enabled: bool = True,
         schedule_hour: int | None = None,
         schedule_minute: int | None = None,
@@ -72,6 +94,7 @@ class DailyVerseNotificationManager:
             device_id=device_id.strip(),
             app_version=app_version.strip(),
             os_version=os_version.strip(),
+            language=normalize_lang(language),
             enabled=enabled,
             schedule_hour=schedule_hour,
             schedule_minute=schedule_minute,
@@ -149,21 +172,37 @@ class DailyVerseNotificationManager:
                 "result": asdict(PushDispatchResult(success_count=0, failure_count=0)),
             }
 
-        payload = PushPayload(
-            title=f"오늘의 말씀 | {verse.reference}",
-            body=verse.text,
-            data={
-                "type": "daily_verse",
-                "verseId": verse.verse_id,
-                "ref": verse.reference,
-                "text": verse.text,
-                "comment": verse.reflection,
-                "tag": "오늘의 말씀",
-                "title": f"오늘의 말씀 | {verse.reference}",
-                "body": verse.text,
-            },
-        )
-        dispatch = self.push_gateway.send(devices, payload)
+        # 기기 언어별로 묶어 제목·본문을 현지화해 발송한다. 발송 시점에
+        # resolve_lang 으로 거르므로 비활성 언어 기기는 ko 그룹으로 온다.
+        groups: dict[str, list[DeviceRegistration]] = {}
+        for device in devices:
+            groups.setdefault(resolve_lang(device.language), []).append(device)
+
+        dispatch = PushDispatchResult(success_count=0, failure_count=0)
+        for lang, group_devices in groups.items():
+            localized = self._localize_verse(verse, lang)
+            title_word = DAILY_VERSE_TITLES.get(lang, DAILY_VERSE_TITLES["ko"])
+            title = f"{title_word} | {localized.reference}"
+            payload = PushPayload(
+                title=title,
+                body=localized.text,
+                data={
+                    "type": "daily_verse",
+                    "verseId": localized.verse_id,
+                    "ref": localized.reference,
+                    "text": localized.text,
+                    "comment": localized.reflection,
+                    "tag": title_word,
+                    "title": title,
+                    "body": localized.text,
+                },
+            )
+            part = self.push_gateway.send(group_devices, payload)
+            dispatch.success_count += part.success_count
+            dispatch.failure_count += part.failure_count
+            dispatch.invalid_tokens.extend(part.invalid_tokens)
+            dispatch.failed_tokens.extend(part.failed_tokens)
+
         if mark_sent:
             local_date = now.date().isoformat()
             for device in devices:

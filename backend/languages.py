@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import time
 from pathlib import Path
 from threading import Lock
@@ -40,6 +41,13 @@ DEFAULT_ENABLED = ["ko"]
 LANGUAGE_NAMES_EN = {
     "ko": "Korean", "en": "English", "es": "Spanish", "pt": "Portuguese",
     "de": "German", "fr": "French", "it": "Italian", "pl": "Polish",
+}
+
+# '오늘의 말씀' — 푸시 제목·태그용. 앱 로케일(home.dailyVerseTitle)과 동일 문구.
+DAILY_VERSE_TITLES = {
+    "ko": "오늘의 말씀", "en": "Today's Verse", "es": "Versículo del día",
+    "pt": "Versículo do dia", "de": "Vers des Tages", "fr": "Verset du jour",
+    "it": "Versetto del giorno", "pl": "Werset dnia",
 }
 
 # 한국어 책 이름(운영 data/verses.csv 기준) ↔ USFM 3글자 코드.
@@ -85,14 +93,24 @@ def get_enabled_languages() -> list[str]:
     return enabled
 
 
-def resolve_lang(raw: str | None) -> str:
-    """요청 lang 을 활성 언어로 정규화한다. 미지원/비활성은 ko 로 폴백."""
+def normalize_lang(raw: str | None) -> str:
+    """지원 언어의 기본 서브태그로 정규화한다(활성 여부는 안 봄 — 저장용).
+
+    기기 등록처럼 '사용자 의도'를 보존해야 하는 곳에 쓴다. 실제 서빙 시점에
+    resolve_lang 으로 활성 여부를 다시 거른다(비활성이면 ko 폴백).
+    """
     if not raw:
         return "ko"
     lang = raw.strip().lower().split("-")[0]
-    if lang in SUPPORTED_LANGUAGES and lang in get_enabled_languages():
-        return lang
-    return "ko"
+    return lang if lang in SUPPORTED_LANGUAGES else "ko"
+
+
+def resolve_lang(raw: str | None) -> str:
+    """요청 lang 을 활성 언어로 정규화한다. 미지원/비활성은 ko 로 폴백."""
+    lang = normalize_lang(raw)
+    if lang != "ko" and lang not in get_enabled_languages():
+        return "ko"
+    return lang
 
 
 # ---------- 언어별 스토어 (lazy) ----------
@@ -274,6 +292,30 @@ def find_aligned_verse(
     except Exception:
         log.exception("verse align 실패(%s) — 같은 번호 절로 폴백", lang)
         return store.find_verse(book_code, chapter, verse)
+
+
+_RE_KO_REF = re.compile(r"^(.+?)\s+(\d+):(\d+)$")
+
+
+def localize_ko_ref(lang: str, ko_ref: str, ko_text: str) -> dict | None:
+    """'시편 23:1' 같은 한국어 ref 를 해당 언어의 같은 구절로 바꾼다.
+
+    /random 오늘의 말씀·푸시·위젯이 공용으로 쓴다. 실패(파싱 불가·판본 차이로
+    정렬 불가) 시 None — 호출측은 한국어 본문으로 폴백한다.
+    """
+    m = _RE_KO_REF.match(ko_ref.strip())
+    if not m:
+        return None
+    code = KO_NAME_TO_CODE.get(m.group(1))
+    if not code:
+        return None
+    found = find_aligned_verse(lang, code, int(m.group(2)), int(m.group(3)), ko_text)
+    if not found:
+        return None
+    return {
+        "ref": f"{found['book']} {found['chapter']}:{found['verse']}",
+        "text": found["text"],
+    }
 
 
 # ---------- 추천 적합성 필터 ----------

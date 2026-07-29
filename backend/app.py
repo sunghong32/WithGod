@@ -31,9 +31,10 @@ from embedding import load_query_embedder
 from languages import (
     KO_NAME_TO_CODE,
     LANGUAGE_NAMES_EN,
-    find_aligned_verse,
     get_store,
     is_recommendable,
+    localize_ko_ref,
+    normalize_lang,
     register_ko_store,
     resolve_lang,
     router as languages_router,
@@ -521,19 +522,36 @@ def _build_verse_interpretation_user_prompt(reference: str, text: str) -> str:
 풀이(2문장 이내, 제목·따옴표·구절 재인용 없이 본문만):""".strip()
 
 
-def _generate_verse_interpretation(reference: str, text: str) -> str:
-    """구절(reference, text)을 받아 한국어 '풀이'를 생성한다.
+def _generate_verse_interpretation(reference: str, text: str, lang: str = "ko") -> str:
+    """구절(reference, text)을 받아 해당 언어의 '풀이'를 생성한다.
 
     키가 없거나 호출이 실패하면 예외를 올려 상위(VerseInterpreter)가 reflection 으로 폴백한다.
     """
     if not OPENAI_API_KEY:
         raise RuntimeError("OPENAI_API_KEY is not configured")
-    interpretation = _call_openai_as_text(
-        _VERSE_INTERPRETATION_SYSTEM,
-        _build_verse_interpretation_user_prompt(reference, text),
-        max_tokens=200,
+    if lang == "ko":
+        interpretation = _call_openai_as_text(
+            _VERSE_INTERPRETATION_SYSTEM,
+            _build_verse_interpretation_user_prompt(reference, text),
+            max_tokens=200,
+        )
+        return _keep_korean_only(interpretation)
+
+    name = LANGUAGE_NAMES_EN.get(lang, lang)
+    system = (
+        f"You are a warm companion in faith, writing ONLY in {name}. "
+        "You gently explain Bible verses in everyday words.\n"
+        "Rules:\n"
+        "- At most 2 short sentences, tender and plain.\n"
+        "- No headings, no quotation marks, no re-quoting the verse — output the "
+        "explanation only.\n"
+        "- Never lecture; speak like someone quietly comforting a friend."
     )
-    return _keep_korean_only(interpretation)
+    user = (
+        f"Verse: {reference}\nText: {text}\n\n"
+        f"Explain it gently in {name} (max 2 sentences, explanation only):"
+    )
+    return _call_openai_as_text(system, user, max_tokens=200)
 
 
 async def _stream_openai(system: str, user: str, max_tokens: int) -> AsyncGenerator[str, None]:
@@ -629,6 +647,8 @@ class DeviceRegisterIn(BaseModel):
         validation_alias=AliasChoices("device_id", "deviceId"),
         examples=["iphone-15-pro-max"],
     )
+    # 앱 표시 언어 — 오늘의 말씀 푸시 제목·본문 현지화용(없으면 ko)
+    language: Optional[str] = Field(default=None, examples=["ko"])
     schedule_hour: Optional[int] = Field(default=None, ge=0, le=23, examples=[9])
     schedule_minute: Optional[int] = Field(default=None, ge=0, le=59, examples=[0])
     # device_id 와 마찬가지로 snake_case(공유 규약)/camelCase(기존 클라이언트) 둘 다 허용.
@@ -706,7 +726,7 @@ def random_verse(
         if cached:
             return cached
 
-        localized = _localize_ko_ref(resolved, ko_pick["ref"], ko_pick["text"])
+        localized = localize_ko_ref(resolved, ko_pick["ref"], ko_pick["text"])
         if localized is None:
             # 절번호 정렬 실패(판본 차이 등) 시 한국어 본문이라도 반환한다.
             return ko_pick
@@ -755,30 +775,12 @@ def _get_or_create_ko_daily_pick(target_day: str) -> dict:
     return payload
 
 
-_RE_KO_REF = re.compile(r"^(.+?)\s+(\d+):(\d+)$")
-
-
-def _localize_ko_ref(lang: str, ko_ref: str, ko_text: str) -> Optional[dict]:
-    """'시편 23:1' 같은 한국어 ref 를 해당 언어의 같은 구절로 바꾼다."""
-    m = _RE_KO_REF.match(ko_ref.strip())
-    if not m:
-        return None
-    code = KO_NAME_TO_CODE.get(m.group(1))
-    if not code:
-        return None
-    found = find_aligned_verse(lang, code, int(m.group(2)), int(m.group(3)), ko_text)
-    if not found:
-        return None
-    return {
-        "ref": f"{found['book']} {found['chapter']}:{found['verse']}",
-        "text": found["text"],
-    }
 
 
 @app.get("/daily-verse")
-def daily_verse():
+def daily_verse(lang: Optional[str] = Query(None, description="말씀 언어(미지원/비활성은 ko 폴백)")):
     manager = _notification_manager()
-    return {"daily_verse": manager.get_daily_verse()}
+    return {"daily_verse": manager.get_daily_verse(lang=resolve_lang(lang))}
 
 
 # 관리용: 전체 토큰 목록 노출 → X-API-Key 필요.
@@ -799,6 +801,7 @@ def register_push_device(inp: DeviceRegisterIn):
             device_id=inp.device_id or "",
             app_version=inp.appVersion or "",
             os_version=inp.osVersion or "",
+            language=inp.language,
             enabled=inp.enabled,
             schedule_hour=inp.schedule_hour,
             schedule_minute=inp.schedule_minute,
