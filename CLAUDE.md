@@ -34,3 +34,10 @@
 - **빌드/배포/제출은 "올렸다"는 사실 자체를 즉시 알릴 것.** (사용자가 가장 답답해하는 부분)
 - 알림 전송이 실패해도 본 작업은 계속 진행한다 (`tg-notify.sh` 는 best-effort).
 - 자격증명은 루트 `.env` 의 `TELEGRAM_BOT_TOKEN`, `TELEGRAM_ALLOWED_CHAT_IDS` 를 스크립트가 알아서 읽는다 — 토큰을 코드/로그에 직접 노출하지 말 것.
+
+## 📱 스토어 제출 시 테스트 노트 필수
+
+TestFlight / Play 비공개테스트에 빌드를 제출하면 **테스터가 무엇을 테스트할지 알 수 있게 반드시 테스트 노트를 채운다** (버전별 변경점 + 테스트 포인트 목록).
+
+- **Play**: 제출 직후 `python3 scripts/play_release_notes.py --track alpha --notes "..."` (500자 제한, google-auth 필요 — 키는 backend/secrets/play-submit-key.json)
+- **TestFlight**: App Store Connect API 키(.p8)가 아직 없어 자동화 불가 — 노트 텍스트를 작성해 사용자에게 전달하고 ASC(TestFlight → 빌드 → 테스트 세부사항)에 붙여넣도록 안내한다. ASC API 키가 생기면 스크립트로 자동화할 것.
