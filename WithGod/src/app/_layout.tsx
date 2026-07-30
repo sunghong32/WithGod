@@ -2,7 +2,7 @@ import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native
 import { type Href, Stack, usePathname, useRouter } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import 'react-native-reanimated';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -11,6 +11,7 @@ import { useColorScheme } from '@/shared/hooks/use-color-scheme';
 import { logScreenViewEvent } from '@/shared/lib/analytics';
 import { QueryProvider } from '@/shared/lib/QueryProvider';
 import { getAppLanguageChoice, initAppLanguage } from '@/shared/lib/i18n';
+import { setWidgetHomeHandler } from '@/shared/lib/widgetLink';
 import { syncWidgetLanguage } from '../../modules/widget-bridge';
 import { setupPushNotificationsAsync } from '@/shared/lib/pushNotifications';
 import { startTelemetry, stopTelemetry } from '@/shared/lib/telemetry';
@@ -60,6 +61,28 @@ export default function RootLayout() {
     void refreshHomeWidgetAsync();
   }, []);
 
+  // 위젯 탭(실행 중 딥링크): 화면 전환 애니메이션을 끄고 즉시 홈 탭으로 팝한다.
+  // 앱 등장(줌) 아래에서 전환이 끝나 "열리면 이미 홈"으로 보인다(이슈 #16).
+  // instantPop 이 켜진 렌더가 커밋된 다음 틱에 팝해야 무애니메이션이 적용된다.
+  const [instantPop, setInstantPop] = useState(false);
+  useEffect(() => {
+    setWidgetHomeHandler(() => setInstantPop(true));
+    return () => setWidgetHomeHandler(null);
+  }, []);
+  useEffect(() => {
+    if (!instantPop) return;
+    const popId = setTimeout(() => {
+      if (router.canGoBack()) {
+        router.dismissTo('/(tabs)');
+      }
+    }, 0);
+    const restoreId = setTimeout(() => setInstantPop(false), 400);
+    return () => {
+      clearTimeout(popId);
+      clearTimeout(restoreId);
+    };
+  }, [instantPop, router]);
+
   useEffect(() => {
     let unsubscribe: () => void = () => {};
     let isMounted = true;
@@ -103,9 +126,9 @@ export default function RootLayout() {
               options={{ gestureEnabled: false, animation: 'fade' }}
             />
             <Stack.Screen name="(tabs)" options={{ gestureEnabled: false }} />
-            <Stack.Screen name="result" />
-            <Stack.Screen name="settings" />
-            <Stack.Screen name="bookmarks" />
+            <Stack.Screen name="result" options={{ animation: instantPop ? 'none' : 'default' }} />
+            <Stack.Screen name="settings" options={{ animation: instantPop ? 'none' : 'default' }} />
+            <Stack.Screen name="bookmarks" options={{ animation: instantPop ? 'none' : 'default' }} />
           </Stack>
           {/* 유럽 첫 실행 시 통계 수집 동의창 (그 외 지역은 뜨지 않음) */}
           <TelemetryConsentModal />
