@@ -34,6 +34,60 @@ private enum VerseCache {
   }
 }
 
+// MARK: - 현지화 (앱 로케일 widget.* 문구와 동일 — 이슈 #14 위젯 라벨 버그 수정)
+// 위젯 확장은 앱 JS i18n 을 못 쓰므로 기기 선호 언어 기준으로 직접 고른다.
+// 미지원 언어는 영어(국제 관례), 폴백 최종값은 한국어.
+
+private enum L10n {
+  static var lang: String {
+    let raw = Locale.preferredLanguages.first ?? "ko"
+    let code = raw.split(separator: "-").first.map(String.init)?.lowercased() ?? "ko"
+    return supported.contains(code) ? code : "en"
+  }
+
+  private static let supported: Set<String> = ["ko", "en", "es", "pt", "de", "fr", "it", "pl"]
+
+  static var headerLabel: String {
+    switch lang {
+    case "en": return "Today's Verse"
+    case "es": return "Versículo del día"
+    case "pt": return "Versículo do dia"
+    case "de": return "Vers des Tages"
+    case "fr": return "Verset du jour"
+    case "it": return "Versetto del giorno"
+    case "pl": return "Werset dnia"
+    default: return "오늘의 말씀"
+    }
+  }
+
+  static var galleryDescription: String {
+    switch lang {
+    case "en": return "Meet a new Bible verse on your home screen every day."
+    case "es": return "Un versículo bíblico nuevo cada día en tu pantalla de inicio."
+    case "pt": return "Um novo versículo bíblico todos os dias na sua tela inicial."
+    case "de": return "Jeden Tag ein neuer Bibelvers auf deinem Startbildschirm."
+    case "fr": return "Chaque jour un nouveau verset biblique sur votre écran d'accueil."
+    case "it": return "Ogni giorno un nuovo versetto biblico nella schermata iniziale."
+    case "pl": return "Codziennie nowy werset biblijny na ekranie głównym."
+    default: return "매일 새로운 말씀을 홈 화면에서 만나보세요."
+    }
+  }
+
+  // 첫 로드 전·갤러리 미리보기용 자리표시 구절 (각 언어 성경의 이사야 41:10)
+  static var placeholderVerse: (reference: String, text: String) {
+    switch lang {
+    case "en": return ("Isaiah 41:10", "Don’t you be afraid, for I am with you. Don’t be dismayed, for I am your God.")
+    case "es": return ("Isaías 41:10", "No temas, que yo soy contigo; no desmayes, que yo soy tu Dios que te esfuerzo.")
+    case "pt": return ("Isaías 41:10", "Não temas, porque eu estou contigo; não te assombres, porque eu sou teu Deus.")
+    case "de": return ("Jesaja 41:10", "Fürchte dich nicht, ich bin mit dir; weiche nicht, denn ich bin dein Gott.")
+    case "fr": return ("Ésaïe 41:10", "Ne crains rien, car je suis avec toi; car je suis ton Dieu.")
+    case "it": return ("Isaia 41:10", "Tu, non temere, perché io son teco; non ti smarrire, perché io sono il tuo Dio.")
+    case "pl": return ("Izajasza 41:10", "Nie bój się, bo ja jestem z tobą. Nie lękaj się, bo ja jestem twoim Bogiem.")
+    default: return ("이사야 41:10", "두려워하지 말라 내가 너와 함께 함이라 놀라지 말라 나는 네 하나님이 됨이라.")
+    }
+  }
+}
+
 // MARK: - Timeline
 
 struct VerseEntry: TimelineEntry {
@@ -44,8 +98,8 @@ struct VerseEntry: TimelineEntry {
 
 private let placeholderEntry = VerseEntry(
   date: Date(),
-  reference: "이사야 41:10",
-  text: "두려워하지 말라 내가 너와 함께 함이라 놀라지 말라 나는 네 하나님이 됨이라."
+  reference: L10n.placeholderVerse.reference,
+  text: L10n.placeholderVerse.text
 )
 
 struct Provider: TimelineProvider {
@@ -122,7 +176,7 @@ struct DailyVerseWidgetEntryView: View {
         RoundedRectangle(cornerRadius: 2)
           .fill(Color("accent"))
           .frame(width: 3, height: 13)
-        Text("오늘의 말씀")
+        Text(L10n.headerLabel)
           .font(.caption)
           .fontWeight(.semibold)
           .foregroundStyle(.secondary)
@@ -163,8 +217,8 @@ struct DailyVerseWidget: Widget {
     StaticConfiguration(kind: kind, provider: Provider()) { entry in
       DailyVerseWidgetEntryView(entry: entry)
     }
-    .configurationDisplayName("오늘의 말씀")
-    .description("매일 새로운 말씀을 홈 화면에서 만나보세요.")
+    .configurationDisplayName(L10n.headerLabel)
+    .description(L10n.galleryDescription)
     .supportedFamilies([.systemMedium])
   }
 }
