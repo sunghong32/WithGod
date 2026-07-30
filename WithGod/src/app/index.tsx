@@ -2,7 +2,7 @@ import { baseFontFamily, colors, scaleFont } from '@/shared/styles';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useNavigation, useRouter } from 'expo-router';
-import { useCallback, useEffect, useLayoutEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -34,15 +34,16 @@ export default function SplashScreen() {
     splashPlayedThisLaunch = true;
   }, []);
 
-  // 재진입(위젯 탭 등): 스플래시 없이 즉시 홈 탭으로 — 다른 앱들처럼 화면 전환만.
-  // 페인트 전에 팝해야 스플래시가 한 프레임도 안 보인다.
-  useLayoutEffect(() => {
+  // 재진입 시 홈 탭으로 전환하는 안전망. 1차 방어는 +native-intent(스플래시
+  // 라우트 마운트 자체를 차단)이고, 여기는 다른 경로로 '/'에 재진입한 경우만
+  // 처리한다. 마운트 커밋 중(useLayoutEffect)의 팝 디스패치는 네이티브 스택
+  // 전환과 경합해 크래시했으므로(#16), 마운트가 끝난 뒤 태스크로 미뤄서 보낸다.
+  useEffect(() => {
     if (!isRelaunch) return;
-    if (router.canGoBack()) {
-      router.dismissTo('/(tabs)');
-    } else {
-      router.replace('/(tabs)');
-    }
+    const timeoutId = setTimeout(() => {
+      router.navigate('/(tabs)');
+    }, 0);
+    return () => clearTimeout(timeoutId);
   }, [isRelaunch, router]);
 
   useEffect(() => {
