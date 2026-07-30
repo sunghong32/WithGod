@@ -27,8 +27,8 @@ data/verse_interpretations.json
 # Local tooling
 .claude/
 
-# Secrets
-secrets/*.json
+# Secrets — 인증서·키 전부 (json, p8 등)
+secrets/*
 data/app_version.json
 models/
 
