@@ -40,4 +40,4 @@
 TestFlight / Play 비공개테스트에 빌드를 제출하면 **테스터가 무엇을 테스트할지 알 수 있게 반드시 테스트 노트를 채운다** (버전별 변경점 + 테스트 포인트 목록).
 
 - **Play**: 제출 직후 `python3 scripts/play_release_notes.py --track alpha --notes "..."` (500자 제한, google-auth 필요 — 키는 backend/secrets/play-submit-key.json)
-- **TestFlight**: App Store Connect API 키(.p8)가 아직 없어 자동화 불가 — 노트 텍스트를 작성해 사용자에게 전달하고 ASC(TestFlight → 빌드 → 테스트 세부사항)에 붙여넣도록 안내한다. ASC API 키가 생기면 스크립트로 자동화할 것.
+- **TestFlight**: 제출 직후 `python3 scripts/asc_test_notes.py --wait --notes "..."` (ASC API — 키는 backend/secrets/AuthKey_*.p8 + asc-api-key.json, pyjwt·cryptography 필요. --wait 는 애플 처리 완료까지 폴링)
