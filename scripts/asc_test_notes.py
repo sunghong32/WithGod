@@ -61,6 +61,11 @@ def main() -> None:
             params["filter[version]"] = args.build
         builds = s.get(f"{BASE}/builds", params=params, headers=auth(), timeout=30).json()
         if not builds.get("data"):
+            # 방금 제출한 빌드는 애플 인제스트 전이라 목록에 늦게 나타난다
+            if args.wait and time.time() < deadline:
+                print("빌드가 아직 목록에 없음 — 대기")
+                time.sleep(60)
+                continue
             raise SystemExit(f"빌드를 찾을 수 없음: {builds.get('errors')}")
         build = builds["data"][0]
         state = build["attributes"]["processingState"]
