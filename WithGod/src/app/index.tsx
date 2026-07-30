@@ -2,10 +2,15 @@ import { baseFontFamily, colors, scaleFont } from '@/shared/styles';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useNavigation, useRouter } from 'expo-router';
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+
+// 콜드 스타트에서 스플래시가 한 번 재생됐는지 (프로세스 생존 동안 유지).
+// 위젯 탭 등 '/' 딥링크는 실행 중인 앱의 스택을 [탭, 스플래시]로 리셋하므로,
+// 이 플래그가 없으면 앱이 새로 켜지는 것처럼 스플래시가 또 재생된다.
+let splashPlayedThisLaunch = false;
 
 export default function SplashScreen() {
   const { t } = useTranslation();
@@ -13,6 +18,7 @@ export default function SplashScreen() {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const timerElapsedRef = useRef(false);
+  const isRelaunch = useRef(splashPlayedThisLaunch).current;
 
   const dismissSplash = useCallback(() => {
     // anchor='(tabs)' 로 인해 스택이 [(tabs), index] 이므로, replace 를 하면
@@ -25,6 +31,22 @@ export default function SplashScreen() {
   }, [router]);
 
   useEffect(() => {
+    splashPlayedThisLaunch = true;
+  }, []);
+
+  // 재진입(위젯 탭 등): 스플래시 없이 즉시 홈 탭으로 — 다른 앱들처럼 화면 전환만.
+  // 페인트 전에 팝해야 스플래시가 한 프레임도 안 보인다.
+  useLayoutEffect(() => {
+    if (!isRelaunch) return;
+    if (router.canGoBack()) {
+      router.dismissTo('/(tabs)');
+    } else {
+      router.replace('/(tabs)');
+    }
+  }, [isRelaunch, router]);
+
+  useEffect(() => {
+    if (isRelaunch) return;
     const timeoutId = setTimeout(() => {
       timerElapsedRef.current = true;
       // 푸시 딥링크 등으로 다른 화면이 이미 위에 떠 있으면 back() 이 그 화면을
@@ -35,7 +57,7 @@ export default function SplashScreen() {
     }, 3000);
 
     return () => clearTimeout(timeoutId);
-  }, [navigation, dismissSplash]);
+  }, [isRelaunch, navigation, dismissSplash]);
 
   // 딥링크 화면에서 돌아와 스플래시가 다시 보이면(타이머는 이미 소진) 즉시 닫는다.
   useFocusEffect(
@@ -45,6 +67,10 @@ export default function SplashScreen() {
       }
     }, [dismissSplash])
   );
+
+  if (isRelaunch) {
+    return null;
+  }
 
   return (
     <View style={styles.root}>
