@@ -14,13 +14,13 @@
   },
   "home": {
     "logoA11y": "WithGod logo",
-    "openBookmarksA11y": "View saved verses",
+    "openBookmarksA11y": "View verses in your heart",
     "openSettingsA11y": "Settings",
     "dailyVerseTitle": "Today's Verse",
     "tapToRetry": "Tap to try again",
     "loadingVerse": "Loading today's verse...",
-    "dailySaveA11y": "Save today's verse",
-    "dailyUnsaveA11y": "Remove today's verse from saved verses",
+    "dailySaveA11y": "Keep today's verse in your heart",
+    "dailyUnsaveA11y": "Remove today's verse from your heart",
     "widgetBannerA11y": "See home screen widget guide",
     "widgetBannerTitle": "Home screen widget is here",
     "widgetBannerSubtitle": "Meet a new verse every day without opening the app",
@@ -58,28 +58,31 @@
     "widgetCardTitle": "Home screen widget",
     "widgetCardSubtitle": "See today's verse right on your home screen without opening the app",
     "widgetCardA11y": "See how to add the home screen widget",
-    "version": "Version {{version}}"
+    "version": "Version {{version}}",
+    "languageTitle": "Language",
+    "languageSystem": "Use system language",
+    "languageCardA11y": "Choose app language"
   },
   "bookmarks": {
-    "headerTitle": "Saved Verses",
+    "headerTitle": "Verses in Your Heart",
     "filterAll": "All",
     "sourceDaily": "Today's Verse",
     "sourceRecommend": "Words of Comfort",
     "filterA11y": "Show {{label}}",
-    "emptyFilteredTitle": "No saved verses in this category",
-    "emptyTitle": "No saved verses yet",
-    "emptyDesc": "Tap the heart on a verse card to save it here",
-    "removeTitle": "Remove Verse",
-    "removeBody": "Remove {{reference}} from your saved verses?",
+    "emptyFilteredTitle": "No verses in your heart in this category",
+    "emptyTitle": "No verses in your heart yet",
+    "emptyDesc": "Tap the heart on a verse card to keep it here",
+    "removeTitle": "Remove from Your Heart",
+    "removeBody": "Remove {{reference}} from your list?",
     "removeConfirm": "Remove",
-    "unsaveA11y": "Remove {{reference}} from saved verses"
+    "unsaveA11y": "Remove {{reference}} from your heart"
   },
   "verseActions": {
     "shareDialogTitle": "Share Verse",
     "copyA11y": "Copy {{reference}}",
     "shareA11y": "Share {{reference}} as an image",
-    "saveA11y": "Save {{reference}}",
-    "unsaveA11y": "Remove {{reference}} from saved verses"
+    "saveA11y": "Keep {{reference}} in your heart",
+    "unsaveA11y": "Remove {{reference}} from your heart"
   },
   "consent": {
     "title": "Share Usage Statistics",

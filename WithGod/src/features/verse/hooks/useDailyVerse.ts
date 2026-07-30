@@ -11,7 +11,8 @@ function kstToday(): string {
 }
 
 export function useDailyVerse() {
-  const { t } = useTranslation();
+  // i18n.language 를 구독해 설정에서 언어를 바꾸면 말씀도 새 언어로 다시 불러온다.
+  const { t, i18n } = useTranslation();
   const [today, setToday] = useState(kstToday);
 
   // 백그라운드에 있다가 돌아왔을 때 날짜가 바뀌었으면 쿼리 키가 바뀌어 새로 불러온다.
@@ -25,7 +26,7 @@ export function useDailyVerse() {
   }, []);
 
   const query = useQuery({
-    queryKey: verseKeys.daily(today),
+    queryKey: verseKeys.daily(today, i18n.language),
     queryFn: verseApi.getDailyVerse,
     retry: (failureCount, error) => {
       // ApiError인 경우 retryable 체크

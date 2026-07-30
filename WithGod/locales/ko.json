@@ -1,0 +1,8 @@
+{
+  "ios": {
+    "CFBundleDisplayName": "신과함께"
+  },
+  "android": {
+    "app_name": "신과함께"
+  }
+}

@@ -4,7 +4,7 @@
 import i18next from 'i18next';
 import { initReactI18next } from 'react-i18next';
 
-import { getStorageItem, setStorageItem } from '@/shared/lib/storage';
+import { getStorageItem, removeStorageItem, setStorageItem } from '@/shared/lib/storage';
 
 import de from './locales/de.json';
 import en from './locales/en.json';
@@ -40,8 +40,24 @@ const DEV_LANGUAGE_KEY = 'withgod.language.dev';
 const isSupported = (value: unknown): value is AppLanguage =>
   typeof value === 'string' && (SUPPORTED_LANGUAGES as readonly string[]).includes(value);
 
-/** 기기 언어의 원시 태그(ko-KR 등)에서 기본 언어(ko)만 뽑는다. */
+/**
+ * 기기 언어의 원시 태그(ko-KR 등)에서 기본 언어(ko)만 뽑는다.
+ *
+ * iOS 의 Intl 은 '기기 언어'가 아니라 '앱이 선언한 지원 언어와 협상된 결과'를
+ * 돌려준다 — 지원 언어 선언(app.json locales)이 없던 v1.3.0 에서 한국어 기기가
+ * 영어로 협상되는 버그의 원인. expo-localization 은 사용자의 실제 선호 언어를
+ * 반환하므로 이를 우선하고, 네이티브 모듈이 없는 환경(구 dev client 등)에서만
+ * Intl 로 폴백한다.
+ */
 export const detectDeviceLanguage = (): string => {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- 모듈 미탑재 환경 폴백을 위해 지연 로드
+    const { getLocales } = require('expo-localization') as typeof import('expo-localization');
+    const code = getLocales()[0]?.languageCode ?? '';
+    if (code) return code.toLowerCase();
+  } catch {
+    // expo-localization 미탑재 — Intl 폴백
+  }
   try {
     const tag = Intl.DateTimeFormat().resolvedOptions().locale || '';
     return tag.split('-')[0].toLowerCase();
@@ -102,10 +118,47 @@ export const initAppLanguage = async (): Promise<void> => {
   }
 };
 
-/** 설정에서 수동 변경 시(향후 언어 선택 UI): 저장하고 즉시 적용. */
+/** 설정에서 수동 변경 시: 저장하고 즉시 적용. */
 export const setAppLanguage = async (language: AppLanguage): Promise<void> => {
   await setStorageItem(LANGUAGE_KEY, language);
   await i18next.changeLanguage(language);
+};
+
+/** 언어 선택 UI 의 선택값: 'system'(기기 언어 따르기) 또는 특정 언어. */
+export type AppLanguageChoice = AppLanguage | 'system';
+
+/** 저장된 선택을 읽는다 — 없으면 'system'(기기 언어 따르기). */
+export const getAppLanguageChoice = async (): Promise<AppLanguageChoice> => {
+  try {
+    const stored = await getStorageItem(LANGUAGE_KEY);
+    return isSupported(stored) ? stored : 'system';
+  } catch {
+    return 'system';
+  }
+};
+
+/** 선택 적용: 'system'이면 저장을 지우고 기기 언어로 재결정한다. */
+export const setAppLanguageChoice = async (
+  choice: AppLanguageChoice,
+): Promise<void> => {
+  if (choice === 'system') {
+    await removeStorageItem(LANGUAGE_KEY);
+    await i18next.changeLanguage(resolveLanguage(null));
+    return;
+  }
+  await setAppLanguage(choice);
+};
+
+/** 언어 선택 UI 표기용 — 각 언어의 자기 이름(번역하지 않는 것이 관례). */
+export const LANGUAGE_NATIVE_NAMES: Record<AppLanguage, string> = {
+  ko: '한국어',
+  en: 'English',
+  es: 'Español',
+  pt: 'Português',
+  de: 'Deutsch',
+  fr: 'Français',
+  it: 'Italiano',
+  pl: 'Polski',
 };
 
 export const getAppLanguage = (): string => i18next.language;

@@ -2,7 +2,7 @@
   "expo": {
     "name": "신과함께",
     "slug": "WithGod",
-    "version": "1.3.0",
+    "version": "1.4.0",
     "orientation": "portrait",
     "icon": "./src/shared/assets/images/icon.png",
     "scheme": "withgod",
@@ -92,7 +92,8 @@
           }
         }
       ],
-      "expo-font"
+      "expo-font",
+      "expo-localization"
     ],
     "experiments": {
       "typedRoutes": true,
@@ -104,6 +105,16 @@
         "projectId": "89ef64a4-7131-472f-89aa-7de04f4256fe"
       }
     },
-    "owner": "sunghong32"
+    "owner": "sunghong32",
+    "locales": {
+      "ko": "./locales/ko.json",
+      "en": "./locales/en.json",
+      "es": "./locales/es.json",
+      "pt": "./locales/pt.json",
+      "de": "./locales/de.json",
+      "fr": "./locales/fr.json",
+      "it": "./locales/it.json",
+      "pl": "./locales/pl.json"
+    }
   }
 }

@@ -58,7 +58,10 @@
     "widgetCardTitle": "Widget d'écran d'accueil",
     "widgetCardSubtitle": "Retrouve le verset du jour sur ton écran d'accueil, sans même ouvrir l'app",
     "widgetCardA11y": "Voir comment ajouter le widget d'écran d'accueil",
-    "version": "Version {{version}}"
+    "version": "Version {{version}}",
+    "languageTitle": "Langue",
+    "languageSystem": "Suivre la langue du système",
+    "languageCardA11y": "Choisir la langue de l'application"
   },
   "bookmarks": {
     "headerTitle": "Versets gardés dans ton cœur",

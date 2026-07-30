@@ -58,7 +58,10 @@
     "widgetCardTitle": "Widget della schermata Home",
     "widgetCardSubtitle": "Puoi vedere il versetto del giorno nella schermata Home senza aprire l'app",
     "widgetCardA11y": "Vedi come aggiungere il widget alla schermata Home",
-    "version": "Versione {{version}}"
+    "version": "Versione {{version}}",
+    "languageTitle": "Lingua",
+    "languageSystem": "Usa la lingua di sistema",
+    "languageCardA11y": "Scegli la lingua dell'app"
   },
   "bookmarks": {
     "headerTitle": "Versetti nel cuore",

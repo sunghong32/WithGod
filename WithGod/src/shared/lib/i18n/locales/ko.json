@@ -58,7 +58,10 @@
     "widgetCardTitle": "홈 화면 위젯",
     "widgetCardSubtitle": "앱을 열지 않아도 홈 화면에서 오늘의 말씀을 볼 수 있어요",
     "widgetCardA11y": "홈 화면 위젯 추가 방법 보기",
-    "version": "버전 {{version}}"
+    "version": "버전 {{version}}",
+    "languageTitle": "언어",
+    "languageSystem": "시스템 언어 따르기",
+    "languageCardA11y": "앱 언어 선택"
   },
   "bookmarks": {
     "headerTitle": "마음에 담은 말씀",

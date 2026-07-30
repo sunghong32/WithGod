@@ -16,10 +16,19 @@ import {
   isTelemetryEnabled,
   setTelemetryEnabled,
 } from "@/shared/lib/telemetry";
+import { LanguagePickerModal } from "@/shared/components/LanguagePickerModal";
 import { ScreenHeader } from "@/shared/components/ScreenHeader";
 import { WheelTimePicker } from "@/shared/components/WheelTimePicker";
 import { WidgetGuideModal } from "@/shared/components/WidgetGuideModal";
-import { t } from "@/shared/lib/i18n";
+import {
+  type AppLanguageChoice,
+  LANGUAGE_NATIVE_NAMES,
+  getAppLanguageChoice,
+  setAppLanguageChoice,
+  t,
+} from "@/shared/lib/i18n";
+import { refreshHomeWidgetAsync } from "@/widgets/refreshHomeWidget";
+import { clearDailyVerseCache } from "@/widgets/widgetTaskHandler";
 import { baseFontFamily, colors, scaleFont } from "@/shared/styles";
 import { Ionicons } from "@expo/vector-icons";
 import Constants from "expo-constants";
@@ -65,6 +74,9 @@ export default function SettingsScreen() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncFailed, setSyncFailed] = useState(false);
   const [showWidgetGuide, setShowWidgetGuide] = useState(false);
+  const [showLanguagePicker, setShowLanguagePicker] = useState(false);
+  const [languageChoice, setLanguageChoice] =
+    useState<AppLanguageChoice>("system");
   const [telemetryOn, setTelemetryOn] = useState(isTelemetryEnabled());
   // 동의가 필요한 지역(EU/EEA)에서만 통계 토글을 노출한다. 지역은 실행 중
   // 바뀌지 않으므로 최초 1회만 계산한다.
@@ -73,7 +85,24 @@ export default function SettingsScreen() {
   // 통계 수집 여부는 SDK 초기화(비동기) 후에 확정되므로 화면 진입 시 다시 읽는다.
   useEffect(() => {
     setTelemetryOn(isTelemetryEnabled());
+    void getAppLanguageChoice().then(setLanguageChoice);
   }, []);
+
+  // 언어 변경: 즉시 적용 + 푸시 재등록(제목·본문 언어 반영) + 위젯 캐시 갱신.
+  const handleSelectLanguage = useCallback(
+    (choice: AppLanguageChoice) => {
+      setLanguageChoice(choice);
+      setShowLanguagePicker(false);
+      void (async () => {
+        await setAppLanguageChoice(choice);
+        // 실패해도 무해한 best-effort 후속 처리들
+        void syncNotificationSettingsAsync(settingsRef.current);
+        await clearDailyVerseCache();
+        void refreshHomeWidgetAsync();
+      })();
+    },
+    [],
+  );
 
   const handleToggleTelemetry = useCallback((next: boolean) => {
     setTelemetryOn(next);
@@ -351,6 +380,29 @@ export default function SettingsScreen() {
               </View>
             )}
 
+            {/* 언어 — 기본은 기기 언어 자동 감지, 수동 오버라이드 제공 (이슈 #14) */}
+            <TouchableOpacity
+              style={styles.card}
+              activeOpacity={0.8}
+              onPress={() => setShowLanguagePicker(true)}
+              accessibilityRole="button"
+              accessibilityLabel={t("settings.languageCardA11y")}
+            >
+              <View style={styles.cardRow}>
+                <View style={styles.cardRowText}>
+                  <Text style={styles.cardTitle}>
+                    {t("settings.languageTitle")}
+                  </Text>
+                  <Text style={styles.cardSubtitle}>
+                    {languageChoice === "system"
+                      ? t("settings.languageSystem")
+                      : LANGUAGE_NATIVE_NAMES[languageChoice]}
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
+              </View>
+            </TouchableOpacity>
+
             {/* 홈 화면 위젯 안내 */}
             <TouchableOpacity
               style={styles.card}
@@ -383,6 +435,13 @@ export default function SettingsScreen() {
       <WidgetGuideModal
         visible={showWidgetGuide}
         onClose={() => setShowWidgetGuide(false)}
+      />
+
+      <LanguagePickerModal
+        visible={showLanguagePicker}
+        current={languageChoice}
+        onSelect={handleSelectLanguage}
+        onClose={() => setShowLanguagePicker(false)}
       />
     </View>
   );

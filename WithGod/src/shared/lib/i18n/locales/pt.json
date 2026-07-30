@@ -58,7 +58,10 @@
     "widgetCardTitle": "Widget da tela inicial",
     "widgetCardSubtitle": "Veja o versículo do dia na tela inicial sem precisar abrir o app",
     "widgetCardA11y": "Ver como adicionar o widget à tela inicial",
-    "version": "Versão {{version}}"
+    "version": "Versão {{version}}",
+    "languageTitle": "Idioma",
+    "languageSystem": "Seguir o idioma do sistema",
+    "languageCardA11y": "Escolher o idioma do app"
   },
   "bookmarks": {
     "headerTitle": "Versículos no coração",

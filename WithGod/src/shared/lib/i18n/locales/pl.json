@@ -58,7 +58,10 @@
     "widgetCardTitle": "Widżet na ekranie głównym",
     "widgetCardSubtitle": "Werset dnia na ekranie głównym — bez otwierania aplikacji",
     "widgetCardA11y": "Zobacz, jak dodać widżet na ekran główny",
-    "version": "Wersja {{version}}"
+    "version": "Wersja {{version}}",
+    "languageTitle": "Język",
+    "languageSystem": "Język systemu",
+    "languageCardA11y": "Wybierz język aplikacji"
   },
   "bookmarks": {
     "headerTitle": "Zachowane w sercu",

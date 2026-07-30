@@ -83,7 +83,13 @@ struct Provider: TimelineProvider {
   }
 
   private func fetchDailyVerse() async throws -> DailyVerse {
-    guard let url = URL(string: "https://mincha.co.kr/daily-verse") else {
+    // 기기 선호 언어로 말씀을 요청한다(이슈 #12·#14). 위젯 확장은 앱 내 언어
+    // 오버라이드를 읽을 수 없어(별도 App Group 필요) 기기 언어를 쓰며,
+    // 미지원 언어는 서버가 한국어로 폴백한다.
+    let lang = Locale.preferredLanguages.first?.split(separator: "-").first.map(String.init) ?? "ko"
+    var components = URLComponents(string: "https://mincha.co.kr/daily-verse")!
+    components.queryItems = [URLQueryItem(name: "lang", value: lang.lowercased())]
+    guard let url = components.url else {
       throw URLError(.badURL)
     }
     var request = URLRequest(url: url)

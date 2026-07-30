@@ -1,7 +1,7 @@
 import type { WidgetTaskHandlerProps } from "react-native-android-widget";
 
-import { getAppLanguage, t } from "@/shared/lib/i18n";
-import { getStorageItem, setStorageItem } from "@/shared/lib/storage";
+import { getAppLanguage, initAppLanguage, t } from "@/shared/lib/i18n";
+import { getStorageItem, removeStorageItem, setStorageItem } from "@/shared/lib/storage";
 
 import { DailyVerseWidget } from "./DailyVerseWidget";
 
@@ -20,6 +20,7 @@ const FETCH_TIMEOUT_MS = 10_000;
 
 interface CachedVerse {
   day: string;
+  lang: string;
   reference: string;
   text: string;
 }
@@ -38,6 +39,10 @@ const readCache = async (): Promise<CachedVerse | null> => {
       typeof parsed.reference !== "string" ||
       typeof parsed.text !== "string"
     ) {
+      return null;
+    }
+    // 구버전 캐시(lang 없음)는 무효 처리해 새 언어로 받아오게 한다.
+    if (typeof parsed.lang !== "string") {
       return null;
     }
     return parsed as CachedVerse;
@@ -75,6 +80,15 @@ const fetchDailyVerse = async (): Promise<{
   }
 };
 
+/** 언어 변경 시 등 캐시를 강제로 비운다 — 다음 조회가 새 언어로 받아온다. */
+export const clearDailyVerseCache = async (): Promise<void> => {
+  try {
+    await removeStorageItem(CACHE_KEY);
+  } catch {
+    // 캐시 삭제 실패는 무해 — 다음 날 갱신 시 자연 교체된다.
+  }
+};
+
 /**
  * 오늘의 말씀을 캐시 우선으로 가져온다.
  * 실패 시 지난 캐시라도 반환하고, 그것도 없으면 null.
@@ -83,9 +97,14 @@ export const getDailyVerseWithCache = async (): Promise<{
   reference: string;
   text: string;
 } | null> => {
+  // 헤드리스 컨텍스트(앱 프로세스 없이 위젯 주기 갱신)에서는 _layout 의
+  // initAppLanguage() 가 돈 적이 없어 i18n 이 초기값(ko)에 머문다 — 저장된
+  // 선택/기기 언어를 먼저 반영해야 fetch 언어가 맞는다(리뷰 발견, v1.4.0).
+  await initAppLanguage();
   const cached = await readCache();
   const today = kstToday();
-  if (cached && cached.day === today) {
+  const lang = getAppLanguage();
+  if (cached && cached.day === today && cached.lang === lang) {
     return { reference: cached.reference, text: cached.text };
   }
 
@@ -93,7 +112,7 @@ export const getDailyVerseWithCache = async (): Promise<{
     const verse = await fetchDailyVerse();
     await setStorageItem(
       CACHE_KEY,
-      JSON.stringify({ day: today, ...verse } satisfies CachedVerse),
+      JSON.stringify({ day: today, lang, ...verse } satisfies CachedVerse),
     );
     return verse;
   } catch {

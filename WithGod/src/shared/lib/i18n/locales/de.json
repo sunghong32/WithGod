@@ -58,7 +58,10 @@
     "widgetCardTitle": "Startbildschirm-Widget",
     "widgetCardSubtitle": "Sieh den Vers des Tages direkt auf deinem Startbildschirm – ohne die App zu öffnen",
     "widgetCardA11y": "Anleitung zum Hinzufügen des Widgets ansehen",
-    "version": "Version {{version}}"
+    "version": "Version {{version}}",
+    "languageTitle": "Sprache",
+    "languageSystem": "Systemsprache verwenden",
+    "languageCardA11y": "App-Sprache wählen"
   },
   "bookmarks": {
     "headerTitle": "Verse in deinem Herzen",

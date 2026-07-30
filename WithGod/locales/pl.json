@@ -1,0 +1,8 @@
+{
+  "ios": {
+    "CFBundleDisplayName": "WithGod"
+  },
+  "android": {
+    "app_name": "WithGod"
+  }
+}
