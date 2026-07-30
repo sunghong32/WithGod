@@ -10,7 +10,8 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useColorScheme } from '@/shared/hooks/use-color-scheme';
 import { logScreenViewEvent } from '@/shared/lib/analytics';
 import { QueryProvider } from '@/shared/lib/QueryProvider';
-import { initAppLanguage } from '@/shared/lib/i18n';
+import { getAppLanguageChoice, initAppLanguage } from '@/shared/lib/i18n';
+import { syncWidgetLanguage } from '../../modules/widget-bridge';
 import { setupPushNotificationsAsync } from '@/shared/lib/pushNotifications';
 import { startTelemetry, stopTelemetry } from '@/shared/lib/telemetry';
 import { TelemetryConsentModal } from '@/shared/components/TelemetryConsentModal';
@@ -32,8 +33,13 @@ export default function RootLayout() {
   }, []);
 
   // 저장된 언어/기기 언어를 반영 (동기 초기화는 ko 로 이미 완료 — 여기선 보정만).
+  // 이어서 iOS 위젯의 App Group 공유 언어도 동기화한다(재설치·업데이트 대비).
   useEffect(() => {
-    void initAppLanguage();
+    void (async () => {
+      await initAppLanguage();
+      const choice = await getAppLanguageChoice();
+      syncWidgetLanguage(choice === "system" ? null : choice);
+    })();
   }, []);
 
   // 자체 지표 수집 시작. 화면 추적보다 먼저 켜져야 첫 screen_view 가 잡힌다.

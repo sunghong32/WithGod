@@ -40,6 +40,12 @@ private enum VerseCache {
 
 private enum L10n {
   static var lang: String {
+    // 1순위: 앱에서 수동 선택한 언어(App Group 공유, WidgetBridge 가 기록).
+    // 없으면(시스템 따르기) 기기 선호 언어를 쓴다.
+    if let stored = UserDefaults(suiteName: "group.kr.co.mincha.withgod")?
+      .string(forKey: "withgod.language"), supported.contains(stored) {
+      return stored
+    }
     let raw = Locale.preferredLanguages.first ?? "ko"
     let code = raw.split(separator: "-").first.map(String.init)?.lowercased() ?? "ko"
     return supported.contains(code) ? code : "en"
@@ -137,12 +143,10 @@ struct Provider: TimelineProvider {
   }
 
   private func fetchDailyVerse() async throws -> DailyVerse {
-    // 기기 선호 언어로 말씀을 요청한다(이슈 #12·#14). 위젯 확장은 앱 내 언어
-    // 오버라이드를 읽을 수 없어(별도 App Group 필요) 기기 언어를 쓰며,
-    // 미지원 언어는 서버가 한국어로 폴백한다.
-    let lang = Locale.preferredLanguages.first?.split(separator: "-").first.map(String.init) ?? "ko"
+    // 위젯 언어(앱 내 선택 우선, 없으면 기기 언어 — L10n.lang)로 말씀을 요청한다.
+    // 미지원 언어는 서버가 한국어로 폴백한다(이슈 #12·#14).
     var components = URLComponents(string: "https://mincha.co.kr/daily-verse")!
-    components.queryItems = [URLQueryItem(name: "lang", value: lang.lowercased())]
+    components.queryItems = [URLQueryItem(name: "lang", value: L10n.lang)]
     guard let url = components.url else {
       throw URLError(.badURL)
     }

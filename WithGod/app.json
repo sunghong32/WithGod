@@ -20,7 +20,10 @@
       "appleTeamId": "B434W34DLF",
       "googleServicesFile": "./GoogleService-Info.plist",
       "entitlements": {
-        "aps-environment": "production"
+        "aps-environment": "production",
+        "com.apple.security.application-groups": [
+          "group.kr.co.mincha.withgod"
+        ]
       },
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,

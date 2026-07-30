@@ -29,6 +29,7 @@ import {
 } from "@/shared/lib/i18n";
 import { refreshHomeWidgetAsync } from "@/widgets/refreshHomeWidget";
 import { clearDailyVerseCache } from "@/widgets/widgetTaskHandler";
+import { syncWidgetLanguage } from "../../modules/widget-bridge";
 import { baseFontFamily, colors, scaleFont } from "@/shared/styles";
 import { Ionicons } from "@expo/vector-icons";
 import Constants from "expo-constants";
@@ -99,6 +100,8 @@ export default function SettingsScreen() {
         void syncNotificationSettingsAsync(settingsRef.current);
         await clearDailyVerseCache();
         void refreshHomeWidgetAsync();
+        // iOS 위젯은 별도 프로세스라 App Group 으로 언어를 공유해야 따라온다
+        syncWidgetLanguage(choice === "system" ? null : choice);
       })();
     },
     [],

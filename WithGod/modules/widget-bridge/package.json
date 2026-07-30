@@ -1,0 +1,6 @@
+{
+  "name": "widget-bridge",
+  "version": "1.0.0",
+  "description": "앱-위젯 공유 저장소(App Group) 브리지 — 언어 동기화·위젯 새로고침",
+  "main": "index.ts"
+}
