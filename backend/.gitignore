@@ -23,6 +23,7 @@ __pycache__/
 data/device_store.json
 data/daily_random.sqlite3
 data/verse_interpretations.json
+data/analytics.sqlite3
 
 # Local tooling
 .claude/
@@ -30,6 +31,8 @@ data/verse_interpretations.json
 # Secrets — 인증서·키 전부 (json, p8 등)
 secrets/*
 data/app_version.json
+data/app_version.json.lock
+data/.app_version.json.*.tmp
 models/
 
 # 다국어 파이프라인 — CSV(원천 데이터)만 커밋하고 무거운 산출물은 제외.

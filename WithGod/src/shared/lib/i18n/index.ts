@@ -69,12 +69,16 @@ export const detectDeviceLanguage = (): string => {
 /**
  * 실제 사용할 언어 결정: 저장된 선택 → 기기 언어 → en → ko.
  * 각 단계에서 활성 게이트를 통과해야 한다.
+ *
+ * 기기 언어를 **읽지 못한** 경우(빈 문자열)에는 en 이 아니라 ko 로 간다. 감지 실패는
+ * 대부분 한국 사용자에게서 나는데(이 앱의 주 사용자층), 여기서 en 을 고르면 화면도
+ * 푸시도 영어로 나가버린다 — 감지된 언어가 미지원일 때만 en 이 합리적인 선택이다.
  */
 const resolveLanguage = (stored: string | null): AppLanguage => {
   if (isSupported(stored) && ENABLED_LANGUAGES.includes(stored)) return stored;
   const device = detectDeviceLanguage();
   if (isSupported(device) && ENABLED_LANGUAGES.includes(device)) return device;
-  if (ENABLED_LANGUAGES.includes('en')) return 'en';
+  if (device && ENABLED_LANGUAGES.includes('en')) return 'en';
   return 'ko';
 };
 
@@ -99,6 +103,25 @@ void i18next.use(initReactI18next).init({
   initAsync: false,
 });
 
+// 언어 하이드레이션 완료 신호 — 푸시 기기 등록처럼 "확정된 언어"가 필요한
+// 소비자가 대기할 수 있게 한다. initAppLanguage() 완료(성공/실패 무관) 시 풀린다.
+// 배경: 앱 시작 시 푸시 등록이 initAppLanguage 보다 먼저 달리면 저장된 선택이
+// 반영되기 전의 초기값(ko)이 서버에 언어로 저장되는 경쟁이 있었다.
+let resolveLanguageReady: () => void = () => {};
+const languageReady = new Promise<void>((resolve) => {
+  resolveLanguageReady = resolve;
+});
+
+/**
+ * 언어 하이드레이션을 기다린다. initAppLanguage 가 호출되지 않는 특수 컨텍스트
+ * (위젯 태스크 등)에서 영원히 멈추지 않도록 타임아웃 폴백을 둔다.
+ */
+export const waitForLanguageReadyAsync = (timeoutMs = 5000): Promise<void> =>
+  Promise.race([
+    languageReady,
+    new Promise<void>((resolve) => setTimeout(resolve, timeoutMs)),
+  ]);
+
 /** 앱 시작 시 1회: 저장된 선택/기기 언어를 반영한다. 실패해도 ko 로 동작. */
 export const initAppLanguage = async (): Promise<void> => {
   try {
@@ -115,6 +138,8 @@ export const initAppLanguage = async (): Promise<void> => {
     }
   } catch {
     // 언어 결정 실패가 앱을 막지 않는다 — ko 유지.
+  } finally {
+    resolveLanguageReady();
   }
 };
 

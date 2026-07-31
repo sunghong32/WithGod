@@ -8,10 +8,10 @@ import { ChartCard } from "./ChartCard";
  * 앱 버전 관리.
  *
  * - latest: 스토어 최신 버전. 올리면 그보다 낮은 사용자에게 '선택 업데이트' 팝업.
- * - min_supported: 최소 지원 버전. 올리면 그보다 낮은 사용자에게 '강제 업데이트' 팝업.
- *
- * ⚠️ latest 는 새 버전이 스토어에 실제로 올라간 뒤 올려야 한다(아직 없는 버전으로
- * 업데이트하라고 안내하지 않도록).
+ *   **App Store 라이브 버전을 백엔드가 자동 추적**한다 — 새 버전이 스토어에
+ *   릴리즈되면 자동으로 올라가므로 평소엔 손댈 필요가 없다. 수동으로 더 높게
+ *   올리는 것은 그대로 존중되고, 자동은 절대 값을 내리지 않는다.
+ * - min_supported: 최소 지원 버전(강제 업데이트). 어드민 수동 전용 — 비상시만.
  */
 
 interface VersionConfig {
@@ -19,6 +19,8 @@ interface VersionConfig {
   min_supported: string;
   ios_url: string;
   android_url: string;
+  /** 백엔드가 감지한 App Store 라이브 버전(자동 추적 소스). 조회 전엔 없음. */
+  store_latest?: string;
 }
 
 const VERSION_RE = /^\d+(\.\d+){1,3}$/;
@@ -82,7 +84,7 @@ export function AppVersionControl() {
   return (
     <ChartCard
       title="앱 버전 관리"
-      subtitle="새 버전 출시 후 최신 버전을 올리면 구버전 사용자에게 업데이트 안내가 뜹니다"
+      subtitle="최신 버전은 App Store 릴리즈를 자동 추적합니다 — 강제 업데이트(최소 지원)만 수동으로 관리하세요"
     >
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="text-xs">
@@ -95,7 +97,9 @@ export function AppVersionControl() {
             className="mt-1 w-full rounded-lg border border-[var(--border-1)] bg-transparent px-3 py-2 tabular-nums text-[var(--text-primary)] outline-none focus:border-[var(--text-muted)]"
           />
           <span className="mt-1 block text-[var(--text-muted)]">
-            그보다 낮은 사용자 → 선택 업데이트 팝업
+            {config?.store_latest
+              ? `App Store 라이브 ${config.store_latest} 자동 추적 중 · 수동은 올리기만 유효`
+              : "그보다 낮은 사용자 → 선택 업데이트 팝업 (스토어 릴리즈 시 자동 갱신)"}
           </span>
         </label>
 

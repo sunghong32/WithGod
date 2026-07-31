@@ -15,6 +15,8 @@ export interface RegisterPushDeviceInput {
   enabled?: boolean;
   scheduleHour?: number;
   scheduleMinute?: number;
+  /** 명시하지 않으면 현재 앱 표시 언어를 전송한다. */
+  language?: string;
 }
 
 export interface RegisterPushDevicePayload {
@@ -82,6 +84,7 @@ export const pushApi = {
     enabled = true,
     scheduleHour,
     scheduleMinute,
+    language,
   }: RegisterPushDeviceInput): Promise<void> => {
     const resolvedAppVersion = appVersion || getAppVersion();
     const resolvedOsVersion = osVersion || getOsVersion();
@@ -93,7 +96,7 @@ export const pushApi = {
       platform: getPlatform(),
       timezone: timezone || getTimezone(),
       enabled,
-      language: getAppLanguage(),
+      language: language || getAppLanguage(),
       // 공유 규약(snake_case)
       device_id: deviceId,
       schedule_hour: resolvedHour,

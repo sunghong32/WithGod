@@ -89,7 +89,10 @@ export default function SettingsScreen() {
     void getAppLanguageChoice().then(setLanguageChoice);
   }, []);
 
-  // 언어 변경: 즉시 적용 + 푸시 재등록(제목·본문 언어 반영) + 위젯 캐시 갱신.
+  // 언어 변경: 즉시 적용 + 위젯 캐시 갱신. 푸시 언어의 서버 재등록은
+  // pushNotifications 의 languageChanged 리스너가 담당한다 — 이 화면을 거치지 않는
+  // 언어 변경(기기 언어 따르기 등)까지 한곳에서 처리하고, 실패해도 앱 포그라운드
+  // 복귀 시 불일치를 감지해 재시도하므로 여기서 따로 보내지 않는다.
   const handleSelectLanguage = useCallback(
     (choice: AppLanguageChoice) => {
       setLanguageChoice(choice);
@@ -97,7 +100,6 @@ export default function SettingsScreen() {
       void (async () => {
         await setAppLanguageChoice(choice);
         // 실패해도 무해한 best-effort 후속 처리들
-        void syncNotificationSettingsAsync(settingsRef.current);
         await clearDailyVerseCache();
         void refreshHomeWidgetAsync();
         // iOS 위젯은 별도 프로세스라 App Group 으로 언어를 공유해야 따라온다
