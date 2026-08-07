@@ -7,7 +7,8 @@
   },
   "splash": {
     "logoA11y": "Logotipo de la app WithGod",
-    "subtitle": "Consuelo para tu corazón"
+    "subtitle": "Consuelo para tu corazón",
+    "updating": "Preparando la nueva versión"
   },
   "nav": {
     "backA11y": "Volver"
@@ -35,6 +36,7 @@
     "headerTitle": "Palabras de consuelo",
     "sectionTitle": "Un versículo para ti",
     "searching": "Buscando un versículo para ti...",
+    "privacyNote": "Lo que escribes aquí se queda en este teléfono",
     "loadFailed": "No pudimos cargar el versículo",
     "tapToRetry": "Toca para intentarlo de nuevo",
     "searchAgain": "Buscar de nuevo"
@@ -59,9 +61,39 @@
     "widgetCardSubtitle": "Mira el versículo del día en tu pantalla de inicio sin abrir la app",
     "widgetCardA11y": "Ver cómo agregar el widget a la pantalla de inicio",
     "version": "Versión {{version}}",
+    "versionLabel": "Versión",
     "languageTitle": "Idioma",
     "languageSystem": "Usar el idioma del sistema",
     "languageCardA11y": "Elegir el idioma de la app"
+  },
+  "history": {
+    "title": "Momentos pasados",
+    "openA11y": "Abrir momentos pasados",
+    "closeA11y": "Cerrar",
+    "emptyTitle": "Aún no hay nada aquí",
+    "emptyDesc": "Cuéntanos cómo te sientes y aparecerá aquí",
+    "groupToday": "Hoy",
+    "groupYesterday": "Ayer",
+    "groupThisWeek": "Esta semana",
+    "groupEarlier": "Anteriores",
+    "refsMore": "{{first}} y {{count}} más",
+    "itemA11y": "Volver a abrir: {{mood}}",
+    "removeTitle": "¿Borrar esta entrada?",
+    "removeBody": "No se puede deshacer. Tus versículos guardados no se tocan.",
+    "removeConfirm": "Borrar",
+    "privacyNote": "Tu historial se queda solo en este teléfono. Ni nosotros podemos verlo.",
+    "searchA11y": "Buscar en el historial",
+    "searchPlaceholder": "Buscar",
+    "emptySearch": "Sin resultados",
+    "actionOpen": "Abrir",
+    "actionRename": "Cambiar nombre",
+    "renameTitle": "Cambiar nombre",
+    "renamePlaceholder": "Nuevo nombre",
+    "renameSave": "Guardar",
+    "clearAction": "Borrar todo el historial",
+    "clearTitle": "¿Borrar todo?",
+    "clearBody": "Se irá todo lo que has compartido y recibido. Tus versículos guardados no se tocan. No se puede deshacer.",
+    "clearConfirm": "Borrar todo"
   },
   "bookmarks": {
     "headerTitle": "Versículos en tu corazón",

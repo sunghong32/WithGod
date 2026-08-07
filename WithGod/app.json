@@ -2,7 +2,7 @@
   "expo": {
     "name": "신과함께",
     "slug": "WithGod",
-    "version": "1.4.1",
+    "version": "1.5.0",
     "orientation": "portrait",
     "icon": "./src/shared/assets/images/icon.png",
     "scheme": "withgod",

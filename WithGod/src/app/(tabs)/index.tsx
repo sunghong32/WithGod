@@ -1,5 +1,6 @@
 import { useBookmarks, useToggleBookmark } from "@/features/bookmarks";
 import { useDailyVerse } from "@/features/verse/hooks/useDailyVerse";
+import { useAppDrawer } from "@/shared/components/AppDrawer";
 import { NotificationPrimingModal } from "@/shared/components/NotificationPrimingModal";
 import { WidgetGuideModal } from "@/shared/components/WidgetGuideModal";
 import { VerseActionRow } from "@/shared/components/VerseActionRow";
@@ -45,6 +46,7 @@ export default function HomeScreen() {
   const [showPriming, setShowPriming] = useState(false);
   const [showWidgetPromo, setShowWidgetPromo] = useState(false);
   const [showWidgetGuide, setShowWidgetGuide] = useState(false);
+  const { open: openHistoryDrawer } = useAppDrawer();
   const isKeyboardVisible = useKeyboardVisible();
   const { headerPaddingTop, getInputBarPaddingBottom } = useSafeAreaPadding();
   const router = useRouter();
@@ -184,6 +186,16 @@ export default function HomeScreen() {
   const content = (
     <View style={styles.container}>
         <View style={[styles.header, { paddingTop: headerPaddingTop }]}>
+          <TouchableOpacity
+            style={styles.menuButton}
+            onPress={openHistoryDrawer}
+            activeOpacity={0.7}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={t("history.openA11y")}
+          >
+            <Ionicons name="menu-outline" size={26} color="#1E2939" />
+          </TouchableOpacity>
           <View style={styles.headerLogoWrapper}>
             <Image
               source={LOGO_IMAGE}
@@ -360,6 +372,7 @@ export default function HomeScreen() {
           visible={showWidgetGuide}
           onClose={handleWidgetGuideClose}
         />
+
     </View>
   );
 
@@ -388,6 +401,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 24,
     paddingBottom: 16,
+  },
+  menuButton: {
+    marginRight: 10,
+    marginLeft: -4,
   },
   headerLogoWrapper: {
     height: 40,

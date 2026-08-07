@@ -7,7 +7,8 @@
   },
   "splash": {
     "logoA11y": "WithGod-App-Logo",
-    "subtitle": "Trost für dein Herz"
+    "subtitle": "Trost für dein Herz",
+    "updating": "Neue Version wird vorbereitet"
   },
   "nav": {
     "backA11y": "Zurück"
@@ -35,6 +36,7 @@
     "headerTitle": "Worte des Trostes",
     "sectionTitle": "Ein Vers für dich",
     "searching": "Wir suchen einen Vers für dich …",
+    "privacyNote": "Was du hier schreibst, bleibt auf diesem Handy",
     "loadFailed": "Der Vers konnte nicht geladen werden",
     "tapToRetry": "Tippe, um es erneut zu versuchen",
     "searchAgain": "Erneut suchen"
@@ -59,9 +61,39 @@
     "widgetCardSubtitle": "Sieh den Vers des Tages direkt auf deinem Startbildschirm – ohne die App zu öffnen",
     "widgetCardA11y": "Anleitung zum Hinzufügen des Widgets ansehen",
     "version": "Version {{version}}",
+    "versionLabel": "Version",
     "languageTitle": "Sprache",
     "languageSystem": "Systemsprache verwenden",
     "languageCardA11y": "App-Sprache wählen"
+  },
+  "history": {
+    "title": "Vergangene Gedanken",
+    "openA11y": "Vergangene Gedanken öffnen",
+    "closeA11y": "Schließen",
+    "emptyTitle": "Noch nichts hier",
+    "emptyDesc": "Erzähl, was dich bewegt — es erscheint hier",
+    "groupToday": "Heute",
+    "groupYesterday": "Gestern",
+    "groupThisWeek": "Diese Woche",
+    "groupEarlier": "Früher",
+    "refsMore": "{{first}} und {{count}} weitere",
+    "itemA11y": "Erneut öffnen: {{mood}}",
+    "removeTitle": "Diesen Eintrag löschen?",
+    "removeBody": "Das lässt sich nicht rückgängig machen. Deine gespeicherten Verse bleiben erhalten.",
+    "removeConfirm": "Löschen",
+    "privacyNote": "Dein Verlauf bleibt nur auf diesem Handy. Nicht einmal wir können ihn sehen.",
+    "searchA11y": "Verlauf durchsuchen",
+    "searchPlaceholder": "Suchen",
+    "emptySearch": "Keine Treffer",
+    "actionOpen": "Öffnen",
+    "actionRename": "Umbenennen",
+    "renameTitle": "Umbenennen",
+    "renamePlaceholder": "Neuer Name",
+    "renameSave": "Speichern",
+    "clearAction": "Verlauf löschen",
+    "clearTitle": "Alle Einträge löschen?",
+    "clearBody": "Alles, was du geteilt und erhalten hast, verschwindet. Deine gespeicherten Verse bleiben. Das lässt sich nicht rückgängig machen.",
+    "clearConfirm": "Alle löschen"
   },
   "bookmarks": {
     "headerTitle": "Verse in deinem Herzen",

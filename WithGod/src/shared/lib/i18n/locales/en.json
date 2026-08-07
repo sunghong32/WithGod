@@ -7,7 +7,8 @@
   },
   "splash": {
     "logoA11y": "WithGod app logo",
-    "subtitle": "Bringing comfort to your heart"
+    "subtitle": "Bringing comfort to your heart",
+    "updating": "Getting the latest version ready"
   },
   "nav": {
     "backA11y": "Go back"
@@ -35,6 +36,7 @@
     "headerTitle": "Words of Comfort",
     "sectionTitle": "A Verse for You",
     "searching": "Finding a verse for you...",
+    "privacyNote": "What you write here stays on this phone",
     "loadFailed": "Couldn't load the verse",
     "tapToRetry": "Tap to try again",
     "searchAgain": "Search again"
@@ -59,9 +61,39 @@
     "widgetCardSubtitle": "See today's verse right on your home screen without opening the app",
     "widgetCardA11y": "See how to add the home screen widget",
     "version": "Version {{version}}",
+    "versionLabel": "Version",
     "languageTitle": "Language",
     "languageSystem": "Use system language",
     "languageCardA11y": "Choose app language"
+  },
+  "history": {
+    "title": "Past reflections",
+    "openA11y": "Open past reflections",
+    "closeA11y": "Close",
+    "emptyTitle": "Nothing here yet",
+    "emptyDesc": "Share what's on your heart and it will appear here",
+    "groupToday": "Today",
+    "groupYesterday": "Yesterday",
+    "groupThisWeek": "This week",
+    "groupEarlier": "Earlier",
+    "refsMore": "{{first}} and {{count}} more",
+    "itemA11y": "Reopen: {{mood}}",
+    "removeTitle": "Delete this entry?",
+    "removeBody": "This can't be undone. Your saved verses stay as they are.",
+    "removeConfirm": "Delete",
+    "privacyNote": "Your history stays on this phone only. Not even we can see it.",
+    "searchA11y": "Search history",
+    "searchPlaceholder": "Search",
+    "emptySearch": "No results",
+    "actionOpen": "Open",
+    "actionRename": "Rename",
+    "renameTitle": "Rename",
+    "renamePlaceholder": "New name",
+    "renameSave": "Save",
+    "clearAction": "Clear all history",
+    "clearTitle": "Delete all entries?",
+    "clearBody": "Everything you've shared and received will be gone. Your saved verses stay as they are. This can't be undone.",
+    "clearConfirm": "Delete all"
   },
   "bookmarks": {
     "headerTitle": "Verses in Your Heart",

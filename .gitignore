@@ -117,3 +117,6 @@ backend/secrets/*.json
 
 # Telegram → Claude Code bridge (로컬 전용: 로그/inbox)
 .tg-bridge/
+
+# Claude Code 로컬 전용 설정 (launch.json 등 공유 파일은 커밋한다)
+WithGod/.claude/settings.local.json

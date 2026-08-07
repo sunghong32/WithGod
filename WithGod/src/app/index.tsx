@@ -1,8 +1,9 @@
+import { applyPendingUpdateAsync, type OtaPhase } from '@/shared/lib/otaUpdate';
 import { baseFontFamily, colors, scaleFont } from '@/shared/styles';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useNavigation, useRouter } from 'expo-router';
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -12,6 +13,9 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 // 이 플래그가 없으면 앱이 새로 켜지는 것처럼 스플래시가 또 재생된다.
 let splashPlayedThisLaunch = false;
 
+/** 스플래시 최소 노출 시간. OTA 확인은 이 시간 안에서 끝내는 것을 목표로 한다. */
+const SPLASH_MIN_MS = 3000;
+
 export default function SplashScreen() {
   const { t } = useTranslation();
   const router = useRouter();
@@ -19,6 +23,7 @@ export default function SplashScreen() {
   const insets = useSafeAreaInsets();
   const timerElapsedRef = useRef(false);
   const isRelaunch = useRef(splashPlayedThisLaunch).current;
+  const [otaPhase, setOtaPhase] = useState<OtaPhase>('idle');
 
   const dismissSplash = useCallback(() => {
     // anchor='(tabs)' 로 인해 스택이 [(tabs), index] 이므로, replace 를 하면
@@ -46,18 +51,38 @@ export default function SplashScreen() {
     return () => clearTimeout(timeoutId);
   }, [isRelaunch, router]);
 
+  // 스플래시가 머무는 동안 OTA 새 번들이 있으면 받아서 곧바로 재시작한다.
+  // 사용자가 앱을 껐다 켜지 않아도 새 버전 화면으로 들어가게 하기 위함이고,
+  // 어차피 기다리는 3초 안에서 처리하므로 체감 지연이 없다.
+  // 확인·내려받기가 실패하거나 늦어지면 그냥 원래대로 진행한다(fail-open).
   useEffect(() => {
     if (isRelaunch) return;
-    const timeoutId = setTimeout(() => {
+    let cancelled = false;
+
+    const minWait = new Promise<void>((resolve) => {
+      setTimeout(resolve, SPLASH_MIN_MS);
+    });
+
+    void (async () => {
+      const reloading = await applyPendingUpdateAsync((phase) => {
+        if (!cancelled) setOtaPhase(phase);
+      });
+      // 재시작이 걸렸으면 화면을 넘기지 않는다 — 곧 새 번들로 앱이 다시 뜬다.
+      if (reloading || cancelled) return;
+
+      await minWait;
+      if (cancelled) return;
       timerElapsedRef.current = true;
       // 푸시 딥링크 등으로 다른 화면이 이미 위에 떠 있으면 back() 이 그 화면을
       // 팝해버리므로, 스플래시가 최상단(포커스)일 때만 닫는다.
       if (navigation.isFocused()) {
         dismissSplash();
       }
-    }, 3000);
+    })();
 
-    return () => clearTimeout(timeoutId);
+    return () => {
+      cancelled = true;
+    };
   }, [isRelaunch, navigation, dismissSplash]);
 
   // 딥링크 화면에서 돌아와 스플래시가 다시 보이면(타이머는 이미 소진) 즉시 닫는다.
@@ -110,7 +135,11 @@ export default function SplashScreen() {
             />
           </View>
           <Text style={styles.title}>{t('common.appName')}</Text>
-          <Text style={styles.subtitle}>{t('splash.subtitle')}</Text>
+          <Text style={styles.subtitle}>
+            {otaPhase === 'downloading'
+              ? t('splash.updating')
+              : t('splash.subtitle')}
+          </Text>
         </View>
       </SafeAreaView>
     </View>

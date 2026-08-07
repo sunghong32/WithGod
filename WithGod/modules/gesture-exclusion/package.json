@@ -1,0 +1,6 @@
+{
+  "name": "gesture-exclusion",
+  "version": "1.0.0",
+  "description": "안드로이드 좌측 엣지를 시스템 뒤로가기 제스처에서 넘겨받는 브리지 (드로어 스와이프용)",
+  "main": "index.ts"
+}

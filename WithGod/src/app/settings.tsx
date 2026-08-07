@@ -429,10 +429,18 @@ export default function SettingsScreen() {
               </View>
             </TouchableOpacity>
 
-            {/* 현재 앱 버전 — 업데이트 안내 팝업 도입으로 확인 수단이 필요해짐 */}
-            <Text style={styles.versionText}>
-              {t("settings.version", { version: appVersion })}
-            </Text>
+            {/* 현재 앱 버전 — 업데이트 안내 팝업 도입으로 확인 수단이 필요해짐.
+                누르는 항목은 아니지만 목록의 리듬이 끊기지 않게 같은 카드로 둔다. */}
+            <View style={styles.card}>
+              <View style={styles.cardRow}>
+                <View style={styles.cardRowText}>
+                  <Text style={styles.cardTitle}>
+                    {t("settings.versionLabel")}
+                  </Text>
+                </View>
+                <Text style={styles.versionValue}>{appVersion}</Text>
+              </View>
+            </View>
           </>
         )}
       </ScrollView>
@@ -570,11 +578,9 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: 12,
   },
-  versionText: {
-    fontSize: scaleFont(13),
-    color: "#B0B5BD",
+  versionValue: {
+    fontSize: scaleFont(15),
+    color: colors.textSecondary,
     fontFamily: baseFontFamily,
-    textAlign: "center",
-    marginTop: 8,
   },
 });

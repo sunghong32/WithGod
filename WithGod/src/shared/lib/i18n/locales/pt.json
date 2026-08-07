@@ -7,7 +7,8 @@
   },
   "splash": {
     "logoA11y": "Logotipo do app WithGod",
-    "subtitle": "Levando conforto ao seu coração"
+    "subtitle": "Levando conforto ao seu coração",
+    "updating": "Preparando a nova versão"
   },
   "nav": {
     "backA11y": "Voltar"
@@ -35,6 +36,7 @@
     "headerTitle": "Versículo de conforto",
     "sectionTitle": "Um versículo para você",
     "searching": "Buscando o versículo...",
+    "privacyNote": "O que você escreve aqui fica neste celular",
     "loadFailed": "Não foi possível carregar o versículo",
     "tapToRetry": "Toque para tentar novamente",
     "searchAgain": "Buscar novamente"
@@ -59,9 +61,39 @@
     "widgetCardSubtitle": "Veja o versículo do dia na tela inicial sem precisar abrir o app",
     "widgetCardA11y": "Ver como adicionar o widget à tela inicial",
     "version": "Versão {{version}}",
+    "versionLabel": "Versão",
     "languageTitle": "Idioma",
     "languageSystem": "Seguir o idioma do sistema",
     "languageCardA11y": "Escolher o idioma do app"
+  },
+  "history": {
+    "title": "Momentos passados",
+    "openA11y": "Abrir momentos passados",
+    "closeA11y": "Fechar",
+    "emptyTitle": "Ainda não há nada aqui",
+    "emptyDesc": "Conte como se sente e aparecerá aqui",
+    "groupToday": "Hoje",
+    "groupYesterday": "Ontem",
+    "groupThisWeek": "Esta semana",
+    "groupEarlier": "Anteriores",
+    "refsMore": "{{first}} e mais {{count}}",
+    "itemA11y": "Reabrir: {{mood}}",
+    "removeTitle": "Excluir este registro?",
+    "removeBody": "Não dá para desfazer. Seus versículos salvos continuam lá.",
+    "removeConfirm": "Excluir",
+    "privacyNote": "Seu histórico fica só neste celular. Nem nós conseguimos ver.",
+    "searchA11y": "Buscar no histórico",
+    "searchPlaceholder": "Buscar",
+    "emptySearch": "Nenhum resultado",
+    "actionOpen": "Abrir",
+    "actionRename": "Renomear",
+    "renameTitle": "Renomear",
+    "renamePlaceholder": "Novo nome",
+    "renameSave": "Salvar",
+    "clearAction": "Apagar todo o histórico",
+    "clearTitle": "Apagar tudo?",
+    "clearBody": "Tudo o que você compartilhou e recebeu vai sumir. Seus versículos salvos continuam lá. Não dá para desfazer.",
+    "clearConfirm": "Apagar tudo"
   },
   "bookmarks": {
     "headerTitle": "Versículos no coração",

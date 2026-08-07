@@ -8,6 +8,11 @@ import {
   type StreamKey,
 } from "@/features/verse";
 import { useBookmarks, useToggleBookmark } from "@/features/bookmarks";
+import {
+  appendHistory,
+  loadHistory,
+  type HistoryVerse,
+} from "@/features/history";
 import { ScreenHeader } from "@/shared/components/ScreenHeader";
 import { VerseActionRow } from "@/shared/components/VerseActionRow";
 import { useSafeAreaPadding } from "@/shared/hooks";
@@ -16,7 +21,10 @@ import { useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
+  AccessibilityInfo,
   ActivityIndicator,
+  Animated,
+  Easing,
   type LayoutChangeEvent,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
@@ -33,6 +41,15 @@ const VERSE_TYPING_TICK_MS = 24;
 const VERSE_TYPING_CHARS_PER_TICK = 1;
 const AUTO_SCROLL_BOTTOM_THRESHOLD = 80;
 
+// 로딩 문구 전환 타이밍.
+// 첫 말씀까지 실측 2~3초(서버가 첫 카드 전에 OpenAI를 두 번 호출한다)라 문구
+// 두 개를 보여줄 시간이 나온다. 안내를 위해 로딩을 인위적으로 늘리지는 않는다 —
+// 응답이 빠르면 두 번째 문구는 스쳐 지나가는데, 기다림이 없던 사람은 어차피
+// 자기가 적은 내용을 곱씹을 틈도 없었으므로 의도된 동작이다.
+const LOADING_SWAP_DELAY_MS = 1200;
+const LOADING_FADE_OUT_MS = 260;
+const LOADING_FADE_IN_MS = 420;
+
 type VerseTypingKey = "text" | "ref";
 
 type VerseTypingTask = {
@@ -44,7 +61,15 @@ type VerseTypingTask = {
 
 export default function ResultScreen() {
   const { t } = useTranslation();
-  const { mood } = useLocalSearchParams<{ mood: string }>();
+  // historyId 가 오면 지난 기록 다시보기 — 새로 스트리밍하지 않고 저장분을 보여준다.
+  const { mood: moodParam, historyId } = useLocalSearchParams<{
+    mood?: string;
+    historyId?: string;
+  }>();
+  const isReplay = !!historyId;
+  const [replayMood, setReplayMood] = useState("");
+  const [isReplayLoading, setIsReplayLoading] = useState(isReplay);
+  const mood = isReplay ? replayMood : (moodParam ?? "");
   const { insets } = useSafeAreaPadding();
   const [results, setResults] = useState<RecommendItem[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
@@ -60,6 +85,24 @@ export default function ResultScreen() {
   const scrollViewRef = useRef<ScrollView | null>(null);
   const draftRef = useRef<RecommendItem[]>([]);
   const isMountedRef = useRef(true);
+  // 언마운트 시점의 기록 저장에 쓰는 스냅샷 — 정리 콜백은 state 를 볼 수 없다
+  const resultsRef = useRef<RecommendItem[]>([]);
+  const streamErrorRef = useRef<string | null>(null);
+  const moodRef = useRef("");
+  const historySavedRef = useRef(false);
+  /**
+   * 기록 저장 전용 수집기. 화면 표시용 파이프라인(타이핑 애니메이션·state)과
+   * 완전히 분리해 **마운트 여부와 무관하게** 원본 토큰을 그대로 쌓는다.
+   * 사용자가 스트리밍 중 화면을 벗어나도 연결을 끊지 않고 여기 계속 쌓아,
+   * 완료되면 전체 내용을 기록에 남긴다.
+   */
+  const captureRef = useRef<{
+    verses: Map<number, HistoryVerse>;
+    parsers: Map<number, ReturnType<typeof createIndexedTokenParser>>;
+    title: string;
+    failed: boolean;
+  }>({ verses: new Map(), parsers: new Map(), title: "", failed: false });
+  const isBackgroundRef = useRef(false);
   const flushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const typingQueueRef = useRef("");
   const typingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -409,6 +452,84 @@ export default function ResultScreen() {
     streamRef.current = null;
   }, []);
 
+  // ---------- 기록 수집기 ----------
+  // 화면 표시용 파이프라인과 독립적으로 원본을 쌓는다. 마운트 여부를 보지 않는다.
+  const captureVerse = useCallback(
+    (index?: number, verse?: RecommendStreamVerse) => {
+      if (typeof index !== "number" || !verse) return;
+      const prev = captureRef.current.verses.get(index);
+      captureRef.current.verses.set(index, {
+        ref: verse.ref ?? prev?.ref ?? "",
+        text: verse.text ?? prev?.text ?? "",
+        comment: prev?.comment,
+        tag: prev?.tag,
+      });
+    },
+    [],
+  );
+
+  const captureToken = useCallback((content: string, index?: number) => {
+    if (typeof index !== "number" || !content) return;
+    let parser = captureRef.current.parsers.get(index);
+    if (!parser) {
+      parser = createIndexedTokenParser({
+        onFieldUpdate: (key, value) => {
+          const current = captureRef.current.verses.get(index) ?? {
+            ref: "",
+            text: "",
+          };
+          captureRef.current.verses.set(index, { ...current, [key]: value });
+        },
+        onActiveField: () => {},
+      });
+      captureRef.current.parsers.set(index, parser);
+    }
+    parser.feed(content);
+  }, []);
+
+  const resetCapture = useCallback(() => {
+    captureRef.current = {
+      verses: new Map(),
+      parsers: new Map(),
+      title: "",
+      failed: false,
+    };
+  }, []);
+
+  /**
+   * 수집한 내용을 기록으로 남긴다.
+   * - 에러가 났으면 남기지 않는다
+   * - 받은 말씀이 하나도 없으면 남기지 않는다
+   * - 앱이 강제 종료되면 애초에 호출되지 않는다
+   */
+  const saveCapture = useCallback(() => {
+    if (isReplay || historySavedRef.current) return;
+    if (captureRef.current.failed || streamErrorRef.current) return;
+
+    const captured = [...captureRef.current.verses.entries()]
+      .sort(([a], [b]) => a - b)
+      .map(([, verse]) => verse);
+    // indexed 모드가 아닌 레거시 경로면 화면에 그려진 결과를 그대로 쓴다
+    const verses = (
+      captured.length > 0
+        ? captured
+        : resultsRef.current.map((item) => ({
+            ref: item.ref ?? "",
+            text: item.text ?? "",
+            comment: item.comment || undefined,
+            tag: item.tag || undefined,
+          }))
+    ).filter((verse) => !!verse.ref && !!verse.text);
+
+    if (verses.length === 0) return;
+    historySavedRef.current = true;
+    void appendHistory({
+      mood: moodRef.current,
+      title: captureRef.current.title || undefined,
+      verses,
+    });
+  }, [isReplay]);
+
   const extractResults = useCallback(
     (payload: unknown): RecommendItem[] | null => {
       const unwrap = (
@@ -703,6 +824,9 @@ export default function ResultScreen() {
     receivedTokenRef.current = false;
     hasVersesSeedRef.current = false;
     commentLoggedIndicesRef.current.clear();
+    resetCapture();
+    isBackgroundRef.current = false;
+    historySavedRef.current = false;
     timingRef.current = {
       startAt: Date.now(),
       metaAt: 0,
@@ -741,7 +865,11 @@ export default function ResultScreen() {
           }
           handleVerses(verses);
         },
+        onTitle: (title) => {
+          captureRef.current.title = title;
+        },
         onVerse: (event) => {
+          captureVerse(event.index, event.verse);
           if (!isMountedRef.current) return;
           const index = event.index;
           const verse = event.verse;
@@ -756,6 +884,7 @@ export default function ResultScreen() {
           handleVerse(index, verse);
         },
         onToken: (content, tokenIndex) => {
+          captureToken(content, tokenIndex);
           if (!isMountedRef.current) return;
           receivedTokenRef.current = true;
           if (!timingRef.current.firstTokenAt) {
@@ -774,8 +903,22 @@ export default function ResultScreen() {
           }
           enqueueTokens(content);
         },
-        onDone: handleStreamDone,
+        onDone: (payload) => {
+          // 백그라운드(화면 이탈 후)면 UI 갱신 없이 기록만 남기고 연결을 닫는다
+          if (isBackgroundRef.current) {
+            saveCapture();
+            stopStream();
+            return;
+          }
+          handleStreamDone(payload);
+        },
         onError: (message, context) => {
+          // 에러가 나면 기록을 남기지 않는다 — 백그라운드에서도 마찬가지
+          captureRef.current.failed = true;
+          if (isBackgroundRef.current) {
+            stopStream();
+            return;
+          }
           if (!isMountedRef.current) return;
           setStreamError(message || t("result.loadFailed"));
           setIsStreaming(false);
@@ -809,12 +952,16 @@ export default function ResultScreen() {
       },
     );
   }, [
+    captureToken,
+    captureVerse,
     enqueueTokens,
     ensureIndexedTokenPump,
     handleStreamDone,
     handleVerse,
     handleVerses,
     mood,
+    resetCapture,
+    saveCapture,
     stopStream,
     stopTyping,
     stopVerseTyping,
@@ -830,7 +977,15 @@ export default function ResultScreen() {
     isMountedRef.current = true;
     return () => {
       isMountedRef.current = false;
-      stopStream();
+      // 스트리밍이 아직 안 끝났으면 연결을 끊지 않고 백그라운드로 마저 받는다.
+      // 실수로 화면을 벗어나도 기록에는 온전한 내용이 남게 하기 위해서다.
+      // 화면용 타이머는 전부 멈추므로 비용은 수신·파싱뿐이다.
+      if (streamRef.current && !isReplay && !captureRef.current.failed) {
+        isBackgroundRef.current = true;
+      } else {
+        stopStream();
+        saveCapture();
+      }
       stopTyping();
       stopVerseTyping();
       stopIndexedTokenPump();
@@ -839,17 +994,70 @@ export default function ResultScreen() {
         flushTimerRef.current = null;
       }
     };
-  }, [stopStream, stopTyping, stopVerseTyping, stopIndexedTokenPump]);
+  }, [
+    isReplay,
+    saveCapture,
+    stopStream,
+    stopTyping,
+    stopVerseTyping,
+    stopIndexedTokenPump,
+  ]);
 
   useEffect(() => {
-    if (!mood) return;
+    if (isReplay || !mood) return;
     startStream();
     return () => {
-      stopStream();
+      // 백그라운드 수신으로 넘어갔으면 연결을 유지한다
+      if (!isBackgroundRef.current) stopStream();
       stopVerseTyping();
       stopIndexedTokenPump();
     };
-  }, [mood, startStream, stopStream, stopVerseTyping, stopIndexedTokenPump]);
+  }, [
+    isReplay,
+    mood,
+    startStream,
+    stopStream,
+    stopVerseTyping,
+    stopIndexedTokenPump,
+  ]);
+
+  // 지난 기록 다시보기: 로컬 저장분을 그대로 채운다(스트리밍/타이핑 없음).
+  useEffect(() => {
+    if (!historyId) return;
+    let active = true;
+    void (async () => {
+      const entries = await loadHistory();
+      const entry = entries.find((item) => item.id === historyId);
+      if (!active) return;
+      if (entry) {
+        setReplayMood(entry.mood);
+        setResults(
+          entry.verses.map((verse) => ({
+            ref: verse.ref,
+            text: verse.text,
+            comment: verse.comment ?? "",
+            tag: verse.tag ?? "",
+          })),
+        );
+      }
+      setIsReplayLoading(false);
+    })();
+    return () => {
+      active = false;
+    };
+  }, [historyId]);
+
+  useEffect(() => {
+    resultsRef.current = results;
+  }, [results]);
+
+  useEffect(() => {
+    streamErrorRef.current = streamError;
+  }, [streamError]);
+
+  useEffect(() => {
+    moodRef.current = mood;
+  }, [mood]);
 
   useEffect(() => {
     if (!isStreaming) {
@@ -879,10 +1087,12 @@ export default function ResultScreen() {
 
   const visibleResults = results.filter(hasVisibleResultContent);
 
-  const showLoading = isStreaming && visibleResults.length === 0;
+  const showLoading =
+    (isStreaming || isReplayLoading) && visibleResults.length === 0;
   const hasError =
-    (!isStreaming && visibleResults.length === 0) ||
-    (!!streamError && visibleResults.length === 0);
+    !isReplayLoading &&
+    ((!isStreaming && visibleResults.length === 0) ||
+      (!!streamError && visibleResults.length === 0));
 
   const errorMessage =
     streamError ?? (hasError ? t("result.loadFailed") : null);
@@ -919,16 +1129,10 @@ export default function ResultScreen() {
 
           {showLoading ? (
             // 로딩 중: 유저 메시지 아래에 로딩 표시
-            <View style={styles.loadingCard}>
-              <ActivityIndicator
-                size="small"
-                color={colors.primary}
-                style={styles.loadingIndicator}
-              />
-              <Text style={styles.loadingCardText}>
-                {t("result.searching")}
-              </Text>
-            </View>
+            <LoadingCard
+              primary={t("result.searching")}
+              secondary={t("result.privacyNote")}
+            />
           ) : hasError ? (
             <TouchableOpacity
               style={styles.errorContainer}
@@ -984,6 +1188,84 @@ export default function ResultScreen() {
           )}
         </View>
       </ScrollView>
+    </View>
+  );
+}
+
+type LoadingCardProps = {
+  /** 처음 보이는 문구 */
+  primary: string;
+  /** 잠시 뒤 크로스페이드로 바뀌는 문구(안내). 이후 로딩이 끝날 때까지 유지 */
+  secondary: string;
+};
+
+/**
+ * 로딩 카드. 문구가 한 번 바뀐다(primary → secondary).
+ *
+ * 순환시키지 않고 두 단계로 끝낸다 — 힘든 마음으로 여는 앱이라 문구가 계속
+ * 도는 건 톤에 맞지 않는다. 문구가 바뀌어도 스크린리더에는 primary 하나만
+ * 읽히도록 카드를 단일 접근성 요소로 묶는다.
+ */
+function LoadingCard({ primary, secondary }: LoadingCardProps) {
+  const [message, setMessage] = useState(primary);
+  const opacity = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    let cancelled = false;
+    let swapTimer: ReturnType<typeof setTimeout> | null = null;
+
+    void (async () => {
+      let reduceMotion = false;
+      try {
+        reduceMotion = await AccessibilityInfo.isReduceMotionEnabled();
+      } catch {
+        // best-effort — 확인 실패 시엔 애니메이션을 적용한다
+      }
+      if (cancelled) return;
+
+      swapTimer = setTimeout(() => {
+        if (cancelled) return;
+        // Reduce Motion 이면 페이드 없이 즉시 교체
+        if (reduceMotion) {
+          setMessage(secondary);
+          return;
+        }
+        // 움직임 없이 제자리에서 서서히 사라졌다가 서서히 나타난다
+        Animated.timing(opacity, {
+          toValue: 0,
+          duration: LOADING_FADE_OUT_MS,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }).start(({ finished }) => {
+          // 투명해진 순간에 교체해 글자가 겹쳐 보이지 않게 한다
+          if (!finished || cancelled) return;
+          setMessage(secondary);
+          Animated.timing(opacity, {
+            toValue: 1,
+            duration: LOADING_FADE_IN_MS,
+            easing: Easing.inOut(Easing.quad),
+            useNativeDriver: true,
+          }).start();
+        });
+      }, LOADING_SWAP_DELAY_MS);
+    })();
+
+    return () => {
+      cancelled = true;
+      if (swapTimer) clearTimeout(swapTimer);
+    };
+  }, [opacity, secondary]);
+
+  return (
+    <View style={styles.loadingCard} accessible accessibilityLabel={primary}>
+      <ActivityIndicator
+        size="small"
+        color={colors.primary}
+        style={styles.loadingIndicator}
+      />
+      <Animated.Text style={[styles.loadingCardText, { opacity }]}>
+        {message}
+      </Animated.Text>
     </View>
   );
 }
@@ -1155,6 +1437,8 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   loadingCardText: {
+    // 안내 문구는 첫 문구보다 길어 줄바꿈이 필요하다 — flex 없이 두면 카드를 넘친다
+    flex: 1,
     fontSize: scaleFont(16),
     color: colors.textSecondary,
     fontFamily: baseFontFamily,

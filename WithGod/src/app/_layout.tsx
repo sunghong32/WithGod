@@ -7,6 +7,8 @@ import { KeyboardProvider } from 'react-native-keyboard-controller';
 import 'react-native-reanimated';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { AppDrawer, useAppDrawer } from '@/shared/components/AppDrawer';
+import { HistorySidebar } from '@/shared/components/HistorySidebar';
 import { useColorScheme } from '@/shared/hooks/use-color-scheme';
 import { logScreenViewEvent } from '@/shared/lib/analytics';
 import { QueryProvider } from '@/shared/lib/QueryProvider';
@@ -20,6 +22,33 @@ import { UpdatePromptModal } from '@/shared/components/UpdatePromptModal';
 import { refreshHomeWidgetAsync } from '@/widgets/refreshHomeWidget';
 
 SplashScreen.preventAutoHideAsync();
+
+/**
+ * 스택 위로 밀려 올라오는 화면들. 여기서는 좌측 엣지가 네이티브 뒤로가기
+ * 제스처와 겹치므로 드로어 스와이프를 끈다.
+ *
+ * 홈 경로를 '/' 로 직접 비교하면 안 된다 — 스플래시를 닫는 경로가 플랫폼마다
+ * 달라(back 또는 replace) 홈의 pathname 이 '/' 가 아닐 수 있고, 그러면 안드로이드
+ * 에서 스와이프가 통째로 죽는다(실측).
+ */
+const PUSHED_ROUTES = ['/result', '/settings', '/bookmarks'];
+
+/**
+ * 드로어 안에서 렌더되는 사이드바. 항목을 고르면 드로어를 닫고 결과 화면으로
+ * 이동한다 (드로어 컨텍스트를 쓰려면 AppDrawer 내부여야 해서 별도 컴포넌트).
+ */
+function HistorySidebarHost() {
+  const router = useRouter();
+  const { close } = useAppDrawer();
+  return (
+    <HistorySidebar
+      onSelect={(entry) => {
+        close();
+        router.push({ pathname: '/result', params: { historyId: entry.id } });
+      }}
+    />
+  );
+}
 
 export const unstable_settings = {
   anchor: '(tabs)',
@@ -116,6 +145,13 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <KeyboardProvider>
           <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+          {/* 기록 드로어. 스택 전체를 감싸 화면이 통째로 밀리게 한다.
+              스와이프로 여는 건 홈에서만 — 다른 화면은 좌측 엣지가 네이티브
+              뒤로가기 제스처와 겹친다. */}
+          <AppDrawer
+            swipeEnabled={!PUSHED_ROUTES.some((route) => pathname.startsWith(route))}
+            renderSidebar={() => <HistorySidebarHost />}
+          >
           <Stack screenOptions={{ headerShown: false }}>
             {/* 스플래시·메인은 스와이프 백 비활성 (스택 최하단이라 뒤로 갈 곳이 없음) */}
             {/* 스플래시는 router.back()(pop)으로 닫히는데, 네이티브 pop 기본
@@ -130,6 +166,7 @@ export default function RootLayout() {
             <Stack.Screen name="settings" options={{ animation: instantPop ? 'none' : 'default' }} />
             <Stack.Screen name="bookmarks" options={{ animation: instantPop ? 'none' : 'default' }} />
           </Stack>
+          </AppDrawer>
           {/* 유럽 첫 실행 시 통계 수집 동의창 (그 외 지역은 뜨지 않음) */}
           <TelemetryConsentModal />
           {/* 새 버전이 있으면 업데이트 안내 (서버 미응답 시 뜨지 않음) */}

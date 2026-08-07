@@ -7,7 +7,8 @@
   },
   "splash": {
     "logoA11y": "Logo de l'application WithGod",
-    "subtitle": "Un peu de réconfort pour ton cœur"
+    "subtitle": "Un peu de réconfort pour ton cœur",
+    "updating": "Préparation de la nouvelle version"
   },
   "nav": {
     "backA11y": "Revenir en arrière"
@@ -35,6 +36,7 @@
     "headerTitle": "Verset de réconfort",
     "sectionTitle": "Un verset pour toi",
     "searching": "Nous cherchons un verset pour toi…",
+    "privacyNote": "Ce que tu écris ici reste sur ce téléphone",
     "loadFailed": "Impossible de charger le verset",
     "tapToRetry": "Touche pour réessayer",
     "searchAgain": "Chercher à nouveau"
@@ -59,9 +61,39 @@
     "widgetCardSubtitle": "Retrouve le verset du jour sur ton écran d'accueil, sans même ouvrir l'app",
     "widgetCardA11y": "Voir comment ajouter le widget d'écran d'accueil",
     "version": "Version {{version}}",
+    "versionLabel": "Version",
     "languageTitle": "Langue",
     "languageSystem": "Suivre la langue du système",
     "languageCardA11y": "Choisir la langue de l'application"
+  },
+  "history": {
+    "title": "Moments passés",
+    "openA11y": "Ouvrir les moments passés",
+    "closeA11y": "Fermer",
+    "emptyTitle": "Rien ici pour l'instant",
+    "emptyDesc": "Confie ce que tu ressens, cela apparaîtra ici",
+    "groupToday": "Aujourd'hui",
+    "groupYesterday": "Hier",
+    "groupThisWeek": "Cette semaine",
+    "groupEarlier": "Plus tôt",
+    "refsMore": "{{first}} et {{count}} autres",
+    "itemA11y": "Rouvrir : {{mood}}",
+    "removeTitle": "Supprimer cette entrée ?",
+    "removeBody": "C'est irréversible. Tes versets enregistrés restent intacts.",
+    "removeConfirm": "Supprimer",
+    "privacyNote": "Ton historique reste uniquement sur ce téléphone. Même nous ne pouvons pas le voir.",
+    "searchA11y": "Rechercher dans l'historique",
+    "searchPlaceholder": "Rechercher",
+    "emptySearch": "Aucun résultat",
+    "actionOpen": "Ouvrir",
+    "actionRename": "Renommer",
+    "renameTitle": "Renommer",
+    "renamePlaceholder": "Nouveau nom",
+    "renameSave": "Enregistrer",
+    "clearAction": "Effacer tout l'historique",
+    "clearTitle": "Tout supprimer ?",
+    "clearBody": "Tout ce que tu as partagé et reçu disparaîtra. Tes versets enregistrés restent intacts. C'est irréversible.",
+    "clearConfirm": "Tout supprimer"
   },
   "bookmarks": {
     "headerTitle": "Versets gardés dans ton cœur",

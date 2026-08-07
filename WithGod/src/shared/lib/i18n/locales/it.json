@@ -7,7 +7,8 @@
   },
   "splash": {
     "logoA11y": "Logo dell'app WithGod",
-    "subtitle": "Un conforto per il tuo cuore"
+    "subtitle": "Un conforto per il tuo cuore",
+    "updating": "Stiamo preparando la nuova versione"
   },
   "nav": {
     "backA11y": "Indietro"
@@ -35,6 +36,7 @@
     "headerTitle": "Parole di conforto",
     "sectionTitle": "Un versetto per te",
     "searching": "Stiamo cercando il versetto...",
+    "privacyNote": "Quello che scrivi qui resta su questo telefono",
     "loadFailed": "Non siamo riusciti a caricare il versetto",
     "tapToRetry": "Tocca per riprovare",
     "searchAgain": "Cerca di nuovo"
@@ -59,9 +61,39 @@
     "widgetCardSubtitle": "Puoi vedere il versetto del giorno nella schermata Home senza aprire l'app",
     "widgetCardA11y": "Vedi come aggiungere il widget alla schermata Home",
     "version": "Versione {{version}}",
+    "versionLabel": "Versione",
     "languageTitle": "Lingua",
     "languageSystem": "Usa la lingua di sistema",
     "languageCardA11y": "Scegli la lingua dell'app"
+  },
+  "history": {
+    "title": "Momenti passati",
+    "openA11y": "Apri i momenti passati",
+    "closeA11y": "Chiudi",
+    "emptyTitle": "Ancora niente qui",
+    "emptyDesc": "Racconta come ti senti e apparirà qui",
+    "groupToday": "Oggi",
+    "groupYesterday": "Ieri",
+    "groupThisWeek": "Questa settimana",
+    "groupEarlier": "Precedenti",
+    "refsMore": "{{first}} e altri {{count}}",
+    "itemA11y": "Riapri: {{mood}}",
+    "removeTitle": "Eliminare questa voce?",
+    "removeBody": "Non si può annullare. I versetti salvati restano come sono.",
+    "removeConfirm": "Elimina",
+    "privacyNote": "La cronologia resta solo su questo telefono. Nemmeno noi possiamo vederla.",
+    "searchA11y": "Cerca nella cronologia",
+    "searchPlaceholder": "Cerca",
+    "emptySearch": "Nessun risultato",
+    "actionOpen": "Apri",
+    "actionRename": "Rinomina",
+    "renameTitle": "Rinomina",
+    "renamePlaceholder": "Nuovo nome",
+    "renameSave": "Salva",
+    "clearAction": "Cancella tutta la cronologia",
+    "clearTitle": "Eliminare tutto?",
+    "clearBody": "Sparirà tutto quello che hai condiviso e ricevuto. I versetti salvati restano. Non si può annullare.",
+    "clearConfirm": "Elimina tutto"
   },
   "bookmarks": {
     "headerTitle": "Versetti nel cuore",

@@ -7,7 +7,8 @@
   },
   "splash": {
     "logoA11y": "Logo aplikacji WithGod",
-    "subtitle": "Ukojenie dla Twojego serca"
+    "subtitle": "Ukojenie dla Twojego serca",
+    "updating": "Przygotowujemy nową wersję"
   },
   "nav": {
     "backA11y": "Wstecz"
@@ -35,6 +36,7 @@
     "headerTitle": "Słowo pociechy",
     "sectionTitle": "Werset dla Ciebie",
     "searching": "Szukamy wersetu dla Ciebie...",
+    "privacyNote": "To, co tu piszesz, zostaje na tym telefonie",
     "loadFailed": "Nie udało się wczytać wersetu",
     "tapToRetry": "Dotknij, aby spróbować ponownie",
     "searchAgain": "Szukaj ponownie"
@@ -59,9 +61,39 @@
     "widgetCardSubtitle": "Werset dnia na ekranie głównym — bez otwierania aplikacji",
     "widgetCardA11y": "Zobacz, jak dodać widżet na ekran główny",
     "version": "Wersja {{version}}",
+    "versionLabel": "Wersja",
     "languageTitle": "Język",
     "languageSystem": "Język systemu",
     "languageCardA11y": "Wybierz język aplikacji"
+  },
+  "history": {
+    "title": "Minione chwile",
+    "openA11y": "Otwórz minione chwile",
+    "closeA11y": "Zamknij",
+    "emptyTitle": "Jeszcze nic tu nie ma",
+    "emptyDesc": "Napisz, co czujesz, a pojawi się tutaj",
+    "groupToday": "Dziś",
+    "groupYesterday": "Wczoraj",
+    "groupThisWeek": "W tym tygodniu",
+    "groupEarlier": "Wcześniej",
+    "refsMore": "{{first}} i jeszcze {{count}}",
+    "itemA11y": "Otwórz ponownie: {{mood}}",
+    "removeTitle": "Usunąć ten wpis?",
+    "removeBody": "Tego nie da się cofnąć. Zapisane wersety zostają bez zmian.",
+    "removeConfirm": "Usuń",
+    "privacyNote": "Historia zostaje tylko na tym telefonie. Nawet my jej nie widzimy.",
+    "searchA11y": "Szukaj w historii",
+    "searchPlaceholder": "Szukaj",
+    "emptySearch": "Brak wyników",
+    "actionOpen": "Otwórz",
+    "actionRename": "Zmień nazwę",
+    "renameTitle": "Zmień nazwę",
+    "renamePlaceholder": "Nowa nazwa",
+    "renameSave": "Zapisz",
+    "clearAction": "Wyczyść całą historię",
+    "clearTitle": "Usunąć wszystko?",
+    "clearBody": "Zniknie wszystko, czym się dzieliłeś i co otrzymałeś. Zapisane wersety zostają. Tego nie da się cofnąć.",
+    "clearConfirm": "Usuń wszystko"
   },
   "bookmarks": {
     "headerTitle": "Zachowane w sercu",

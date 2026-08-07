@@ -27,6 +27,8 @@ export interface RecommendStreamVerseEvent {
 
 export interface RecommendStreamHandlers {
   onMeta?: (meta: RecommendStreamMeta) => void;
+  /** 기록 목록용 요약 제목 (서버가 지원할 때만 옴) */
+  onTitle?: (title: string) => void;
   onVerses?: (verses: RecommendStreamVerse[]) => void;
   onVerse?: (event: RecommendStreamVerseEvent) => void;
   onToken?: (content: string, index?: number) => void;
@@ -103,6 +105,10 @@ const handleSsePayload = (
       handlers.onMeta?.(data);
     } else if (eventType === "ping") {
       return;
+    } else if (eventType === "title") {
+      // 기록 목록에 쓸 요약 제목. 구버전 서버는 보내지 않으므로 없을 수 있다.
+      const title = typeof data?.title === "string" ? data.title : "";
+      if (title) handlers.onTitle?.(title);
     } else if (eventType === "verses") {
       const verses = Array.isArray(data?.verses) ? data.verses : [];
       handlers.onVerses?.(verses);
