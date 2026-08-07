@@ -17,7 +17,6 @@ import {
   StyleSheet,
   View,
 } from "react-native";
-import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { setLeftEdgeGestureExclusion } from "../../../modules/gesture-exclusion";
 
@@ -101,7 +100,6 @@ export function AppDrawer({
 }: AppDrawerProps) {
   // 0(닫힘) ~ DRAWER_WIDTH(열림). 제스처 계산을 픽셀로 하려고 이 단위를 쓴다.
   const translateX = useRef(new Animated.Value(0)).current;
-  const router = useRouter();
   const insets = useSafeAreaInsets();
   // 홈버튼 기기(상단 안전영역이 작음)는 화면 모서리가 각지므로 깎지 않는다.
   const cornerRadius = insets.top > 24 ? DEVICE_CORNER_RADIUS : 0;
@@ -110,6 +108,9 @@ export function AppDrawer({
   const [isVisible, setIsVisible] = useState(false);
   const isOpenRef = useRef(false);
   const isVisibleRef = useRef(false);
+  // 뒤로가기 핸들러에서 읽어야 해서 ref 로도 들고 있는다(핸들러는 한 번만 등록된다)
+  const isHomeRef = useRef(swipeEnabled);
+  isHomeRef.current = swipeEnabled;
 
   const markVisible = useCallback((visible: boolean) => {
     if (isVisibleRef.current === visible) return;
@@ -165,14 +166,17 @@ export function AppDrawer({
         close();
         return true;
       }
-      if (!router.canGoBack()) {
+      // swipeEnabled 는 "밀려 올라온 화면이 아니다" == 홈이라는 뜻이다.
+      // router.canGoBack() 으로 판단하면 안 된다 — 홈인데도 참을 돌려주는 경우가
+      // 있고, 그때 기본 동작에 맡기면 홈까지 팝돼 빈 화면이 남는다.
+      if (isHomeRef.current) {
         BackHandler.exitApp();
         return true;
       }
       return false;
     });
     return () => sub.remove();
-  }, [close, router]);
+  }, [close]);
 
   const panResponder = useMemo(
     () =>
