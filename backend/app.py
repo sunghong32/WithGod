@@ -1112,6 +1112,50 @@ def _expand_search_query(mood: str, lang: str = "ko") -> str:
         return mood
 
 
+def _make_history_title(mood: str, lang: str = "ko") -> str:
+    """사용자 입력을 기록 목록에 쓸 짧은 제목으로 다듬는다.
+
+    목록에 고민 원문이 그대로 뜨면 너무 적나라하고, 어깨너머로도 읽힌다.
+    "미래가 불안해서 아무것도 손에 안 잡혀요" → "미래 불안에 대한 상담" 처럼
+    한 걸음 물러선 명사구로 바꾼다. 실패하면 빈 문자열(앱이 원문으로 폴백).
+    """
+    if not OPENAI_API_KEY or not mood.strip():
+        return ""
+    if lang == "ko":
+        system = (
+            "너는 사용자의 고민 문장을 목록에 표시할 짧은 제목으로 바꾸는 도우미다. "
+            "감정을 그대로 노출하지 말고 한 걸음 물러선 담담한 명사구로 쓴다. "
+            "12자 이내, 따옴표·마침표 없이 제목만 출력한다."
+        )
+        user = (
+            f'고민: "{mood}"\n\n'
+            "위 고민을 목록용 제목으로 바꿔라.\n"
+            '예: "미래가 불안해서 아무것도 손에 안 잡혀요" → 미래 불안에 대한 상담\n'
+            '예: "직장에서 사람 관계가 힘들어요" → 직장 관계에 대한 고민'
+        )
+    else:
+        name = LANGUAGE_NAMES_EN.get(lang, lang)
+        system = (
+            f"You turn a user's personal concern into a short {name} list title. "
+            "Keep it a calm, detached noun phrase — do not restate raw emotion. "
+            "Max 5 words. Output the title only, no quotes or punctuation."
+        )
+        user = (
+            f'Concern: "{mood}"\n\n'
+            "Rewrite it as a list title.\n"
+            'e.g. "I am so anxious about the future I can\'t focus" '
+            "→ On anxiety about the future"
+        )
+    try:
+        title = _call_openai_as_text(system, user, max_tokens=40).strip()
+        if lang == "ko":
+            title = _keep_korean_only(title).strip()
+        return title.strip('"“” ').strip()
+    except Exception:
+        log.exception("history title generation failed")
+        return ""
+
+
 def _select_verses(mood: str, candidates: List[dict], picks: int) -> List[dict]:
     """후보 구절 중 사용자 입력의 '의미·정서'에 가장 맞는 picks개를 LLM이 재순위.
 
@@ -1197,13 +1241,23 @@ def _recommend_stream_response(mood: str, lang: str = "ko") -> StreamingResponse
         per_card_tokens = max(300, limits["max_tokens"] // PICKS)
 
         # 준비 단계: 쿼리 확장 → 넓게 검색 → LLM 재순위. 진행 중엔 ping 으로 연결 유지.
+        # 기록 목록용 제목은 같이 시작해 준비 단계 뒤에 숨긴다(추가 지연 없음).
         prep_task = loop.run_in_executor(
             None, _prepare_recommendations, mood, SEARCH_K, PICKS, lang
         )
+        title_task = loop.run_in_executor(None, _make_history_title, mood, lang)
         while not prep_task.done():
             yield f"data: {json.dumps({'event': 'ping'}, ensure_ascii=False)}\n\n"
             await asyncio.sleep(1)
         selected_verses = await prep_task
+
+        # 제목은 실패해도 스트림을 막지 않는다(앱이 원문으로 폴백).
+        try:
+            title = await title_task
+        except Exception:
+            title = ""
+        if title:
+            yield f"data: {json.dumps({'event': 'title', 'title': title}, ensure_ascii=False)}\n\n"
 
         if not selected_verses:
             yield f"data: {json.dumps({'event': 'done'}, ensure_ascii=False)}\n\n"
