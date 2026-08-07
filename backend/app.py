@@ -791,6 +791,18 @@ def _get_or_create_ko_daily_pick(target_day: str) -> dict:
 
 
 
+@app.post("/history/title")
+def history_title(inp: RecommendIn):
+    """기록 목록용 요약 제목만 따로 만들어 준다.
+
+    평소에는 /recommend/stream 이 `title` 이벤트로 함께 내려주므로 이 경로는
+    쓰이지 않는다. **그때 생성이 실패했거나(구버전 서버·OpenAI 오류) 제목 없이
+    남은 기록**을 앱이 나중에 채워 넣는 용도다. 실패해도 빈 문자열을 주고,
+    앱은 원문으로 계속 폴백한다.
+    """
+    return {"title": _make_history_title(inp.mood, resolve_lang(inp.lang))}
+
+
 @app.get("/daily-verse")
 def daily_verse(lang: Optional[str] = Query(None, description="말씀 언어(미지원/비활성은 ko 폴백)")):
     manager = _notification_manager()
