@@ -184,8 +184,17 @@ export function AppDrawer({
         // 열려 있을 때 덮인/밀린 화면을 건드리면 **capture 단계에서** 가로챈다.
         // 콘텐츠 위에 Pressable 을 얹는 방식은 네이티브 스택이 터치를 먼저
         // 가져가는 경우가 있어 신뢰할 수 없다.
-        onStartShouldSetPanResponderCapture: (evt) =>
-          isOpenRef.current && evt.nativeEvent.pageX > DRAWER_WIDTH,
+        onStartShouldSetPanResponderCapture: (evt) => {
+          // 열려 있을 때: 덮인/밀린 화면을 건드리면 가로챈다(탭으로 닫기).
+          if (isOpenRef.current) return evt.nativeEvent.pageX > DRAWER_WIDTH;
+          // 닫혀 있을 때: 좌측 엣지에서 시작한 터치는 **손이 닿는 즉시** 선점한다.
+          //
+          // 움직임을 보고 판단하면 늦다. 실제 손가락은 처음 몇 샘플이 dx 1~2px
+          // 수준이라 그 사이 ScrollView 의 네이티브 제스처 인식기가 터치를
+          // 가져가고, 한번 넘어가면 되찾을 수 없다(iOS 에서 특히 심하다).
+          // 엣지 폭이 좁아(24~40dp) 그 안의 탭·세로 스크롤을 포기해도 손해가 적다.
+          return isHomeRef.current && evt.nativeEvent.pageX <= EDGE_HIT_WIDTH;
+        },
         onMoveShouldSetPanResponderCapture: (evt, gesture) => {
           // 임계값을 낮게 잡아 **최대한 일찍** 선점한다. 늦게 잡으면 첫 엣지
           // 스와이프를 네이티브 엣지 제스처 인식기가 먼저 가져가 버린다
@@ -202,6 +211,14 @@ export function AppDrawer({
         },
         onPanResponderMove: (_evt, gesture) => {
           const base = isOpenRef.current ? DRAWER_WIDTH : 0;
+          // 엣지에서 손을 댔지만 세로로 끄는 중이면 드로어를 움직이지 않는다.
+          // (터치 다운에 선점하므로 세로 제스처도 우리에게 들어온다)
+          if (
+            base === 0 &&
+            Math.abs(gesture.dy) > Math.abs(gesture.dx) * 1.2
+          ) {
+            return;
+          }
           const next = Math.min(DRAWER_WIDTH, Math.max(0, base + gesture.dx));
           translateX.setValue(next);
           // 손가락으로 살짝 끌어낸 순간부터 사이드바를 '보이는' 상태로 친다.
