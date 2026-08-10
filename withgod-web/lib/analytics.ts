@@ -53,6 +53,9 @@ export interface EventCount {
 export interface Breakdown {
   platforms: { key: string; users: number }[];
   app_versions: { key: string; users: number }[];
+  // 기기 타임존으로 추정한 국가(ISO 3166-1 alpha-2, 모르면 "unknown").
+  // 백엔드가 구버전이면 빠져 있을 수 있다.
+  countries?: { key: string; users: number }[];
 }
 
 export class UnauthorizedError extends Error {}

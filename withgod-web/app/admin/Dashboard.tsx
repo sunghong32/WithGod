@@ -38,6 +38,27 @@ interface DashboardData {
   breakdown: Breakdown;
 }
 
+// 국가 코드(ISO 3166-1 alpha-2) → "🇰🇷 대한민국". 이름은 브라우저 로케일
+// 데이터에 맡긴다 — 국가 이름 표를 우리가 들고 있을 이유가 없다.
+const REGION_NAMES =
+  typeof Intl !== "undefined" && "DisplayNames" in Intl
+    ? new Intl.DisplayNames(["ko"], { type: "region" })
+    : null;
+
+const countryLabel = (code: string): string => {
+  if (!/^[A-Z]{2}$/.test(code)) return "🌐 알 수 없음";
+  const flag = String.fromCodePoint(
+    ...[...code].map((ch) => 0x1f1a5 + ch.charCodeAt(0)),
+  );
+  let name = code;
+  try {
+    name = REGION_NAMES?.of(code) ?? code;
+  } catch {
+    // 로케일 데이터에 없는 코드는 코드 그대로 보여준다.
+  }
+  return `${flag} ${name}`;
+};
+
 const formatUpdatedAt = (iso: string | null): string => {
   if (!iso) return "아직 수집된 이벤트가 없습니다";
   const parsed = new Date(iso);
@@ -241,6 +262,13 @@ export function Dashboard() {
                   <BreakdownList
                     title="앱 버전"
                     items={data.breakdown.app_versions}
+                  />
+                  <BreakdownList
+                    title="국가 (타임존 추정)"
+                    items={(data.breakdown.countries ?? []).map((item) => ({
+                      key: countryLabel(item.key),
+                      users: item.users,
+                    }))}
                   />
                 </div>
               </ChartCard>

@@ -24,7 +24,7 @@ def batch(anon_id, events, **meta):
         "platform": meta.get("platform", "ios"),
         "app_version": meta.get("app_version", "1.2.0"),
         "os_version": meta.get("os_version", "18.2"),
-        "tz": "Asia/Seoul",
+        "tz": meta.get("tz", "Asia/Seoul"),
         "events": events,
     }
     return payload
@@ -267,6 +267,126 @@ class QueriesTest(AnalyticsTestBase):
 
         breakdown = queries.get_breakdown(self.db, days=30, now=now)
         self.assertEqual(breakdown["platforms"], [{"key": "ios", "users": 1}])
+
+    def test_country_breakdown_groups_timezones_by_country(self):
+        now = kst(2026, 7, 23)
+        # 서로 다른 미국 타임존 2명 + 한국 1명 + 정체불명 tz 1명
+        ingest_batch(self.db, batch("us-east", [event("e1")], tz="America/New_York"), received_at=now)
+        ingest_batch(self.db, batch("us-west", [event("e2")], tz="America/Los_Angeles"), received_at=now)
+        ingest_batch(self.db, batch("kr", [event("e3")], tz="Asia/Seoul"), received_at=now)
+        ingest_batch(self.db, batch("mystery", [event("e4")], tz="UTC"), received_at=now)
+
+        breakdown = queries.get_breakdown(self.db, days=30, now=now)
+        self.assertEqual(
+            breakdown["countries"],
+            [
+                {"key": "US", "users": 2},
+                {"key": "KR", "users": 1},
+                {"key": "unknown", "users": 1},
+            ],
+        )
+
+    def test_empty_tz_does_not_erase_known_country(self):
+        now = kst(2026, 7, 23)
+        ingest_batch(self.db, batch("device-a", [event("e1")], tz="Asia/Tokyo"), received_at=now)
+        ingest_batch(self.db, batch("device-a", [event("e2")], tz=""), received_at=now)
+
+        breakdown = queries.get_breakdown(self.db, days=30, now=now)
+        self.assertEqual(breakdown["countries"], [{"key": "JP", "users": 1}])
+
+
+class TzCountryTest(unittest.TestCase):
+    def test_maps_canonical_and_legacy_icu_names(self):
+        from analytics.tz_country import country_for_tz
+
+        self.assertEqual(country_for_tz("Asia/Seoul"), "KR")
+        # 구형 ICU 는 옛 이름을 반환한다
+        self.assertEqual(country_for_tz("Asia/Calcutta"), "IN")
+        self.assertEqual(country_for_tz("Europe/Kiev"), "UA")
+        # 구 tzdb 에서만 정식이던 존들 — 옛 tzdata 기기가 그대로 보낸다
+        self.assertEqual(country_for_tz("Asia/Choibalsan"), "MN")
+        self.assertEqual(country_for_tz("Australia/Currie"), "AU")
+        self.assertEqual(country_for_tz("America/Virgin"), "VI")
+        self.assertIsNone(country_for_tz("Etc/UTC"))
+        self.assertIsNone(country_for_tz(""))
+        self.assertIsNone(country_for_tz(None))
+
+
+class DeviceTzMigrationTest(unittest.TestCase):
+    def test_adds_column_and_backfills_from_remaining_events(self):
+        # last_tz 도입 전 스키마를 그대로 만들어 두고 init_db 로 마이그레이션한다.
+        with tempfile.TemporaryDirectory() as tmp:
+            db = str(Path(tmp) / "analytics.sqlite3")
+            with session(db) as conn:
+                conn.executescript(
+                    """
+                    CREATE TABLE events (
+                        event_id TEXT PRIMARY KEY, anon_id TEXT NOT NULL,
+                        session_id TEXT, name TEXT NOT NULL, day TEXT NOT NULL,
+                        ts_client TEXT, ts_server TEXT NOT NULL, platform TEXT,
+                        app_version TEXT, os_version TEXT, tz TEXT, params_json TEXT
+                    );
+                    CREATE TABLE device_profile (
+                        anon_id TEXT PRIMARY KEY, first_day TEXT NOT NULL,
+                        last_day TEXT NOT NULL, platform TEXT,
+                        first_app_version TEXT, last_app_version TEXT,
+                        last_os_version TEXT
+                    );
+                    """
+                )
+                conn.execute(
+                    "INSERT INTO device_profile VALUES ('d1', '2026-07-01', '2026-07-20', 'ios', '1.2', '1.2', '18')"
+                )
+                # 오래된 tz 와 최신 tz — 최신 것이 남아야 한다
+                conn.execute(
+                    "INSERT INTO events (event_id, anon_id, name, day, ts_server, tz)"
+                    " VALUES ('e1', 'd1', 'app_open', '2026-07-01', '2026-07-01T00:00:00+00:00', 'Asia/Seoul')"
+                )
+                conn.execute(
+                    "INSERT INTO events (event_id, anon_id, name, day, ts_server, tz)"
+                    " VALUES ('e2', 'd1', 'app_open', '2026-07-20', '2026-07-20T00:00:00+00:00', 'America/New_York')"
+                )
+                conn.commit()
+
+            init_db(db)
+
+            with session(db) as conn:
+                row = conn.execute(
+                    "SELECT last_tz FROM device_profile WHERE anon_id = 'd1'"
+                ).fetchone()
+            self.assertEqual(row["last_tz"], "America/New_York")
+
+    def test_backfill_resumes_if_interrupted_after_alter(self):
+        # ALTER 는 autocommit 이라 컬럼만 생기고 백필 전에 죽을 수 있다.
+        # 그 상태(컬럼 있음 + last_tz 전부 NULL)에서 다음 부팅이 채워야 한다.
+        with tempfile.TemporaryDirectory() as tmp:
+            db = str(Path(tmp) / "analytics.sqlite3")
+            init_db(db)
+            with session(db) as conn:
+                conn.execute(
+                    "INSERT INTO device_profile (anon_id, first_day, last_day, last_tz)"
+                    " VALUES ('d1', '2026-07-01', '2026-07-20', NULL)"
+                )
+                conn.execute(
+                    "INSERT INTO events (event_id, anon_id, name, day, ts_server, tz)"
+                    " VALUES ('e1', 'd1', 'app_open', '2026-07-20', '2026-07-20T00:00:00+00:00', 'Asia/Seoul')"
+                )
+                conn.commit()
+
+            init_db(db)  # 재부팅
+
+            with session(db) as conn:
+                row = conn.execute(
+                    "SELECT last_tz FROM device_profile WHERE anon_id = 'd1'"
+                ).fetchone()
+            self.assertEqual(row["last_tz"], "Asia/Seoul")
+
+    def test_repeated_init_db_is_safe(self):
+        # 워커마다 부팅 시 init_db 를 호출한다 — 몇 번을 불러도 에러가 없어야 한다.
+        with tempfile.TemporaryDirectory() as tmp:
+            db = str(Path(tmp) / "analytics.sqlite3")
+            for _ in range(3):
+                init_db(db)
 
 
 class RateLimitTest(unittest.TestCase):

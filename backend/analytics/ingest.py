@@ -99,7 +99,7 @@ def ingest_batch(
                 accepted += 1
 
         if accepted or duplicates:
-            _touch_device(conn, anon_id, day, platform, app_version, os_version)
+            _touch_device(conn, anon_id, day, platform, app_version, os_version, tz)
             conn.execute(
                 "INSERT OR IGNORE INTO daily_active (day, anon_id) VALUES (?, ?)",
                 (day, anon_id),
@@ -116,6 +116,7 @@ def _touch_device(
     platform: str,
     app_version: str,
     os_version: str,
+    tz: str,
 ) -> None:
     # first_day 는 한 번 정해지면 절대 덮어쓰지 않는다 — 신규 사용자 판정과
     # 리텐션 코호트가 전부 이 값에 걸려 있다.
@@ -123,8 +124,8 @@ def _touch_device(
         """
         INSERT INTO device_profile (
             anon_id, first_day, last_day, platform,
-            first_app_version, last_app_version, last_os_version
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            first_app_version, last_app_version, last_os_version, last_tz
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(anon_id) DO UPDATE SET
             last_day = MAX(device_profile.last_day, excluded.last_day),
             platform = COALESCE(NULLIF(excluded.platform, ''), device_profile.platform),
@@ -133,7 +134,8 @@ def _touch_device(
             ),
             last_os_version = COALESCE(
                 NULLIF(excluded.last_os_version, ''), device_profile.last_os_version
-            )
+            ),
+            last_tz = COALESCE(NULLIF(excluded.last_tz, ''), device_profile.last_tz)
         """,
-        (anon_id, day, day, platform, app_version, app_version, os_version),
+        (anon_id, day, day, platform, app_version, app_version, os_version, tz),
     )

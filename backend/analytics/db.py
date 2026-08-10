@@ -118,7 +118,47 @@ def init_db(path: str) -> None:
             ) WITHOUT ROWID;
             """
         )
+        _migrate_device_tz(conn)
         conn.commit()
+
+
+def _migrate_device_tz(conn: sqlite3.Connection) -> None:
+    """device_profile.last_tz 추가(국가 분포용).
+
+    원시 이벤트는 보관기간이 지나면 지워지므로 tz 를 프로필에 굳혀 둬야
+    오래된 사용자도 국가 집계에 남는다.
+
+    워커 여러 개가 동시에 부팅하며 이 함수를 같이 실행한다. '컬럼 확인 후
+    ALTER' 사이에 잠금이 없어 둘 다 ALTER 에 도달할 수 있으므로, 진 쪽의
+    duplicate column 에러는 정상 경로로 취급한다(startup 에서 죽으면
+    gunicorn 마스터 전체가 내려간다).
+    """
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(device_profile)")}
+    if "last_tz" not in columns:
+        try:
+            conn.execute("ALTER TABLE device_profile ADD COLUMN last_tz TEXT")
+        except sqlite3.OperationalError as exc:
+            if "duplicate column" not in str(exc).lower():
+                raise
+    # 백필은 매 부팅 멱등 실행. ALTER 는 autocommit 이라 백필 커밋 전에
+    # 프로세스가 죽을 수 있는데, '컬럼 존재'를 완료 마커로 쓰면 그 유실이
+    # 영구가 된다. 비어 있는 행만 채우니 반복 실행해도 싸고 안전하다.
+    conn.execute(
+        """
+        UPDATE device_profile SET last_tz = (
+            SELECT e.tz FROM events e
+            WHERE e.anon_id = device_profile.anon_id
+              AND e.tz IS NOT NULL AND e.tz <> ''
+            ORDER BY e.ts_server DESC LIMIT 1
+        )
+        WHERE last_tz IS NULL
+          AND EXISTS (
+            SELECT 1 FROM events e
+            WHERE e.anon_id = device_profile.anon_id
+              AND e.tz IS NOT NULL AND e.tz <> ''
+          )
+        """
+    )
 
 
 def utc_now() -> datetime:
