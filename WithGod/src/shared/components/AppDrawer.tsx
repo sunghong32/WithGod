@@ -42,7 +42,8 @@ export const DRAWER_WIDTH = Math.min(320, Math.round(SCREEN_WIDTH * 0.82));
 
 const IS_ANDROID = Platform.OS === "android";
 const OPEN_MS = 280;
-const CLOSE_MS = 240;
+// 닫힘은 조금 더 짧게 — 사용자는 이미 "닫겠다"고 결정한 상태라 기다림이 거슬린다.
+const CLOSE_MS = 210;
 /**
  * 이 폭 안에서 시작한 가로 스와이프만 드로어를 연다(화면 스크롤과 충돌 방지).
  *
@@ -52,6 +53,14 @@ const CLOSE_MS = 240;
  * 넘겨받는 폭과 감지 폭을 같은 값으로 맞춘다.
  */
 const EDGE_HIT_WIDTH = IS_ANDROID ? 40 : 24;
+/**
+ * 화면 상단 이 높이(안전영역 제외)까지는 엣지 스와이프로 선점하지 않는다.
+ *
+ * 헤더 좌측의 메뉴(☰) 버튼이 엣지 폭 안에 들어와 있어서, 여기까지 터치 다운에
+ * 선점해 버리면 **버튼이 눌리지 않는다**(실측). 헤더에서 가로로 끄는 동작은
+ * 움직임 기반 판정이 대신 받아주므로 손해가 없다.
+ */
+const EDGE_TOP_EXCLUDE = 72;
 /** 손을 뗐을 때 열림/닫힘을 가르는 지점 */
 const SNAP_RATIO = 0.4;
 /**
@@ -111,6 +120,9 @@ export function AppDrawer({
   // 뒤로가기 핸들러에서 읽어야 해서 ref 로도 들고 있는다(핸들러는 한 번만 등록된다)
   const isHomeRef = useRef(swipeEnabled);
   isHomeRef.current = swipeEnabled;
+  // 헤더(메뉴 버튼이 있는 영역)의 아래 경계. 제스처 핸들러에서 읽어야 해서 ref.
+  const edgeTopRef = useRef(0);
+  edgeTopRef.current = insets.top + EDGE_TOP_EXCLUDE;
 
   const markVisible = useCallback((visible: boolean) => {
     if (isVisibleRef.current === visible) return;
@@ -128,7 +140,10 @@ export function AppDrawer({
       Animated.timing(translateX, {
         toValue,
         duration: opening ? OPEN_MS : CLOSE_MS,
-        easing: opening ? Easing.out(Easing.cubic) : Easing.in(Easing.cubic),
+        // 열 때도 닫을 때도 **처음에 빠르고 끝에서 감속**한다.
+        // 닫힘에 Easing.in 을 쓰면 손을 뗀 직후 거의 안 움직여 "멈칫"하는
+        // 느낌을 준다(사용자 지적). 제스처의 기세를 이어받으려면 out 이어야 한다.
+        easing: Easing.out(Easing.cubic),
         useNativeDriver: true,
       }).start(({ finished }) => {
         if (!finished) return;
@@ -193,7 +208,14 @@ export function AppDrawer({
           // 수준이라 그 사이 ScrollView 의 네이티브 제스처 인식기가 터치를
           // 가져가고, 한번 넘어가면 되찾을 수 없다(iOS 에서 특히 심하다).
           // 엣지 폭이 좁아(24~40dp) 그 안의 탭·세로 스크롤을 포기해도 손해가 적다.
-          return isHomeRef.current && evt.nativeEvent.pageX <= EDGE_HIT_WIDTH;
+          //
+          // 단, **헤더는 제외한다.** 좌측 메뉴(☰) 버튼이 엣지 폭 안에 있어서
+          // 여기까지 선점하면 버튼이 눌리지 않는다.
+          return (
+            isHomeRef.current &&
+            evt.nativeEvent.pageX <= EDGE_HIT_WIDTH &&
+            evt.nativeEvent.pageY > edgeTopRef.current
+          );
         },
         onMoveShouldSetPanResponderCapture: (evt, gesture) => {
           // 임계값을 낮게 잡아 **최대한 일찍** 선점한다. 늦게 잡으면 첫 엣지
