@@ -81,7 +81,7 @@ const displayTitle = (entry: HistoryEntry): string =>
 
 export function HistorySidebar({ onSelect }: HistorySidebarProps) {
   useTranslation(); // 언어 변경 시 다시 그리기
-  const { insets } = useSafeAreaPadding();
+  const { insets, headerPaddingTop } = useSafeAreaPadding();
   const { data: entries = [], refetch } = useHistory();
   const removeEntry = useRemoveHistoryEntry();
   const renameEntry = useRenameHistoryEntry();
@@ -177,7 +177,7 @@ export function HistorySidebar({ onSelect }: HistorySidebarProps) {
   };
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top + 8 }]}>
+    <View style={[styles.root, { paddingTop: headerPaddingTop }]}>
       <View style={styles.topBar}>
         {searching ? (
           <>
@@ -202,7 +202,7 @@ export function HistorySidebar({ onSelect }: HistorySidebarProps) {
               accessibilityRole="button"
               accessibilityLabel={t("common.cancel")}
             >
-              <Ionicons name="close" size={20} color="#6B7280" />
+              <Ionicons name="close" size={24} color="#6B7280" />
             </TouchableOpacity>
           </>
         ) : (
@@ -216,7 +216,7 @@ export function HistorySidebar({ onSelect }: HistorySidebarProps) {
               accessibilityRole="button"
               accessibilityLabel={t("history.searchA11y")}
             >
-              <Ionicons name="search" size={20} color="#1E2939" />
+              <Ionicons name="search" size={24} color="#1E2939" />
             </TouchableOpacity>
           </>
         )}
@@ -317,11 +317,15 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#F7F8FA",
   },
+  // 앱의 다른 화면 헤더와 같은 리듬을 쓴다.
+  // paddingTop(insets.top+12) 는 root 가 갖고, 여기서 40 높이 + 하단 16 을 맞춰
+  // 검색 아이콘의 세로 중심이 홈 헤더 아이콘과 정확히 같은 위치에 오게 한다.
   topBar: {
+    height: 40,
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 16,
-    paddingBottom: 10,
+    paddingHorizontal: 20,
+    marginBottom: 16,
     gap: 8,
   },
   topSpacer: {
@@ -351,7 +355,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   listContent: {
-    paddingHorizontal: 8,
+    paddingHorizontal: 8,   // 항목 자체 padding 12 와 합쳐 실효 20
     paddingBottom: 16,
   },
   group: {
@@ -396,7 +400,7 @@ const styles = StyleSheet.create({
   footer: {
     borderTopWidth: 1,
     borderTopColor: "rgba(0, 0, 0, 0.06)",
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
     paddingTop: 12,
   },
   clearButton: {
