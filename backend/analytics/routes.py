@@ -101,6 +101,44 @@ def breakdown(days: int = Query(default=30, ge=1, le=180)) -> dict[str, Any]:
     return queries.get_breakdown(_db_path(), days=days)
 
 
+@router.get("/admin/analytics/languages", dependencies=[Depends(require_analytics_admin)], tags=["analytics"])
+def languages_by_country() -> dict[str, Any]:
+    """국가별 **앱 언어 설정** 분포.
+
+    지표(events)에는 언어가 없다 — 개인정보 최소 수집 원칙으로 tz·플랫폼·버전만
+    받기 때문이다. 대신 푸시 등록 기기에는 발송 언어가 저장돼 있어 그걸 집계한다.
+    따라서 **알림을 켠 사용자만** 집계된다(전체 사용자가 아님).
+    """
+    from analytics.tz_country import country_for_tz
+
+    try:
+        # 지연 임포트 — analytics 가 app 을 임포트하면 순환이 된다.
+        from app import _notification_manager
+
+        devices = _notification_manager().list_devices()
+    except Exception:
+        return {"countries": [], "source": "push_devices", "note": "기기 목록을 읽을 수 없음"}
+
+    agg: dict[str, dict[str, int]] = {}
+    for d in devices:
+        country = country_for_tz(d.get("timezone")) or "unknown"
+        lang = (d.get("language") or "unknown").lower()
+        agg.setdefault(country, {})
+        agg[country][lang] = agg[country].get(lang, 0) + 1
+    countries = [
+        {
+            "key": c,
+            "devices": sum(langs.values()),
+            "languages": [
+                {"key": l, "devices": n}
+                for l, n in sorted(langs.items(), key=lambda kv: (-kv[1], kv[0]))
+            ],
+        }
+        for c, langs in sorted(agg.items(), key=lambda kv: -sum(kv[1].values()))
+    ]
+    return {"countries": countries, "source": "push_devices"}
+
+
 @router.post("/admin/analytics/rollup", dependencies=[Depends(require_analytics_admin)], tags=["analytics"])
 def trigger_rollup() -> dict[str, Any]:
     """수동 롤업. 스케줄러가 도는 중에도 안전하다(같은 값을 다시 굳힐 뿐)."""

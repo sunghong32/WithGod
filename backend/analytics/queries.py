@@ -234,4 +234,47 @@ def get_breakdown(db_path: str, days: int = 30, now: datetime | None = None) -> 
                 country_users.items(), key=lambda item: (-item[1], item[0])
             )
         ]
-    return {"platforms": platforms, "app_versions": versions, "countries": countries}
+        # 국가별 퍼널 — 앱을 연 사람 중 실제로 상담을 시작한 비율.
+        # "어느 나라 사용자가 들어왔다가 그냥 나가는가"를 보려는 지표다.
+        funnel_raw: dict[str, dict[str, int]] = {}
+        for row in conn.execute(
+            """
+            SELECT p.last_tz AS tz,
+                   COUNT(DISTINCT p.anon_id) AS users,
+                   COUNT(DISTINCT CASE WHEN e.name = 'screen_view'
+                                       THEN e.anon_id END) AS home,
+                   COUNT(DISTINCT CASE WHEN e.name = 'mood_submit'
+                                       THEN e.anon_id END) AS mood
+            FROM device_profile p
+            JOIN daily_active a ON a.anon_id = p.anon_id
+            LEFT JOIN events e
+                   ON e.anon_id = p.anon_id AND e.day BETWEEN ? AND ?
+            WHERE a.day BETWEEN ? AND ?
+            GROUP BY p.last_tz
+            """,
+            (start, today, start, today),
+        ):
+            c = country_for_tz(row["tz"]) or "unknown"
+            acc = funnel_raw.setdefault(c, {"users": 0, "home": 0, "mood": 0})
+            acc["users"] += row["users"]
+            acc["home"] += row["home"]
+            acc["mood"] += row["mood"]
+        country_funnel = [
+            {
+                "key": c,
+                "users": v["users"],
+                "home": v["home"],
+                "mood": v["mood"],
+                # 앱을 연 사람 대비 상담을 시작한 비율(%)
+                "rate": round(v["mood"] * 100 / v["users"], 1) if v["users"] else 0.0,
+            }
+            for c, v in sorted(
+                funnel_raw.items(), key=lambda kv: (-kv[1]["users"], kv[0])
+            )
+        ]
+    return {
+        "platforms": platforms,
+        "app_versions": versions,
+        "countries": countries,
+        "country_funnel": country_funnel,
+    }

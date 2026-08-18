@@ -7,18 +7,22 @@ import {
   UnauthorizedError,
   fetchBreakdown,
   fetchEvents,
+  fetchLanguages,
   fetchOverview,
   fetchRetention,
   fetchTimeseries,
   type Breakdown,
   type DailyPoint,
   type EventCount,
+  type LanguageBreakdown,
   type Overview,
   type Retention,
 } from "@/lib/analytics";
 
 import { ActiveUsersChart } from "./components/ActiveUsersChart";
 import { AppVersionControl } from "./components/AppVersionControl";
+import { CountryFunnel } from "./components/CountryFunnel";
+import { LanguageByCountry } from "./components/LanguageByCountry";
 import { LanguageControl } from "./components/LanguageControl";
 import { BreakdownList } from "./components/BreakdownList";
 import { ChartCard } from "./components/ChartCard";
@@ -36,6 +40,7 @@ interface DashboardData {
   retention: Retention;
   events: EventCount[];
   breakdown: Breakdown;
+  languages: LanguageBreakdown | null;
 }
 
 // 국가 코드(ISO 3166-1 alpha-2) → "🇰🇷 대한민국". 이름은 브라우저 로케일
@@ -78,7 +83,7 @@ export function Dashboard() {
       setLoading(true);
       setError("");
       try {
-        const [overview, timeseries, retention, events, breakdown] =
+        const [overview, timeseries, retention, events, breakdown, languages] =
           await Promise.all([
             fetchOverview(),
             fetchTimeseries(days),
@@ -87,6 +92,8 @@ export function Dashboard() {
             fetchRetention(Math.min(90, days + 31)),
             fetchEvents(days),
             fetchBreakdown(days),
+            // 구버전 백엔드에는 없는 경로라 실패해도 대시보드 전체를 막지 않는다.
+            fetchLanguages().catch(() => null),
           ]);
         setData({
           overview,
@@ -94,6 +101,7 @@ export function Dashboard() {
           retention,
           events: events.events,
           breakdown,
+          languages,
         });
       } catch (caught) {
         if (caught instanceof UnauthorizedError) {
@@ -270,7 +278,29 @@ export function Dashboard() {
                       users: item.users,
                     }))}
                   />
+                  <LanguageByCountry
+                    data={data.languages}
+                    label={countryLabel}
+                  />
                 </div>
+                <p className="mt-4 text-[11px] leading-relaxed text-[var(--text-muted)]">
+                  국가는 <strong>기기 타임존</strong>으로 추정한다. IP 를 쓰지 않는
+                  이유는 개인정보 수집을 늘리지 않기 위해서다. 타임존이{" "}
+                  <code>Etc/UTC</code> 처럼 지역을 알 수 없는 값이거나 비어 있으면
+                  <strong> 알 수 없음</strong>으로 잡힌다 — 대부분 에뮬레이터·개발
+                  기기이거나 사용자가 타임존을 수동으로 UTC 로 둔 경우다.
+                </p>
+              </ChartCard>
+
+              <ChartCard
+                title="국가별 전환"
+                subtitle={`최근 ${range}일 · 앱을 연 사람 중 상담을 시작한 비율`}
+              >
+                <CountryFunnel
+                  title="국가별 퍼널"
+                  rows={data.breakdown.country_funnel ?? []}
+                  label={countryLabel}
+                />
               </ChartCard>
             </div>
 

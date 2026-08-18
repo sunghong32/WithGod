@@ -56,6 +56,25 @@ export interface Breakdown {
   // 기기 타임존으로 추정한 국가(ISO 3166-1 alpha-2, 모르면 "unknown").
   // 백엔드가 구버전이면 빠져 있을 수 있다.
   countries?: { key: string; users: number }[];
+  /** 국가별 퍼널 — 앱을 연 사용자 중 상담을 시작한 비율. 구버전 백엔드는 없다. */
+  country_funnel?: {
+    key: string;
+    users: number;
+    home: number;
+    mood: number;
+    rate: number;
+  }[];
+}
+
+/** 국가별 앱 언어 설정. 지표에 언어가 없어 **푸시 등록 기기**로만 집계된다. */
+export interface LanguageBreakdown {
+  countries: {
+    key: string;
+    devices: number;
+    languages: { key: string; devices: number }[];
+  }[];
+  source?: string;
+  note?: string;
 }
 
 export class UnauthorizedError extends Error {}
@@ -86,3 +105,5 @@ export const fetchEvents = (days: number) =>
 
 export const fetchBreakdown = (days: number) =>
   request<Breakdown>(`breakdown?days=${days}`);
+
+export const fetchLanguages = () => request<LanguageBreakdown>("languages");

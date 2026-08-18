@@ -16,6 +16,7 @@ const ALLOWED_METRICS = new Set([
   "retention",
   "events",
   "breakdown",
+  "languages",
 ]);
 
 const ALLOWED_PARAMS = new Set(["days", "cohorts"]);
