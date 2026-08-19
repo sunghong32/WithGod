@@ -75,6 +75,10 @@ export interface LanguageBreakdown {
   }[];
   source?: string;
   note?: string;
+  /** 집계 기간(일). 국가 분포 카드와 같은 창을 쓴다. */
+  days?: number;
+  /** 그 기간에 앱을 열지 않아 제외된 등록 기기 수 */
+  inactive_devices?: number;
 }
 
 export class UnauthorizedError extends Error {}
@@ -106,4 +110,5 @@ export const fetchEvents = (days: number) =>
 export const fetchBreakdown = (days: number) =>
   request<Breakdown>(`breakdown?days=${days}`);
 
-export const fetchLanguages = () => request<LanguageBreakdown>("languages");
+export const fetchLanguages = (days: number) =>
+  request<LanguageBreakdown>(`languages?days=${days}`);

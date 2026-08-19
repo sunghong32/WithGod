@@ -93,7 +93,7 @@ export function Dashboard() {
             fetchEvents(days),
             fetchBreakdown(days),
             // 구버전 백엔드에는 없는 경로라 실패해도 대시보드 전체를 막지 않는다.
-            fetchLanguages().catch(() => null),
+            fetchLanguages(days).catch(() => null),
           ]);
         setData({
           overview,

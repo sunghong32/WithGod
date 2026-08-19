@@ -178,6 +178,25 @@ def get_event_counts(db_path: str, days: int = 7, now: datetime | None = None) -
         ]
 
 
+def active_anon_ids(db_path: str, days: int = 30, now: datetime | None = None) -> set[str]:
+    """최근 N일에 활동한 사용자의 anon_id 집합.
+
+    국가·플랫폼 분포가 쓰는 것과 **같은 조건**이다. 푸시 기기 목록처럼 다른
+    저장소를 집계할 때 모집단을 여기에 맞추면 카드끼리 숫자가 어긋나지 않는다.
+    """
+    now = now or utc_now()
+    today = service_day(now)
+    start = _shift(today, -(days - 1))
+    with session(db_path) as conn:
+        return {
+            row["anon_id"]
+            for row in conn.execute(
+                "SELECT DISTINCT anon_id FROM daily_active WHERE day BETWEEN ? AND ?",
+                (start, today),
+            )
+        }
+
+
 def get_breakdown(db_path: str, days: int = 30, now: datetime | None = None) -> dict[str, Any]:
     """최근 활동한 사용자의 플랫폼·앱 버전·국가 분포."""
     now = now or utc_now()

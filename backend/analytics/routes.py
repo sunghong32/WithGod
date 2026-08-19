@@ -102,12 +102,21 @@ def breakdown(days: int = Query(default=30, ge=1, le=180)) -> dict[str, Any]:
 
 
 @router.get("/admin/analytics/languages", dependencies=[Depends(require_analytics_admin)], tags=["analytics"])
-def languages_by_country() -> dict[str, Any]:
+def languages_by_country(days: int = Query(default=30, ge=1, le=180)) -> dict[str, Any]:
     """국가별 **앱 언어 설정** 분포.
 
     지표(events)에는 언어가 없다 — 개인정보 최소 수집 원칙으로 tz·플랫폼·버전만
     받기 때문이다. 대신 푸시 등록 기기에는 발송 언어가 저장돼 있어 그걸 집계한다.
-    따라서 **알림을 켠 사용자만** 집계된다(전체 사용자가 아님).
+
+    **국가 분포 카드와 같은 모집단(최근 N일 활동 사용자)으로 맞춘다.** 기기 목록은
+    누적이라 그대로 세면 앱을 몇 달째 안 여는 사람까지 들어가 옆 카드와 숫자가
+    어긋난다. device_store.device_id 와 지표의 anon_id 는 앱에서 같은
+    getOrCreateDeviceId() 값을 쓰므로 조인할 수 있다.
+
+    (device_store 의 updated_at 은 **푸시를 보낼 때마다** 갱신되므로 활동 여부의
+    근거가 못 된다 — 그래서 daily_active 로 거른다.)
+
+    여전히 **알림을 켠 사용자만** 집계된다는 한계는 남는다.
     """
     from analytics.tz_country import country_for_tz
 
@@ -119,8 +128,14 @@ def languages_by_country() -> dict[str, Any]:
     except Exception:
         return {"countries": [], "source": "push_devices", "note": "기기 목록을 읽을 수 없음"}
 
+    active = queries.active_anon_ids(_db_path(), days=days)
+
     agg: dict[str, dict[str, int]] = {}
+    skipped = 0
     for d in devices:
+        if d.get("device_id") not in active:
+            skipped += 1
+            continue
         country = country_for_tz(d.get("timezone")) or "unknown"
         lang = (d.get("language") or "unknown").lower()
         agg.setdefault(country, {})
@@ -136,7 +151,13 @@ def languages_by_country() -> dict[str, Any]:
         }
         for c, langs in sorted(agg.items(), key=lambda kv: -sum(kv[1].values()))
     ]
-    return {"countries": countries, "source": "push_devices"}
+    return {
+        "countries": countries,
+        "source": "push_devices",
+        "days": days,
+        # 최근 N일에 앱을 열지 않아 제외된 등록 기기 수(누적과의 차이).
+        "inactive_devices": skipped,
+    }
 
 
 @router.post("/admin/analytics/rollup", dependencies=[Depends(require_analytics_admin)], tags=["analytics"])

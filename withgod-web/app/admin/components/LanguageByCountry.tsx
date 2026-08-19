@@ -32,6 +32,11 @@ export function LanguageByCountry({ data, label }: LanguageByCountryProps) {
     <div>
       <h3 className="text-xs font-medium text-[var(--text-secondary)]">
         국가별 앱 언어 설정
+        {data?.days ? (
+          <span className="ml-1 font-normal text-[var(--text-muted)]">
+            (최근 {data.days}일 활동)
+          </span>
+        ) : null}
       </h3>
       {rows.length === 0 ? (
         <p className="mt-3 text-xs text-[var(--text-muted)]">
@@ -57,9 +62,13 @@ export function LanguageByCountry({ data, label }: LanguageByCountryProps) {
         </ul>
       )}
       <p className="mt-3 text-[11px] leading-relaxed text-[var(--text-muted)]">
-        지표에는 언어를 수집하지 않아(개인정보 최소 수집) <strong>알림을 켠 기기</strong>
-        만 집계된다. 특정 국가 사용자가 그 나라 언어를 실제로 쓰는지 확인해 새 언어
-        추가 여부를 판단하는 용도다.
+        지표에는 언어를 수집하지 않아(개인정보 최소 수집){" "}
+        <strong>알림을 켠 기기</strong>만 집계된다. 왼쪽 국가 분포와 같은 기간·같은
+        사용자를 세도록 맞췄다
+        {typeof data?.inactive_devices === "number" && data.inactive_devices > 0 ? (
+          <> — 그 기간에 앱을 열지 않은 등록 기기 {data.inactive_devices}대는 제외했다</>
+        ) : null}
+        . 그래도 알림을 끈 사용자는 잡히지 않으므로 국가별 사용자 수보다 적을 수 있다.
       </p>
     </div>
   );
