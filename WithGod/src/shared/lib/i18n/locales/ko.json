@@ -3,7 +3,8 @@
     "appName": "신과함께",
     "cancel": "취소",
     "close": "닫기",
-    "ok": "확인"
+    "ok": "확인",
+    "exitConfirm": "한 번 더 누르면 종료됩니다"
   },
   "splash": {
     "logoA11y": "신과함께 앱 로고",

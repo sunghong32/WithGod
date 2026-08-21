@@ -15,8 +15,10 @@ import {
   PanResponder,
   Platform,
   StyleSheet,
+  ToastAndroid,
   View,
 } from "react-native";
+import { t } from "@/shared/lib/i18n";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { setLeftEdgeGestureExclusion } from "../../../modules/gesture-exclusion";
 
@@ -78,6 +80,17 @@ const EDGE_TOP_EXCLUDE = 72;
 /** 손을 뗐을 때 열림/닫힘을 가르는 지점 */
 const SNAP_RATIO = 0.4;
 /**
+ * 열려 있을 때 덮인 화면을 "눌렀다"고 볼 가로 이동 한계(dp).
+ *
+ * **세로로 얼마나 흔들렸는지는 보지 않는다.** 손가락 탭은 세로로 쉽게 몇 dp 씩
+ * 흔들리는데, 예전처럼 세로까지 6dp 안쪽을 요구하면 그 탭이 '드래그'로 분류되고
+ * 스냅 계산이 도로 열림을 골라 **탭해도 안 닫힌다**(사용자 지적, 에뮬레이터에서
+ * 세로 8dp 흔들림으로 재현). 덮인 화면 위 제스처는 어차피 '닫기' 말고 할 일이 없다.
+ */
+const DISMISS_TAP_DX = 16;
+/** 홈에서 뒤로가기를 두 번 눌러야 앱이 꺼지게 하는 간격(ms) */
+const EXIT_CONFIRM_MS = 2000;
+/**
  * iOS: 밀려난 메인 화면의 모서리 둥글기.
  *
  * **기기 화면 자체의 둥근 모서리와 같은 크기**로 맞춘다. 그래야 화면이 통째로
@@ -137,6 +150,9 @@ export function AppDrawer({
   // 헤더(메뉴 버튼이 있는 영역)의 아래 경계. 제스처 핸들러에서 읽어야 해서 ref.
   const edgeTopRef = useRef(0);
   edgeTopRef.current = insets.top + EDGE_TOP_EXCLUDE;
+
+  // 홈에서 뒤로가기를 마지막으로 눌러 종료 안내를 띄운 시각
+  const exitPromptAtRef = useRef(0);
 
   const markVisible = useCallback((visible: boolean) => {
     if (isVisibleRef.current === visible) return;
@@ -199,7 +215,16 @@ export function AppDrawer({
       // router.canGoBack() 으로 판단하면 안 된다 — 홈인데도 참을 돌려주는 경우가
       // 있고, 그때 기본 동작에 맡기면 홈까지 팝돼 빈 화면이 남는다.
       if (isHomeRef.current) {
-        BackHandler.exitApp();
+        // **한 번에 끄지 않는다.** 좌측 엣지 스와이프는 화면 하단 200dp 밖에서는
+        // OS 가 시스템 뒤로가기로 가져가는데(제외 영역 상한), 그러면 사이드바를
+        // 열려던 손짓이 그대로 앱 종료가 된다. 두 번 눌러야 꺼지게 해 사고를 막는다.
+        const now = Date.now();
+        if (now - exitPromptAtRef.current < EXIT_CONFIRM_MS) {
+          BackHandler.exitApp();
+          return true;
+        }
+        exitPromptAtRef.current = now;
+        ToastAndroid.show(t("common.exitConfirm"), ToastAndroid.SHORT);
         return true;
       }
       return false;
@@ -282,10 +307,11 @@ export function AppDrawer({
           if (next > 0) markVisible(true);
         },
         onPanResponderRelease: (_evt, gesture) => {
-          const { dx, dy } = offsetFromGrant(gesture);
-          // 사실상 움직임이 없었으면 탭이다 → 제자리로 돌아오며 닫는다
-          if (Math.abs(dx) < 6 && Math.abs(dy) < 6) {
-            if (isOpenRef.current) close();
+          const { dx } = offsetFromGrant(gesture);
+          // 열려 있는데 가로로 거의 안 움직였으면 덮인 화면을 '누른' 것이다 → 닫는다.
+          // 세로 흔들림은 따지지 않는다(위 DISMISS_TAP_DX 설명).
+          if (isOpenRef.current && Math.abs(dx) < DISMISS_TAP_DX) {
+            close();
             return;
           }
           const base = isOpenRef.current ? DRAWER_WIDTH : 0;

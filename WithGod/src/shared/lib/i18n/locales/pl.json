@@ -3,7 +3,8 @@
     "appName": "WithGod",
     "cancel": "Anuluj",
     "close": "Zamknij",
-    "ok": "OK"
+    "ok": "OK",
+    "exitConfirm": "Naciśnij ponownie, aby wyjść"
   },
   "splash": {
     "logoA11y": "Logo aplikacji WithGod",
