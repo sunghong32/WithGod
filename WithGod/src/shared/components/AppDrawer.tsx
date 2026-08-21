@@ -45,7 +45,11 @@ const OPEN_MS = 280;
 // 닫힘은 조금 더 짧게 — 사용자는 이미 "닫겠다"고 결정한 상태라 기다림이 거슬린다.
 const CLOSE_MS = 210;
 /**
- * 이 폭 안에서 시작한 가로 스와이프만 드로어를 연다(화면 스크롤과 충돌 방지).
+ * 좌측 엣지 — **손이 닿는 즉시** 드로어가 선점하는 구간.
+ *
+ * 드로어는 화면 어디서 밀어도 열리지만(아래 OPEN_ANYWHERE_*), 엣지만은 움직임을
+ * 기다리지 않고 터치 다운에 바로 가져간다. 스크롤 뷰의 네이티브 인식기와 경쟁하는
+ * 구간이라 한 프레임만 늦어도 뺏기기 때문이다.
  *
  * 안드로이드는 제스처 내비게이션에서 화면 맨 왼쪽 약 20dp 를 시스템 뒤로가기가
  * 가져가는데, [[gesture-exclusion]] 네이티브 모듈로 그 구간을 넘겨받아
@@ -53,6 +57,16 @@ const CLOSE_MS = 210;
  * 넘겨받는 폭과 감지 폭을 같은 값으로 맞춘다.
  */
 const EDGE_HIT_WIDTH = IS_ANDROID ? 40 : 24;
+/**
+ * 엣지 밖에서 시작한 스와이프를 드로어로 인정하는 기준 (ChatGPT·Claude 앱처럼
+ * 화면 아무 데서나 밀어도 열리게 하는 부분).
+ *
+ * 엣지보다 **엄격하게** 잡는다. 세로 스크롤 중의 손떨림이나 버튼 위 미세한
+ * 드래그까지 가져가면 화면이 제멋대로 밀리기 때문이다. 가로 이동이 세로의
+ * 2배를 넘고, 12dp 이상 움직였을 때만 드로어가 받는다.
+ */
+const OPEN_ANYWHERE_DX = 12;
+const OPEN_ANYWHERE_RATIO = 2;
 /**
  * 화면 상단 이 높이(안전영역 제외)까지는 엣지 스와이프로 선점하지 않는다.
  *
@@ -193,6 +207,15 @@ export function AppDrawer({
     return () => sub.remove();
   }, [close]);
 
+  const grantRef = useRef({ dx: 0, dy: 0 });
+  const offsetFromGrant = useCallback(
+    (gesture: { dx: number; dy: number }) => ({
+      dx: gesture.dx - grantRef.current.dx,
+      dy: gesture.dy - grantRef.current.dy,
+    }),
+    [],
+  );
+
   const panResponder = useMemo(
     () =>
       PanResponder.create({
@@ -218,46 +241,55 @@ export function AppDrawer({
           );
         },
         onMoveShouldSetPanResponderCapture: (evt, gesture) => {
-          // 임계값을 낮게 잡아 **최대한 일찍** 선점한다. 늦게 잡으면 첫 엣지
+          const absDx = Math.abs(gesture.dx);
+          const absDy = Math.abs(gesture.dy);
+          // 열려 있으면 화면 어디서든 왼쪽 스와이프로 닫는다(홈이 아니어도).
+          if (isOpenRef.current) {
+            return gesture.dx < 0 && absDx > absDy * 1.2 && absDx > 3;
+          }
+          if (!swipeEnabled) return false;
+          // **스와이프가 시작된 지점**으로 판단한다. evt 의 pageX 는 지금 손가락
+          // 위치라 이동한 만큼(dx) 빼야 시작점이 나온다 — 그냥 pageX 를 쓰면
+          // 엣지에서 시작한 스와이프도 몇 px 만 움직이면 엣지 밖으로 읽힌다.
+          const startX = evt.nativeEvent.pageX - gesture.dx;
+          const fromEdge = startX <= EDGE_HIT_WIDTH;
+          // 엣지는 임계값을 낮게 잡아 **최대한 일찍** 선점한다. 늦게 잡으면 첫 엣지
           // 스와이프를 네이티브 엣지 제스처 인식기가 먼저 가져가 버린다
           // (콜드 스타트 후 첫 스와이프만 실패하던 증상).
-          const horizontal =
-            Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.2 &&
-            Math.abs(gesture.dx) > 3;
-          if (!horizontal) return false;
-          // 열려 있으면 화면 어디서든 왼쪽 스와이프로 닫는다(홈이 아니어도).
-          if (isOpenRef.current) return gesture.dx < 0;
-          // 닫혀 있으면 왼쪽 가장자리에서 시작한 오른쪽 스와이프만 연다.
-          if (!swipeEnabled) return false;
-          return gesture.dx > 0 && evt.nativeEvent.pageX <= EDGE_HIT_WIDTH;
+          // 엣지 밖은 세로 스크롤을 뺏지 않도록 더 엄격하게 본다.
+          const minDx = fromEdge ? 3 : OPEN_ANYWHERE_DX;
+          const minRatio = fromEdge ? 1.2 : OPEN_ANYWHERE_RATIO;
+          return gesture.dx > minDx && absDx > absDy * minRatio;
+        },
+        // 드로어가 제스처를 넘겨받은 순간의 이동량. 화면 중간에서 시작한
+        // 스와이프는 12dp 쯤 움직인 뒤에야 넘어오는데, 그 값을 그대로 쓰면
+        // 사이드바가 그만큼 **툭 튀어나온다**. 넘겨받은 시점을 0 으로 잡는다.
+        onPanResponderGrant: (_evt, gesture) => {
+          grantRef.current = { dx: gesture.dx, dy: gesture.dy };
         },
         onPanResponderMove: (_evt, gesture) => {
+          const { dx, dy } = offsetFromGrant(gesture);
           const base = isOpenRef.current ? DRAWER_WIDTH : 0;
           // 엣지에서 손을 댔지만 세로로 끄는 중이면 드로어를 움직이지 않는다.
           // (터치 다운에 선점하므로 세로 제스처도 우리에게 들어온다)
-          if (
-            base === 0 &&
-            Math.abs(gesture.dy) > Math.abs(gesture.dx) * 1.2
-          ) {
+          if (base === 0 && Math.abs(dy) > Math.abs(dx) * 1.2) {
             return;
           }
-          const next = Math.min(DRAWER_WIDTH, Math.max(0, base + gesture.dx));
+          const next = Math.min(DRAWER_WIDTH, Math.max(0, base + dx));
           translateX.setValue(next);
           // 손가락으로 살짝 끌어낸 순간부터 사이드바를 '보이는' 상태로 친다.
           // 모서리도 이때 곧바로 완전히 둥글어진다(서서히 둥글어지지 않는다).
           if (next > 0) markVisible(true);
         },
         onPanResponderRelease: (_evt, gesture) => {
+          const { dx, dy } = offsetFromGrant(gesture);
           // 사실상 움직임이 없었으면 탭이다 → 제자리로 돌아오며 닫는다
-          if (Math.abs(gesture.dx) < 6 && Math.abs(gesture.dy) < 6) {
+          if (Math.abs(dx) < 6 && Math.abs(dy) < 6) {
             if (isOpenRef.current) close();
             return;
           }
           const base = isOpenRef.current ? DRAWER_WIDTH : 0;
-          const current = Math.min(
-            DRAWER_WIDTH,
-            Math.max(0, base + gesture.dx),
-          );
+          const current = Math.min(DRAWER_WIDTH, Math.max(0, base + dx));
           // 빠르게 튕기면 위치와 무관하게 그 방향으로
           if (gesture.vx > 0.5) return open();
           if (gesture.vx < -0.5) return close();
@@ -266,7 +298,7 @@ export function AppDrawer({
         },
         onPanResponderTerminationRequest: () => false,
       }),
-    [close, markVisible, open, swipeEnabled, translateX],
+    [close, markVisible, offsetFromGrant, open, swipeEnabled, translateX],
   );
 
   const value = useMemo(
