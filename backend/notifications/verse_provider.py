@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+import hashlib
 import json
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 from typing import Callable
 from zoneinfo import ZoneInfo
@@ -11,6 +12,53 @@ from notifications.models import DailyVerse
 # 서버 OS 타임존(UTC 등)과 무관하게 '오늘'은 한국 시간 기준으로 계산한다.
 # 설정(push_default_timezone)을 쓰는 경로는 manager 가 normalize 된 now 를 넘겨준다.
 _DEFAULT_TZ = ZoneInfo("Asia/Seoul")
+
+# ── 절기 고정 배치 ────────────────────────────────────────────────
+# 평소에는 배열 순서대로 하루씩 돌지만(아래 index 계산), 아래 날짜에는 정해진 말씀을 낸다.
+# 회전 주기가 365일이 아니라서(=말씀 개수) 그냥 두면 성탄절에 축도가, 새해에 문장
+# 조각이 나오는 일이 생긴다. 고정한 말씀도 목록에 그대로 남아 있어 제 차례에 또 나온다.
+_FIXED_DATES: dict[tuple[int, int], str] = {
+    (1, 1): "jer-29-11",    # 새해 — 너희 장래에 소망을 주려 하는 생각이라
+    (12, 24): "isa-9-2",    # 성탄 전야 — 흑암에 행하던 백성이 큰 빛을 보고
+    (12, 25): "luk-2-14",   # 성탄절 — 땅에서는 기뻐하심을 입은 사람들 중에 평화로다
+}
+
+# 부활절은 해마다 옮겨 다녀서 계산한다(서방 교회 그레고리력 계산법).
+_EASTER_VERSE_ID = "job-19-25"  # 나의 구속자가 살아 계시니
+
+# 설날·추석은 음력이라 계산으로 얻을 수 없다. **검증된 날짜만 넣는다** —
+# 한국천문연구원 발표일을 확인해 {(연, 월, 일): verse_id} 로 채우면 그때부터 동작한다.
+# 추천: 설날 = "num-6-24"(아론의 축복), 추석 = "psa-128-2"(네 손이 수고한대로).
+# 비워 두어도 평소 회전으로 조용히 넘어간다 — 틀린 날짜를 넣는 것보다 낫다.
+_LUNAR_DATES: dict[tuple[int, int, int], str] = {}
+
+
+def _easter(year: int) -> date:
+    """그레고리력 부활절(익명 계산법). 2024~2028 실제 날짜로 대조 확인했다."""
+    a = year % 19
+    b, c = divmod(year, 100)
+    d, e = divmod(b, 4)
+    f = (b + 8) // 25
+    g = (b - f + 1) // 3
+    h = (19 * a + b - d - g + 15) % 30
+    i, k = divmod(c, 4)
+    ell = (32 + 2 * e + 2 * i - h - k) % 7
+    m = (a + 11 * h + 22 * ell) // 451
+    month, day = divmod(h + ell - 7 * m + 114, 31)
+    return date(year, month, day + 1)
+
+
+def fixed_verse_id(day: date) -> str | None:
+    """그 날짜에 고정된 말씀 id. 없으면 None."""
+    pinned = _LUNAR_DATES.get((day.year, day.month, day.day))
+    if pinned:
+        return pinned
+    pinned = _FIXED_DATES.get((day.month, day.day))
+    if pinned:
+        return pinned
+    if day == _easter(day.year):
+        return _EASTER_VERSE_ID
+    return None
 
 
 class DailyVerseProvider:
@@ -25,8 +73,14 @@ class DailyVerseProvider:
         # aware datetime 이 들어오면 그 타임존의 벽시계 날짜를 그대로 쓴다
         # (manager 가 push_default_timezone 으로 normalize 해서 넘겨준다).
         current = now if now is not None else datetime.now(_DEFAULT_TZ)
-        index = current.toordinal() % len(verses)
-        item = verses[index]
+        # 절기에 고정된 말씀이 있으면 그것을 먼저 쓴다. 목록에서 못 찾으면
+        # (말씀 목록이 바뀐 경우) 조용히 평소 회전으로 넘어간다.
+        item = None
+        pinned = fixed_verse_id(current.date())
+        if pinned:
+            item = next((v for v in verses if v.get("verse_id") == pinned), None)
+        if item is None:
+            item = verses[current.toordinal() % len(verses)]
         return DailyVerse(
             verse_id=str(item["verse_id"]),
             reference=str(item["reference"]),
@@ -72,6 +126,21 @@ class VerseInterpretationStore:
             return {}
 
 
+def _cache_key(verse: DailyVerse, lang: str) -> str:
+    """풀이 캐시 키. verse_id 만으로는 부족하다.
+
+    같은 verse_id 라도 본문이 바뀔 수 있다(합본 범위 조정, 서사 껍데기 제거 규칙 수정
+    등). 그때 예전 본문으로 쓴 풀이가 새 본문에 그대로 붙어 나가면 조용히 어긋난다.
+    실제로 목록을 457개로 교체할 때 `num-6-24` 가 민수기 6:24 에서 6:24-26(아론의
+    축복 전체)으로 바뀌었다. 그래서 본문 지문을 키에 섞어 본문이 달라지면 캐시가
+    저절로 무효가 되게 한다.
+    """
+    fingerprint = hashlib.sha256(verse.text.encode("utf-8")).hexdigest()[:8]
+    if lang == "ko":
+        return f"{verse.verse_id}:{fingerprint}"
+    return f"{verse.verse_id}:{lang}:{fingerprint}"
+
+
 class VerseInterpreter:
     """'오늘의 말씀 풀이'의 캐시 조회 → LLM 생성 → 폴백을 담당한다.
 
@@ -89,8 +158,7 @@ class VerseInterpreter:
         self._generate = generate_fn
 
     def interpret(self, verse: DailyVerse, lang: str = "ko") -> str:
-        # 캐시 키: 한국어는 기존 verse_id 그대로(하위호환), 그 외는 언어를 붙인다.
-        cache_key = verse.verse_id if lang == "ko" else f"{verse.verse_id}:{lang}"
+        cache_key = _cache_key(verse, lang)
         try:
             cached = self._store.get(cache_key)
         except Exception:

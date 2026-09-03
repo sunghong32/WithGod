@@ -512,17 +512,34 @@ def _call_openai_as_text(
 # ---------- 오늘의 말씀 '풀이'(LLM) ----------
 # 구절을 일상어로 부드럽게 풀어 주는 한국어 '풀이'를 생성한다.
 # verse_id 기준 파일 캐시(VerseInterpreter)와 결합되어 말씀당 최대 1회만 호출된다.
-_VERSE_INTERPRETATION_SYSTEM = """당신은 따뜻한 신앙 동반자입니다. 성경 구절을 일상어로 부드럽게 풀어 설명합니다.
+# 프롬프트를 고칠 때 알아 둘 것:
+# (1) 목록 457개 중 교훈이 276개다. 전부 위로하듯 풀면 「말이 많으면 허물을 면키
+#     어려우나」 같은 구절이 물러진다. 그래서 구절 성격에 따라 어조를 나눈다.
+# (2) 본문이 개역한글(1961)이라 '경외·긍휼·인자·명철·권고' 처럼 뜻이 바로 안 잡히는
+#     한자어가 자주 나온다. 풀이가 그걸 조용히 오늘 말로 바꿔 주는 것이 핵심 값이다.
+# (3) 가장 흔한 실패는 본문을 살짝 바꿔 다시 말하고 끝내는 것이다. 한 걸음을 더한다.
+_VERSE_INTERPRETATION_SYSTEM = """당신은 따뜻한 신앙 동반자입니다. 성경 구절을 오늘의 말로 풀어 건넵니다.
 
 규칙:
-- 반드시 한국어로만 씁니다.
-- 2문장 이내로 짧고 담백하게 풉니다.
-- '~말씀이에요', '~해도 괜찮아요' 처럼 부드럽고 다정한 종결로 건넵니다.
+- 반드시 한국어로만 씁니다. 2문장 이내로 짧고 담백하게 씁니다.
 - 제목, 따옴표, 구절 재인용 없이 '풀이 본문'만 출력합니다.
-- 훈계하듯 가르치지 말고, 곁에서 조용히 다독이듯 말합니다.
+- **본문을 살짝 바꿔 되풀이하지 않습니다.** 무슨 뜻인지 한 번 짚고, 오늘 붙잡을
+  것 하나를 더합니다.
+- 본문의 옛 한자어(경외, 긍휼, 인자, 명철, 권고, 정녕, 무릇 같은 말)는 풀이에서
+  오늘 쓰는 말로 바꿔 줍니다. 어려운 말을 그대로 옮기지 않습니다.
+- 구절에 없는 배경이나 이야기를 지어내지 않습니다. 주어진 본문 안에서만 풉니다.
 
-예시 톤:
-지친 하루의 짐을 혼자 지지 말라는 말씀이에요. 무거운 마음 그대로, 쉼을 주시는 분께 가져가면 돼요."""
+어조는 구절의 성격에 맞춥니다.
+- 아픔을 겪는 사람에게 건네는 위로의 구절이면, 다독이듯 부드럽게 씁니다.
+  ('~말씀이에요', '~해도 괜찮아요')
+- 살아가는 데 도움이 되는 통찰이나 권면이면, 훈계하지 말되 또렷하게 씁니다.
+  ('~라는 뜻이에요', '오늘 ~해 보면 어떨까요')
+
+예시(위로):
+지친 하루의 짐을 혼자 지지 말라는 말씀이에요. 무거운 마음 그대로, 쉼을 주시는 분께 가져가면 돼요.
+
+예시(교훈):
+말이 길어질수록 실수도 늘어난다는 뜻이에요. 오늘 한 번은 말을 얹기 전에 잠깐 멈춰 보면 어떨까요."""
 
 
 def _build_verse_interpretation_user_prompt(reference: str, text: str) -> str:
@@ -554,10 +571,14 @@ def _generate_verse_interpretation(reference: str, text: str, lang: str = "ko") 
         f"You are a warm companion in faith, writing ONLY in {name}. "
         "You gently explain Bible verses in everyday words.\n"
         "Rules:\n"
-        "- At most 2 short sentences, tender and plain.\n"
+        "- At most 2 short sentences, plain and unadorned.\n"
         "- No headings, no quotation marks, no re-quoting the verse — output the "
         "explanation only.\n"
-        "- Never lecture; speak like someone quietly comforting a friend."
+        "- Do NOT merely restate the verse. Say what it means, then add one "
+        "concrete thing to hold on to today.\n"
+        "- Do not inventbackground or story that is not in the verse itself.\n"
+        "- Match the verse: comfort verses get a gentle, consoling voice; "
+        "wisdom or exhortation gets a clear voice — never lecturing."
     )
     user = (
         f"Verse: {reference}\nText: {text}\n\n"
