@@ -95,9 +95,15 @@ def cmd_status(args) -> int:
     log = load_log()
     keep = sum(1 for r in log.values() if r["verdict"] == "keep")
     drop = sum(1 for r in log.values() if r["verdict"] == "drop")
-    left = len(cards) - len(log)
-    pct = len(log) / len(cards) * 100 if cards else 0
-    print(f"재검토 {len(log)}/{len(cards)} ({pct:.0f}%) — 통과 {keep} · 탈락 {drop} · 남음 {left}")
+    # apply 를 돌린 뒤에는 카드가 이미 걸러진 상태라 log 가 카드보다 많다.
+    # 그때는 진행률이 아니라 '반영 완료'를 보여준다.
+    unseen = [c for c in cards if c["reference"] not in log]
+    if not unseen and len(log) >= len(cards):
+        print(f"재검토 완료 — 판정 {len(log)}건(통과 {keep} · 탈락 {drop}) · 현재 카드 {len(cards)}개")
+    else:
+        pct = (len(cards) - len(unseen)) / len(cards) * 100 if cards else 0
+        print(f"재검토 {len(cards) - len(unseen)}/{len(cards)} ({pct:.0f}%) — "
+              f"통과 {keep} · 탈락 {drop} · 남음 {len(unseen)}")
     if drop:
         reasons = {}
         for r in log.values():
