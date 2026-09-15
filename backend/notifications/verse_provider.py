@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 from datetime import date, datetime
+from functools import lru_cache
 from pathlib import Path
 from typing import Callable
 from zoneinfo import ZoneInfo
@@ -26,11 +27,31 @@ _FIXED_DATES: dict[tuple[int, int], str] = {
 # 부활절은 해마다 옮겨 다녀서 계산한다(서방 교회 그레고리력 계산법).
 _EASTER_VERSE_ID = "job-19-25"  # 나의 구속자가 살아 계시니
 
-# 설날·추석은 음력이라 계산으로 얻을 수 없다. **검증된 날짜만 넣는다** —
-# 한국천문연구원 발표일을 확인해 {(연, 월, 일): verse_id} 로 채우면 그때부터 동작한다.
-# 추천: 설날 = "num-6-24"(아론의 축복), 추석 = "psa-128-2"(네 손이 수고한대로).
-# 비워 두어도 평소 회전으로 조용히 넘어간다 — 틀린 날짜를 넣는 것보다 낫다.
-_LUNAR_DATES: dict[tuple[int, int, int], str] = {}
+# 설날·추석은 음력이라 계산 대신 날짜표를 쓴다(`lunar_holidays.json`).
+# 표는 한국 음력 라이브러리로 만든다 — 중국 음력으로 계산하면 2027·2028 설날이
+# 하루씩 틀린다. 생성·검증: scripts/build_lunar_holidays.py (--check).
+_LUNAR_HOLIDAY_VERSES = {
+    "seollal": "num-6-24",   # 설날 — 아론의 축복(민수기 6:24-26)
+    "chuseok": "psa-128-2",  # 추석 — 네가 네 손이 수고한대로 먹을 것이라
+}
+_LUNAR_TABLE = Path(__file__).with_name("lunar_holidays.json")
+
+
+@lru_cache(maxsize=1)
+def _lunar_dates() -> dict[date, str]:
+    """{양력 날짜: verse_id}. 표가 없거나 깨져도 죽지 않고 빈 표로 넘어간다."""
+    try:
+        table = json.loads(_LUNAR_TABLE.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    out: dict[date, str] = {}
+    for holiday, verse_id in _LUNAR_HOLIDAY_VERSES.items():
+        for iso in table.get(holiday, {}).values():
+            try:
+                out[date.fromisoformat(iso)] = verse_id
+            except (TypeError, ValueError):
+                continue
+    return out
 
 
 def _easter(year: int) -> date:
@@ -50,7 +71,7 @@ def _easter(year: int) -> date:
 
 def fixed_verse_id(day: date) -> str | None:
     """그 날짜에 고정된 말씀 id. 없으면 None."""
-    pinned = _LUNAR_DATES.get((day.year, day.month, day.day))
+    pinned = _lunar_dates().get(day)
     if pinned:
         return pinned
     pinned = _FIXED_DATES.get((day.month, day.day))

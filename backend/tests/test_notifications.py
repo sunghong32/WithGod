@@ -1,7 +1,7 @@
 import json
 import tempfile
 import unittest
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 from unittest.mock import Mock
 from zoneinfo import ZoneInfo
@@ -11,10 +11,12 @@ from notifications.manager import DailyVerseNotificationManager
 from notifications.models import MobilePlatform, PushDispatchResult
 from notifications.push_service import PushGateway
 from notifications.scheduler import DailyVerseScheduler
+from notifications.models import DailyVerse
 from notifications.verse_provider import (
     DailyVerseProvider,
     VerseInterpretationStore,
     VerseInterpreter,
+    fixed_verse_id,
 )
 from settings import AppSettings
 
@@ -287,9 +289,12 @@ class NotificationFeatureTest(unittest.TestCase):
         # (a) 첫 호출 시 LLM 이 1회 호출되어 풀이가 생성된다.
         generate.assert_called_once_with(verse["reference"], verse["text"], "ko")
         self.assertEqual(verse["interpretation"], "풀이 첫 문장이에요. 두 번째 문장이에요.")
-        # verse_id -> interpretation 이 파일 캐시에 영속되어야 한다.
+        # 풀이가 파일 캐시에 영속되어야 한다. 키는 verse_id 에 본문 지문을 붙인 것이다
+        # (같은 verse_id 라도 본문이 바뀌면 예전 풀이를 쓰지 않기 위해 — 아래 테스트 참고).
         cached = json.loads(self.interpretation_store_path.read_text(encoding="utf-8"))
-        self.assertEqual(cached[verse["verse_id"]], verse["interpretation"])
+        keys = [k for k, v in cached.items() if v == verse["interpretation"]]
+        self.assertEqual(len(keys), 1)
+        self.assertTrue(keys[0].startswith(verse["verse_id"] + ":"))
 
     def test_interpretation_reused_from_cache_without_second_llm_call(self) -> None:
         now = datetime(2026, 4, 21, 9, 0)
@@ -318,6 +323,49 @@ class NotificationFeatureTest(unittest.TestCase):
         self.assertEqual(verse["interpretation"], verse["reflection"])
         # 폴백 값은 캐시에 저장하지 않는다(다음 요청에서 LLM 재시도).
         self.assertFalse(self.interpretation_store_path.exists())
+
+    def test_interpretation_cache_invalidated_when_verse_text_changes(self) -> None:
+        # 같은 verse_id 라도 본문이 바뀌면 예전 풀이를 붙여 내보내면 안 된다.
+        # 실제로 목록 교체 때 num-6-24 가 민수기 6:24 → 6:24-26(아론의 축복 전체)으로 바뀌었다.
+        store = VerseInterpretationStore(str(self.interpretation_store_path))
+        old = DailyVerse(verse_id="num-6-24", reference="민수기 6:24",
+                         text="여호와는 네게 복을 주시고 너를 지키시기를 원하며", reflection="r")
+        new = DailyVerse(verse_id="num-6-24", reference="민수기 6:24-26",
+                         text="여호와는 네게 복을 주시고 … 평강주시기를 원하노라", reflection="r")
+
+        VerseInterpreter(store=store, generate_fn=Mock(return_value="예전 본문 풀이")).interpret(old)
+        regenerate = Mock(return_value="새 본문 풀이")
+        result = VerseInterpreter(store=store, generate_fn=regenerate).interpret(new)
+
+        regenerate.assert_called_once()
+        self.assertEqual(result, "새 본문 풀이")
+        # 본문이 같으면 다시 부르지 않는다
+        again = Mock(return_value="불리면 안 됨")
+        self.assertEqual(VerseInterpreter(store=store, generate_fn=again).interpret(new), "새 본문 풀이")
+        again.assert_not_called()
+
+    def test_fixed_verses_on_holidays(self) -> None:
+        # 회전 주기가 365일이 아니라서 절기에는 정해진 말씀을 고정한다.
+        expected = {
+            date(2026, 1, 1): "jer-29-11",    # 새해
+            date(2026, 4, 5): "job-19-25",    # 부활절(계산)
+            date(2027, 3, 28): "job-19-25",   # 부활절은 해마다 옮겨 다닌다
+            date(2026, 12, 24): "isa-9-2",    # 성탄 전야
+            date(2026, 12, 25): "luk-2-14",   # 성탄절
+            date(2026, 2, 17): "num-6-24",    # 설날(음력 1/1)
+            date(2026, 9, 25): "psa-128-2",   # 추석(음력 8/15)
+            date(2027, 2, 7): "num-6-24",     # 2027 설날 — 한국 음력 기준
+        }
+        for day, verse_id in expected.items():
+            with self.subTest(day=day):
+                self.assertEqual(fixed_verse_id(day), verse_id)
+                served = self.provider.get_daily_verse(now=datetime(day.year, day.month, day.day, 9, 0))
+                self.assertEqual(served.verse_id, verse_id)
+
+        # 중국 음력으로 계산하면 2027 설날이 2/6 이 된다. 그날은 고정하지 않아야 한다.
+        self.assertIsNone(fixed_verse_id(date(2027, 2, 6)))
+        # 평범한 날은 고정 없음
+        self.assertIsNone(fixed_verse_id(date(2026, 3, 3)))
 
 
 class LanguageFeatureTest(NotificationFeatureTest):
