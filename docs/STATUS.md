@@ -80,9 +80,6 @@ iOS 는 1.5.0 이 App Store 공개 상태(2026-08-11 릴리스).
 ## 알려진 한계
 
 - Play 프로덕션 신청과 연령등급 질문이 남아 있다.
-- ⚠️ **이 맥의 `/usr/bin/git` 이 Xcode 라이선스 미동의로 막혀 있다**(2026-09-16 확인).
-  `gh` 도 내부에서 git 을 불러 같이 막힌다. 영구 해결은 `sudo xcodebuild -license accept`.
-  임시 우회는 `DEVELOPER_DIR=/Library/Developer/CommandLineTools git ...`.
 
 ## 최근 변경 이력
 
