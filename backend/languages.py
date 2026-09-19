@@ -153,6 +153,19 @@ class VerseStore:
             "text": str(r["text"]),
         }
 
+    def find_passage(
+        self, book_code: str, chapter: int, first: int, last: int
+    ) -> dict | None:
+        """같은 장 first~last 절을 이어 붙인다. 한 절이라도 없으면 None(반쪽 합본 방지)."""
+        verses = [self.find_verse(book_code, chapter, v) for v in range(first, last + 1)]
+        if not verses or not all(verses):
+            return None
+        return {
+            **verses[0],
+            "last_verse": verses[-1]["verse"],
+            "text": " ".join(v["text"] for v in verses),
+        }
+
 
 _stores: dict[str, VerseStore] = {}
 _store_lock = Lock()
@@ -242,7 +255,12 @@ _ALIGN_MIN_SCORE = 0.7
 
 
 def find_aligned_verse(
-    lang: str, book_code: str, chapter: int, verse: int, ko_text: str | None = None
+    lang: str,
+    book_code: str,
+    chapter: int,
+    verse: int,
+    ko_text: str | None = None,
+    last_verse: int | None = None,
 ) -> dict | None:
     """한국어 기준 (책, 장, 절)에 해당하는 다른 언어 구절을 찾는다.
 
@@ -252,7 +270,14 @@ def find_aligned_verse(
     그래서 후보(verse+0 … verse+차이)를 모두 뽑아 **다국어 임베딩으로 한국어
     본문과 내용을 대조**해 가장 유사한 절을 고른다. 이 함수는 '오늘의 말씀'
     현지화(하루·언어당 1회, 캐시됨)에만 쓰여 임베딩 비용은 무시할 수준이다.
+
+    last_verse 를 주면 같은 장 verse~last_verse 합본을 **한 덩어리로** 찾는다.
+    후보도 같은 오프셋의 창(verse+k ~ last_verse+k)을 이어 붙여 만든다. 절마다
+    따로 정렬하면 합본 전체인 ko_text 를 한 절과 비교하게 돼 점수가 뒤집힌다 —
+    fr 시편 40:1-2 가 40:2 를 두 번 고른다(정답은 40:2-3). 반환 dict 의
+    verse·last_verse 는 그 언어의 절 번호, text 는 이어 붙인 본문이다.
     """
+    last = int(verse) if last_verse is None else int(last_verse)
     store = get_store(lang)
     if store.lang != lang:  # 로드 실패로 ko 폴백된 경우
         return None
@@ -263,11 +288,11 @@ def find_aligned_verse(
         diff = lang_count - ref_count
 
     if diff <= 0 or diff > 3 or not ko_text or _encoder is None:
-        return store.find_verse(book_code, chapter, verse)
+        return store.find_passage(book_code, chapter, verse, last)
 
     candidates = []
     for off in range(diff + 1):
-        found = store.find_verse(book_code, chapter, verse + off)
+        found = store.find_passage(book_code, chapter, verse + off, last + off)
         if found:
             candidates.append(found)
     if not candidates:
@@ -283,7 +308,8 @@ def find_aligned_verse(
         score = float(sims[best])
         log.info(
             "verse align %s %s %s:%s → +%d (cos=%.3f)",
-            lang, book_code, chapter, verse,
+            lang, book_code, chapter,
+            verse if last == int(verse) else f"{verse}-{last}",
             candidates[best]["verse"] - int(verse), score,
         )
         if score < _ALIGN_MIN_SCORE:
@@ -291,10 +317,12 @@ def find_aligned_verse(
         return candidates[best]
     except Exception:
         log.exception("verse align 실패(%s) — 같은 번호 절로 폴백", lang)
-        return store.find_verse(book_code, chapter, verse)
+        return store.find_passage(book_code, chapter, verse, last)
 
 
-_RE_KO_REF = re.compile(r"^(.+?)\s+(\d+):(\d+)$")
+# 「시편 23:1」 · 합본 「시편 40:1-2」(같은 장) · 하반절 「요한복음 8:11b」.
+# 둘이 겹친 「…:1-2b」도 받는다(scripts/build_verse_cards.py 가 만들 수 있는 꼴).
+_RE_KO_REF = re.compile(r"^(.+?)\s+(\d+):(\d+)(?:-(\d+))?b?$")
 
 
 def localize_ko_ref(lang: str, ko_ref: str, ko_text: str) -> dict | None:
@@ -302,6 +330,11 @@ def localize_ko_ref(lang: str, ko_ref: str, ko_text: str) -> dict | None:
 
     /random 오늘의 말씀·푸시·위젯이 공용으로 쓴다. 실패(파싱 불가·판본 차이로
     정렬 불가) 시 None — 호출측은 한국어 본문으로 폴백한다.
+
+    합본(40:1-2)은 범위의 절을 이어 붙이고 ref 도 그 언어 절 번호로 「장:시작-끝」.
+    하반절(8:11b)은 **절 전체**를 싣고 ref 에서 b 를 뗀다. 한국어의 b 는 「예수께서
+    가라사대」 같은 서사만 벗긴 표기인데(docs/오늘의말씀_재선정.md), 번역본마다
+    인용 표기가 달라(따옴표·콜론·표기 없음) 같은 자르기를 규칙으로 옮길 수 없다.
     """
     m = _RE_KO_REF.match(ko_ref.strip())
     if not m:
@@ -309,13 +342,19 @@ def localize_ko_ref(lang: str, ko_ref: str, ko_text: str) -> dict | None:
     code = KO_NAME_TO_CODE.get(m.group(1))
     if not code:
         return None
-    found = find_aligned_verse(lang, code, int(m.group(2)), int(m.group(3)), ko_text)
+    first = int(m.group(3))
+    last = int(m.group(4)) if m.group(4) else first
+    if last < first:
+        return None
+    found = find_aligned_verse(
+        lang, code, int(m.group(2)), first, ko_text, last_verse=last
+    )
     if not found:
         return None
-    return {
-        "ref": f"{found['book']} {found['chapter']}:{found['verse']}",
-        "text": found["text"],
-    }
+    ref = f"{found['book']} {found['chapter']}:{found['verse']}"
+    if found["last_verse"] != found["verse"]:
+        ref += f"-{found['last_verse']}"
+    return {"ref": ref, "text": found["text"]}
 
 
 # ---------- 추천 적합성 필터 ----------
