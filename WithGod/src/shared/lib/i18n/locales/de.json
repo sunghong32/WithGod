@@ -40,7 +40,9 @@
     "privacyNote": "Was du hier schreibst, bleibt auf diesem Handy",
     "loadFailed": "Der Vers konnte nicht geladen werden",
     "tapToRetry": "Tippe, um es erneut zu versuchen",
-    "searchAgain": "Erneut suchen"
+    "searchAgain": "Erneut suchen",
+    "commentFailed": "Die Betrachtung zu diesem Vers konnte nicht geladen werden",
+    "restFailed": "Die übrigen Verse konnten nicht geladen werden"
   },
   "settings": {
     "headerTitle": "Einstellungen",

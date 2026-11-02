@@ -40,7 +40,9 @@
     "privacyNote": "Ce que tu écris ici reste sur ce téléphone",
     "loadFailed": "Impossible de charger le verset",
     "tapToRetry": "Touche pour réessayer",
-    "searchAgain": "Chercher à nouveau"
+    "searchAgain": "Chercher à nouveau",
+    "commentFailed": "Impossible de charger la méditation de ce verset",
+    "restFailed": "Impossible de charger les autres versets"
   },
   "settings": {
     "headerTitle": "Réglages",

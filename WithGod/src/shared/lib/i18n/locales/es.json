@@ -40,7 +40,9 @@
     "privacyNote": "Lo que escribes aquí se queda en este teléfono",
     "loadFailed": "No pudimos cargar el versículo",
     "tapToRetry": "Toca para intentarlo de nuevo",
-    "searchAgain": "Buscar de nuevo"
+    "searchAgain": "Buscar de nuevo",
+    "commentFailed": "No pudimos cargar la reflexión de este versículo",
+    "restFailed": "No pudimos cargar los demás versículos"
   },
   "settings": {
     "headerTitle": "Configuración",

@@ -203,11 +203,15 @@ export const verseApi = {
     };
 
     const handleChunk = (chunk: string) => {
-      if (!chunk) return;
+      if (!chunk || closed) return;
       buffer += chunk;
-      buffer = drainSseBuffer(buffer, (payload, eventName) =>
-        handleSsePayload(payload, eventName, trackedHandlers)
-      );
+      buffer = drainSseBuffer(buffer, (payload, eventName) => {
+        // close() 뒤에는 같은 버퍼에 남은 이벤트도 넘기지 않는다.
+        // 서버는 error 바로 뒤에 done 을 보내는데, 그 done 이 화면에 닿으면
+        // 잘린 초안이 정상 결과로 확정돼 버린다.
+        if (closed) return;
+        handleSsePayload(payload, eventName, trackedHandlers);
+      });
     };
 
     xhr.onprogress = () => {

@@ -74,6 +74,12 @@ export default function ResultScreen() {
   const [results, setResults] = useState<RecommendItem[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamError, setStreamError] = useState<string | null>(null);
+  /**
+   * 카드를 몇 장 받은 뒤 스트림이 실패했을 때, 실패한 카드의 index.
+   * 그 앞 카드는 온전하므로 그대로 두고, 이 자리부터 안내를 띄운다.
+   * 결과가 하나도 없으면 null 이고 화면 전체 에러로 처리한다.
+   */
+  const [failedIndex, setFailedIndex] = useState<number | null>(null);
   const [activeField, setActiveField] = useState<{
     index: number;
     key: StreamKey;
@@ -99,14 +105,26 @@ export default function ResultScreen() {
   const captureRef = useRef<{
     verses: Map<number, HistoryVerse>;
     parsers: Map<number, ReturnType<typeof createIndexedTokenParser>>;
+    /** 코멘트 JSON 이 끝까지 도착한 카드 index — 중간 실패 때 살릴 카드를 가른다 */
+    completed: Set<number>;
     title: string;
     failed: boolean;
-  }>({ verses: new Map(), parsers: new Map(), title: "", failed: false });
+  }>({
+    verses: new Map(),
+    parsers: new Map(),
+    completed: new Set(),
+    title: "",
+    failed: false,
+  });
   const isBackgroundRef = useRef(false);
   const flushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const typingQueueRef = useRef("");
   const typingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const pendingDoneRef = useRef<unknown | null>(null);
+  // 중간 실패 — 이미 받은 카드의 타이핑이 끝난 뒤 안내로 마무리한다(pendingDone 과 같은 방식)
+  const pendingErrorRef = useRef<{ message: string; failedIndex: number } | null>(
+    null,
+  );
   const receivedTokenRef = useRef(false);
   const hasVersesSeedRef = useRef(false);
   const isVerseTypingRef = useRef(false);
@@ -176,14 +194,15 @@ export default function ResultScreen() {
     (_: number, contentHeight: number) => {
       const wasAutoScrollEnabled = autoScrollEnabledRef.current;
       scrollMetricsRef.current.contentHeight = contentHeight;
-      if (isStreaming && wasAutoScrollEnabled) {
+      // 중간 실패 안내·다시 검색 버튼이 붙을 때도 따라 내려가 화면 밖에 남지 않게 한다
+      if ((isStreaming || failedIndex !== null) && wasAutoScrollEnabled) {
         autoScrollEnabledRef.current = true;
         requestAnimationFrame(() => scrollToBottom(false));
         return;
       }
       updateAutoScrollEnabled();
     },
-    [isStreaming, scrollToBottom, updateAutoScrollEnabled],
+    [failedIndex, isStreaming, scrollToBottom, updateAutoScrollEnabled],
   );
 
   const scheduleFlush = useCallback(() => {
@@ -481,6 +500,9 @@ export default function ResultScreen() {
           captureRef.current.verses.set(index, { ...current, [key]: value });
         },
         onActiveField: () => {},
+        onObjectDone: () => {
+          captureRef.current.completed.add(index);
+        },
       });
       captureRef.current.parsers.set(index, parser);
     }
@@ -491,6 +513,7 @@ export default function ResultScreen() {
     captureRef.current = {
       verses: new Map(),
       parsers: new Map(),
+      completed: new Set(),
       title: "",
       failed: false,
     };
@@ -635,16 +658,62 @@ export default function ResultScreen() {
     [extractResults, finalizeResults, t],
   );
 
+  /**
+   * 중간 실패 마무리. 코멘트까지 끝까지 받은 카드는 그대로 두고, 실패한 카드는
+   * 말씀 본문만 남긴다(본문은 verse 이벤트로 온전히 왔다). 그 뒤 카드는 서버가
+   * 보내지 않았으므로 자리에 안내만 띄운다.
+   * 화면의 타이핑 상태가 아니라 원본 수집기(captureRef)를 기준으로 삼아,
+   * 애니메이션이 어디까지 갔든 잘린 글자가 남지 않게 한다.
+   */
+  const finalizeStreamError = useCallback(
+    (message: string, failedAt: number) => {
+      stopTyping();
+      stopVerseTyping();
+      stopIndexedTokenPump();
+      setActiveField(null);
+
+      const captured = captureRef.current.verses;
+      const kept: RecommendItem[] = [];
+      for (let index = 0; index <= failedAt; index += 1) {
+        const verse = captured.get(index);
+        if (!verse?.ref || !verse.text) break;
+        // 실패한 카드의 코멘트는 반쯤 온 것이라 버린다
+        const isFailedCard = index === failedAt;
+        kept.push({
+          ref: verse.ref,
+          text: verse.text,
+          comment: isFailedCard ? "" : (verse.comment ?? ""),
+          tag: isFailedCard ? "" : (verse.tag ?? ""),
+        });
+      }
+
+      finalizeResults(kept);
+      setFailedIndex(kept.length > 0 ? failedAt : null);
+      setStreamError(message);
+      setIsStreaming(false);
+    },
+    [finalizeResults, stopIndexedTokenPump, stopTyping, stopVerseTyping],
+  );
+
   const tryFinalizePendingDone = useCallback(() => {
-    if (pendingDoneRef.current === null) return;
+    if (pendingDoneRef.current === null && pendingErrorRef.current === null) {
+      return;
+    }
     if (typingQueueRef.current.length > 0) return;
     if (indexedTokenQueueRef.current.length > 0) return;
     if (isVerseTypingRef.current) return;
 
+    const pendingError = pendingErrorRef.current;
+    if (pendingError) {
+      pendingErrorRef.current = null;
+      finalizeStreamError(pendingError.message, pendingError.failedIndex);
+      return;
+    }
+
     const payload = pendingDoneRef.current;
     pendingDoneRef.current = null;
     finalizeFromPayload(payload);
-  }, [finalizeFromPayload]);
+  }, [finalizeFromPayload, finalizeStreamError]);
 
   const ensureIndexedTokenPump = useCallback(() => {
     if (indexedTokenTimerRef.current) return;
@@ -821,6 +890,7 @@ export default function ResultScreen() {
     currentIndexedTokenIndexRef.current = 0;
     draftRef.current = [];
     pendingDoneRef.current = null;
+    pendingErrorRef.current = null;
     receivedTokenRef.current = false;
     hasVersesSeedRef.current = false;
     commentLoggedIndicesRef.current.clear();
@@ -837,6 +907,7 @@ export default function ResultScreen() {
     }
     setResults([]);
     setStreamError(null);
+    setFailedIndex(null);
     setIsStreaming(true);
     setActiveField(null);
 
@@ -920,8 +991,6 @@ export default function ResultScreen() {
             return;
           }
           if (!isMountedRef.current) return;
-          setStreamError(message || t("result.loadFailed"));
-          setIsStreaming(false);
           if (__DEV__) {
             const now = Date.now();
             const total = timingRef.current.startAt
@@ -942,12 +1011,24 @@ export default function ResultScreen() {
             }
             console.groupEnd();
           }
-          stopTyping();
-          // 에러 이후에도 verse 타이핑·indexed 토큰 펌프 인터벌이 계속 돌지 않도록 함께 정지
-          stopVerseTyping();
-          stopIndexedTokenPump();
-          pendingDoneRef.current = null;
           stopStream();
+          // 더 올 데이터는 없다. 끝까지 받은 카드는 마저 그리고, 실패한 카드부터 안내로 바꾼다.
+          // 실패 지점은 서버가 준 index 대신 "코멘트를 끝까지 못 받은 첫 카드"로 정한다 —
+          // 서버 error 이벤트든 연결 끊김·타임아웃이든 같은 규칙으로 처리하려고.
+          let failedAt = 0;
+          while (captureRef.current.completed.has(failedAt)) failedAt += 1;
+          stopTyping();
+          indexedTokenQueueRef.current = indexedTokenQueueRef.current.filter(
+            (item) => item.index < failedAt,
+          );
+          pendingDoneRef.current = null;
+          pendingErrorRef.current = {
+            message: message || t("result.loadFailed"),
+            failedIndex: failedAt,
+          };
+          tryFinalizePendingDone();
+          // 타이핑이 남았으면 펌프가 마저 그린 뒤 tryFinalizePendingDone 에서 마무리된다
+          if (pendingErrorRef.current) ensureIndexedTokenPump();
         },
       },
     );
@@ -967,6 +1048,7 @@ export default function ResultScreen() {
     stopVerseTyping,
     stopIndexedTokenPump,
     t,
+    tryFinalizePendingDone,
   ]);
 
   const refetch = useCallback(() => {
@@ -1161,19 +1243,36 @@ export default function ResultScreen() {
                       key={`result-${index}`}
                       result={result}
                       mood={mood}
-                      canSave={!isStreaming && !streamError}
+                      // 중간 실패 뒤에 남긴 카드는 원본 기준으로 온전하다(finalizeStreamError)
+                      canSave={
+                        !isStreaming && (!streamError || failedIndex !== null)
+                      }
                       isStreaming={isStreaming}
                       isTextActive={isFieldActive("text")}
                       isCommentActive={isFieldActive("comment")}
                       isTagActive={isFieldActive("tag")}
                       cursorVisible={cursorVisible}
+                      failedNotice={
+                        index === failedIndex
+                          ? t("result.commentFailed")
+                          : undefined
+                      }
                     />
                   );
                 })}
+
+                {/* 중간 실패: 서버가 보내지 못한 나머지 카드 자리 */}
+                {failedIndex !== null && results.length <= failedIndex && (
+                  <View style={styles.errorContainer}>
+                    <Text style={styles.errorDescription}>
+                      {t("result.restFailed")}
+                    </Text>
+                  </View>
+                )}
               </View>
 
-              {/* 다시 검색하기 버튼 */}
-              {!isStreaming && visibleResults.length > 0 && !streamError && (
+              {/* 다시 검색하기 버튼 — 중간에 실패했어도 띄운다 */}
+              {!isStreaming && visibleResults.length > 0 && (
                 <TouchableOpacity
                   style={styles.searchAgainButton}
                   onPress={() => refetch()}
@@ -1274,13 +1373,18 @@ type VerseResultCardProps = {
   result: RecommendItem;
   /** 저장 시 함께 기록할 사용자 입력(마음) */
   mood?: string;
-  /** 스트리밍이 에러 없이 끝나 카드 내용이 온전할 때만 true (하트 노출 조건) */
+  /**
+   * 카드 내용이 온전할 때만 true (하트 노출 조건) — 스트리밍이 에러 없이 끝났거나,
+   * 중간 실패 뒤 원본 기준으로 남긴 카드일 때
+   */
   canSave?: boolean;
   isStreaming?: boolean;
   isTextActive?: boolean;
   isCommentActive?: boolean;
   isTagActive?: boolean;
   cursorVisible?: boolean;
+  /** 스트림이 이 카드에서 끊겨 코멘트를 못 받았으면 코멘트 자리에 띄울 안내 */
+  failedNotice?: string;
 };
 
 function VerseResultCard({
@@ -1292,6 +1396,7 @@ function VerseResultCard({
   isCommentActive = false,
   isTagActive = false,
   cursorVisible = false,
+  failedNotice,
 }: VerseResultCardProps) {
   const { data: savedVerses } = useBookmarks();
   const toggleBookmark = useToggleBookmark();
@@ -1361,6 +1466,13 @@ function VerseResultCard({
               <Text style={styles.typingCursor}>▍</Text>
             ) : null}
           </Text>
+        </View>
+      )}
+
+      {/* 코멘트를 못 받았을 때 그 자리에 안내 */}
+      {showVerseText && !!failedNotice && (
+        <View style={styles.failedNotice}>
+          <Text style={styles.failedNoticeText}>{failedNotice}</Text>
         </View>
       )}
 
@@ -1534,6 +1646,19 @@ const styles = StyleSheet.create({
     fontSize: scaleFont(14),
     lineHeight: scaleFont(22),
     color: "#5C4A32",
+    fontFamily: baseFontFamily,
+  },
+  // 코멘트 실패 안내 — 코멘트 말풍선 자리, 톤은 회색으로 낮춘다
+  failedNotice: {
+    backgroundColor: "rgba(106, 114, 130, 0.06)",
+    borderRadius: 12,
+    padding: 14,
+    marginTop: 4,
+  },
+  failedNoticeText: {
+    fontSize: scaleFont(14),
+    lineHeight: scaleFont(22),
+    color: colors.textSecondary,
     fontFamily: baseFontFamily,
   },
   // 다시 검색하기 버튼

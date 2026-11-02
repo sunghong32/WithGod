@@ -40,7 +40,9 @@
     "privacyNote": "여기 적은 마음은 이 휴대폰에만 남아요",
     "loadFailed": "말씀을 불러오지 못했어요",
     "tapToRetry": "탭하여 다시 시도해주세요",
-    "searchAgain": "다시 검색하기"
+    "searchAgain": "다시 검색하기",
+    "commentFailed": "말씀 나눔을 불러오지 못했어요",
+    "restFailed": "나머지 말씀을 불러오지 못했어요"
   },
   "settings": {
     "headerTitle": "설정",

@@ -40,7 +40,9 @@
     "privacyNote": "To, co tu piszesz, zostaje na tym telefonie",
     "loadFailed": "Nie udało się wczytać wersetu",
     "tapToRetry": "Dotknij, aby spróbować ponownie",
-    "searchAgain": "Szukaj ponownie"
+    "searchAgain": "Szukaj ponownie",
+    "commentFailed": "Nie udało się wczytać rozważania do tego wersetu",
+    "restFailed": "Nie udało się wczytać pozostałych wersetów"
   },
   "settings": {
     "headerTitle": "Ustawienia",

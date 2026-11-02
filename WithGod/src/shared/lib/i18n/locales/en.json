@@ -40,7 +40,9 @@
     "privacyNote": "What you write here stays on this phone",
     "loadFailed": "Couldn't load the verse",
     "tapToRetry": "Tap to try again",
-    "searchAgain": "Search again"
+    "searchAgain": "Search again",
+    "commentFailed": "Couldn't load the reflection for this verse",
+    "restFailed": "Couldn't load the rest of the verses"
   },
   "settings": {
     "headerTitle": "Settings",
