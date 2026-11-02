@@ -1,11 +1,11 @@
 # app.py
 # =========================================================
-# Bible RAG (KR1910, Public Domain) + OpenAI API 추천
-# - /recommend  : 기분/상태 -> RAG 상위 절 -> OpenAI가 한국어 추천/코멘트 생성
-# - /random     : 랜덤으로 말씀 1개 반환(OpenAI 호출 없음)
+# Bible RAG (KR1910, Public Domain) + Claude API 추천
+# - /recommend  : 기분/상태 -> RAG 상위 절 -> Claude 가 한국어 추천/코멘트 생성
+# - /random     : 랜덤으로 말씀 1개 반환(LLM 호출 없음)
 # - comment_style: short | medium | long 로 코멘트 길이 조절
 # 실행:
-#   export OPENAI_API_KEY="키값"
+#   export ANTHROPIC_API_KEY="키값"
 #   uvicorn app:app --reload --port 8000
 # =========================================================
 
@@ -40,10 +40,16 @@ from languages import (
     router as languages_router,
     set_encoder as languages_set_encoder,
 )
+from notifications.interpretation import cache_tag as interpretation_cache_tag
+from notifications.interpretation import generate_interpretation
 from notifications.jobs import build_notification_manager
 from notifications.manager import DailyVerseNotificationManager
 from notifications.scheduler import DailyVerseScheduler
-from notifications.verse_provider import VerseInterpretationStore, VerseInterpreter
+from notifications.verse_provider import (
+    VerseInterpretationStore,
+    VerseInterpreter,
+    load_curated_interpretations,
+)
 from settings import AppSettings, load_dotenv
 
 # ---------- FastAPI ----------
@@ -102,20 +108,24 @@ languages_set_encoder(model.encode)
 
 
 # =========================================================
-# OpenAI API (생성)
+# LLM (생성) — Anthropic Claude. 호출 방식과 모델 규칙은 llm.py 참고.
 # =========================================================
-from openai import OpenAI
+import llm
 
-OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")  # 빠르고 저렴한 기본값
+LLM_MODEL = llm.LLM_MODEL
 
-# 언어별 코멘트 생성 모델 오버라이드 — 저지 검증(이슈 #11)에서 4o-mini 가
-# 이탈리아어 조어 실수('incomprensi' 류 비단어)를 내는 것이 확인돼 it 만 상향.
-_COMMENT_MODEL_BY_LANG = {"it": os.getenv("OPENAI_MODEL_IT", "gpt-4o")}
+# 언어별 코멘트 모델 오버라이드. OpenAI 시절 gpt-4o-mini 가 이탈리아어 조어 실수
+# ('incomprensi' 류 비단어)를 내서(이슈 #11) it 만 gpt-4o 로 올렸었다. Haiku 5.5 에서도
+# 같은 문제가 보이면 LLM_MODEL_IT 로 상위 모델을 지정한다(비우면 LLM_MODEL).
+_COMMENT_MODEL_BY_LANG = {"it": os.getenv("LLM_MODEL_IT") or None}
 
 
 def _comment_model(lang: str) -> str | None:
     return _COMMENT_MODEL_BY_LANG.get(lang)
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+
+# 오늘의 말씀 풀이 모델. 말씀·언어당 한 번만 부르므로(파일 캐시) 상위 모델이어도 부담이
+# 작다. 한국어는 검토본이 먼저 나가서 여기까지 오는 건 외국어뿐이다.
+LLM_INTERPRETATION_MODEL = os.getenv("LLM_INTERPRETATION_MODEL") or LLM_MODEL
 APP_SETTINGS = AppSettings.from_env()
 
 # 한자/가나 제거(옵션)
@@ -340,7 +350,10 @@ def _style_to_limits(style: str):
             "text_limit": "1–2문장(약 120–180자)",
             "comment_limit": "4–5문장(약 260–360자)",
             "comment_limit_intl": "4–5 sentences (one warm paragraph)",
-            "max_tokens": 1500
+            # Claude 토크나이저는 같은 한국어를 더 많은 토큰으로 센다. 카드 1장이 약 340토큰
+            # 이라 예전 상한(1500 → 카드당 500)이면 긴 코멘트가 JSON 중간에서 잘렸다.
+            # 상한은 실제 쓴 만큼만 과금되니 넉넉히 둔다.
+            "max_tokens": 3000
         }
     # default: medium
     return {
@@ -357,6 +370,8 @@ _RECOMMEND_SYSTEM = (
     "성도가 털어놓은 마음에, 성경 구절을 짧게 설교하듯 풀어 건넵니다.\n"
     "규칙:\n"
     "- 반드시 한국어만 사용합니다.\n"
+    "- 존댓말로 쓰고, 읽는 사람을 '너·너희·당신'으로 부르지 않습니다. 주어를 빼거나 '우리'라고 "
+    "씁니다(구절에 '너'가 있어도 옮기지 않습니다).\n"
     "- 먼저 그 구절이 '무슨 뜻인지'를 쉽게 풀어 설명합니다(성경 풀이).\n"
     "- 그다음 그 말씀이 지금 이 사람의 상황에 어떤 위로·의미가 되는지 다정하게 적용합니다.\n"
     "- 훈계하듯 가르치지 말고, 곁에서 손잡아 주듯 부드럽게 말합니다.\n"
@@ -400,7 +415,7 @@ def _build_user_prompt(mood: str, candidates: List[dict], picks: int, style_limi
 - text는 {style_limits['text_limit']} 로 인용하세요.
 - comment는 {style_limits['comment_limit']} 로 작성하되, 그 구절이 무슨 뜻인지 쉽게 풀어 설명(성경 풀이)한 뒤 성도의 상황에 다정하게 적용하는 흐름을 한 단락에 담으세요. (번호·소제목 없이 매끄럽게)
 - 각 구절의 주제(감정)를 'tag'로 1~2개만 추가하세요. 예: \"두려움\", \"걱정\", \"사랑\", \"소망\", \"감사\", \"회개\" 등
-- 출력은 JSON 배열만. 다른 설명/서문/주석 금지.
+- 출력은 JSON 객체 1개만. 다른 설명/서문/주석 금지.
 
 사용자 기분/상태: \"{mood}\"
 
@@ -410,15 +425,17 @@ def _build_user_prompt(mood: str, candidates: List[dict], picks: int, style_limi
 요청:
 1) 가장 적절한 성경 구절 {picks}개만 선택.
 2) 각 항목에 'text', 'ref', 'tag', 'comment'를 포함.
-3) 정확한 JSON 배열로만 출력 (반드시 아래 키 순서를 지켜주세요):
-[
-  {{
-    \"text\": \"성경 본문\",
-    \"ref\": \"책 장:절\",
-    \"tag\": \"두려움\",
-    \"comment\": \"짧지 않지만 군더더기 없는 한국어 코멘트\"
-  }}
-]
+3) 정확한 JSON 객체 1개로만 출력 (반드시 아래 키 순서를 지켜주세요):
+{{
+  \"results\": [
+    {{
+      \"text\": \"성경 본문\",
+      \"ref\": \"책 장:절\",
+      \"tag\": \"두려움\",
+      \"comment\": \"짧지 않지만 군더더기 없는 한국어 코멘트\"
+    }}
+  ]
+}}
 """.strip()
 
 
@@ -475,137 +492,63 @@ Task: Write a short pastoral reflection as 'comment'.
 """.strip()
 
 
-def _call_openai_as_json(
-    system: str, user: str, max_tokens: int, model: str | None = None
-) -> str:
-    client = OpenAI(api_key=OPENAI_API_KEY)
-    resp = client.chat.completions.create(
-        model=model or OPENAI_MODEL,
-        temperature=0.4,              # 약간 풍부하게
-        max_tokens=max_tokens,        # 스타일에 따라 증가
-        response_format={"type": "json_object"},
-        messages=[
-            {"role": "system", "content": system},
-            {"role": "user",   "content": user}
-        ],
-    )
-    return resp.choices[0].message.content.strip()
-
-
-def _call_openai_as_text(
-    system: str, user: str, max_tokens: int, model: str | None = None
-) -> str:
-    """_call_openai_as_json 과 동형이지만 JSON 강제 없이 평문(풀이 본문)만 받는 헬퍼."""
-    client = OpenAI(api_key=OPENAI_API_KEY)
-    resp = client.chat.completions.create(
-        model=model or OPENAI_MODEL,
-        temperature=0.5,
-        max_tokens=max_tokens,
-        messages=[
-            {"role": "system", "content": system},
-            {"role": "user",   "content": user}
-        ],
-    )
-    return resp.choices[0].message.content.strip()
+# 응답 JSON 스키마. 키 순서가 출력 순서다 — 앱은 tag 다음에 comment 가 흘러온다고 본다.
+_COMMENT_SCHEMA = {
+    "type": "object",
+    "properties": {"tag": {"type": "string"}, "comment": {"type": "string"}},
+    "required": ["tag", "comment"],
+    "additionalProperties": False,
+}
+_RESULTS_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "results": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "text": {"type": "string"},
+                    "ref": {"type": "string"},
+                    "tag": {"type": "string"},
+                    "comment": {"type": "string"},
+                },
+                "required": ["text", "ref", "tag", "comment"],
+                "additionalProperties": False,
+            },
+        }
+    },
+    "required": ["results"],
+    "additionalProperties": False,
+}
+_PICKS_SCHEMA = {
+    "type": "object",
+    "properties": {"picks": {"type": "array", "items": {"type": "integer"}}},
+    "required": ["picks"],
+    "additionalProperties": False,
+}
 
 
 # ---------- 오늘의 말씀 '풀이'(LLM) ----------
-# 구절을 일상어로 부드럽게 풀어 주는 한국어 '풀이'를 생성한다.
-# verse_id 기준 파일 캐시(VerseInterpreter)와 결합되어 말씀당 최대 1회만 호출된다.
-# 프롬프트를 고칠 때 알아 둘 것:
-# (1) 목록 457개 중 교훈이 276개다. 전부 위로하듯 풀면 「말이 많으면 허물을 면키
-#     어려우나」 같은 구절이 물러진다. 그래서 구절 성격에 따라 어조를 나눈다.
-# (2) 본문이 개역한글(1961)이라 '경외·긍휼·인자·명철·권고' 처럼 뜻이 바로 안 잡히는
-#     한자어가 자주 나온다. 풀이가 그걸 조용히 오늘 말로 바꿔 주는 것이 핵심 값이다.
-# (3) 가장 흔한 실패는 본문을 살짝 바꿔 다시 말하고 끝내는 것이다. 한 걸음을 더한다.
-_VERSE_INTERPRETATION_SYSTEM = """당신은 따뜻한 신앙 동반자입니다. 성경 구절을 오늘의 말로 풀어 건넵니다.
-
-규칙:
-- 반드시 한국어로만 씁니다. 2문장 이내로 짧고 담백하게 씁니다.
-- 제목, 따옴표, 구절 재인용 없이 '풀이 본문'만 출력합니다.
-- **본문을 살짝 바꿔 되풀이하지 않습니다.** 무슨 뜻인지 한 번 짚고, 오늘 붙잡을
-  것 하나를 더합니다.
-- 본문의 옛 한자어(경외, 긍휼, 인자, 명철, 권고, 정녕, 무릇 같은 말)는 풀이에서
-  오늘 쓰는 말로 바꿔 줍니다. 어려운 말을 그대로 옮기지 않습니다.
-- 구절에 없는 배경이나 이야기를 지어내지 않습니다. 주어진 본문 안에서만 풉니다.
-
-어조는 구절의 성격에 맞춥니다.
-- 아픔을 겪는 사람에게 건네는 위로의 구절이면, 다독이듯 부드럽게 씁니다.
-  ('~말씀이에요', '~해도 괜찮아요')
-- 살아가는 데 도움이 되는 통찰이나 권면이면, 훈계하지 말되 또렷하게 씁니다.
-  ('~라는 뜻이에요', '오늘 ~해 보면 어떨까요')
-
-예시(위로):
-지친 하루의 짐을 혼자 지지 말라는 말씀이에요. 무거운 마음 그대로, 쉼을 주시는 분께 가져가면 돼요.
-
-예시(교훈):
-말이 길어질수록 실수도 늘어난다는 뜻이에요. 오늘 한 번은 말을 얹기 전에 잠깐 멈춰 보면 어떨까요."""
-
-
-def _build_verse_interpretation_user_prompt(reference: str, text: str) -> str:
-    return f"""다음 성경 구절을 위 규칙대로 부드럽게 풀어 설명해 주세요.
-
-구절: {reference}
-본문: {text}
-
-풀이(2문장 이내, 제목·따옴표·구절 재인용 없이 본문만):""".strip()
-
-
+# 프롬프트와 결함 검사는 notifications/interpretation.py 에 있다(사전 생성 스크립트와 공유).
+# 한국어는 검토본(notifications/daily_interpretations.json)이 먼저 나가므로 여기까지
+# 오는 것은 외국어와, 검토본이 없는 말씀뿐이다. 말씀·언어당 1회만 호출된다(파일 캐시).
 def _generate_verse_interpretation(reference: str, text: str, lang: str = "ko") -> str:
     """구절(reference, text)을 받아 해당 언어의 '풀이'를 생성한다.
 
-    키가 없거나 호출이 실패하면 예외를 올려 상위(VerseInterpreter)가 reflection 으로 폴백한다.
+    키가 없거나 호출·검사가 실패하면 예외를 올려 상위(VerseInterpreter)가 reflection 으로 폴백한다.
     """
-    if not OPENAI_API_KEY:
-        raise RuntimeError("OPENAI_API_KEY is not configured")
-    if lang == "ko":
-        interpretation = _call_openai_as_text(
-            _VERSE_INTERPRETATION_SYSTEM,
-            _build_verse_interpretation_user_prompt(reference, text),
-            max_tokens=200,
-        )
-        return _keep_korean_only(interpretation)
-
-    name = LANGUAGE_NAMES_EN.get(lang, lang)
-    system = (
-        f"You are a warm companion in faith, writing ONLY in {name}. "
-        "You gently explain Bible verses in everyday words.\n"
-        "Rules:\n"
-        "- At most 2 short sentences, plain and unadorned.\n"
-        "- No headings, no quotation marks, no re-quoting the verse — output the "
-        "explanation only.\n"
-        "- Do NOT merely restate the verse. Say what it means, then add one "
-        "concrete thing to hold on to today.\n"
-        "- Do not inventbackground or story that is not in the verse itself.\n"
-        "- Match the verse: comfort verses get a gentle, consoling voice; "
-        "wisdom or exhortation gets a clear voice — never lecturing."
+    if not llm.configured():
+        raise RuntimeError("ANTHROPIC_API_KEY is not configured")
+    interpretation = generate_interpretation(
+        llm.client(),
+        LLM_INTERPRETATION_MODEL,
+        reference,
+        text,
+        lang=lang,
+        lang_name=LANGUAGE_NAMES_EN.get(lang, lang),
     )
-    user = (
-        f"Verse: {reference}\nText: {text}\n\n"
-        f"Explain it gently in {name} (max 2 sentences, explanation only):"
-    )
-    return _call_openai_as_text(system, user, max_tokens=200, model=_comment_model(lang))
+    return _keep_korean_only(interpretation) if lang == "ko" else interpretation
 
-
-async def _stream_openai(
-    system: str, user: str, max_tokens: int, model: str | None = None
-) -> AsyncGenerator[str, None]:
-    """OpenAI API를 스트리밍으로 호출하여 토큰 단위로 yield"""
-    client = OpenAI(api_key=OPENAI_API_KEY)
-    stream = client.chat.completions.create(
-        model=model or OPENAI_MODEL,
-        temperature=0.4,
-        max_tokens=max_tokens,
-        response_format={"type": "json_object"},
-        messages=[
-            {"role": "system", "content": system},
-            {"role": "user",   "content": user}
-        ],
-        stream=True,
-    )
-    for chunk in stream:
-        if chunk.choices and chunk.choices[0].delta.content:
-            yield chunk.choices[0].delta.content
 
 # ---------- /recommend ----------
 class RecommendIn(BaseModel):
@@ -646,17 +589,17 @@ RecommendResult = Union[RecommendItem, RecommendParseError]
 
 class RecommendOut(BaseModel):
     mood: str = Field(..., examples=["불안하고 잠이 안 와요"])
-    model: Optional[str] = Field(None, examples=["gpt-4o-mini"])
+    model: Optional[str] = Field(None, examples=["claude-haiku-5-5"])
     style: Optional[str] = Field(None, examples=["long"])
     results: Optional[List[RecommendResult]] = None
 
     # 현재 코드가 실패 시 200으로 error/candidates를 반환하므로 optional로 허용
-    error: Optional[str] = Field(None, examples=["OpenAI 호출 실패: ..."])
+    error: Optional[str] = Field(None, examples=["LLM 호출 실패: ..."])
     candidates: Optional[List[VerseCandidate]] = None
 
 
 # ---------- /random ----------
-# OpenAI 없이, 인기 말씀 테이블에서 매 호출마다 랜덤으로 1개 반환하는 엔드포인트
+# LLM 없이, 인기 말씀 테이블에서 매 호출마다 랜덤으로 1개 반환하는 엔드포인트
 
 class RandomOut(BaseModel):
     # 반환할 구절의 참조(책 장:절) 예: "시편 23:1"
@@ -817,7 +760,7 @@ def history_title(inp: RecommendIn):
     """기록 목록용 요약 제목만 따로 만들어 준다.
 
     평소에는 /recommend/stream 이 `title` 이벤트로 함께 내려주므로 이 경로는
-    쓰이지 않는다. **그때 생성이 실패했거나(구버전 서버·OpenAI 오류) 제목 없이
+    쓰이지 않는다. **그때 생성이 실패했거나(구버전 서버·LLM 오류) 제목 없이
     남은 기록**을 앱이 나중에 채워 넣는 용도다. 실패해도 빈 문자열을 주고,
     앱은 원문으로 계속 폴백한다.
     """
@@ -893,7 +836,7 @@ def send_daily_verse(inp: PushTokensIn):
                 "application/json": {
                     "example": {
                         "mood": "불안하고 잠이 안 와요",
-                        "model": "gpt-4o-mini",
+                        "model": "claude-haiku-5-5",
                         "style": "long",
                         "results": [
                             {
@@ -954,7 +897,7 @@ def recommend(inp: RecommendIn):
     _lap("cands", t)
     t = time.perf_counter()
 
-    # 2) OpenAI 생성
+    # 2) LLM 생성
     limits = _style_to_limits(COMMENT_STYLE)
     system = _recommend_system(lang)
 
@@ -971,9 +914,10 @@ def recommend(inp: RecommendIn):
         for v in selected:
             item = {"ref": v["ref"], "text": str(v["text"]), "tag": "", "comment": ""}
             try:
-                parsed = json.loads(_call_openai_as_json(
+                parsed = json.loads(llm.complete_json(
                     system, _build_single_comment_prompt(inp.mood, v, limits, lang),
                     max_tokens=per_card_tokens,
+                    schema=_COMMENT_SCHEMA,
                     model=_comment_model(lang),
                 ))
                 if isinstance(parsed, dict):
@@ -982,11 +926,11 @@ def recommend(inp: RecommendIn):
             except Exception:
                 log.exception("/recommend 코멘트 생성 실패 (%s)", v["ref"])
             results.append(item)
-        _lap("openai", t)
+        _lap("llm", t)
         log.info("/recommend total=%.3fs", time.perf_counter() - t0)
         return {
             "mood": inp.mood,
-            "model": OPENAI_MODEL,
+            "model": LLM_MODEL,
             "style": COMMENT_STYLE,
             "results": results,
         }
@@ -996,20 +940,22 @@ def recommend(inp: RecommendIn):
     t = time.perf_counter()
 
     try:
-        answer_str = _call_openai_as_json(system, user, max_tokens=limits["max_tokens"])
-        _lap("openai", t)
+        answer_str = llm.complete_json(
+            system, user, max_tokens=limits["max_tokens"], schema=_RESULTS_SCHEMA
+        )
+        _lap("llm", t)
         t = time.perf_counter()
     except Exception as e:
-        log.exception("/recommend openai_failed after %.3fs", time.perf_counter() - t0)
+        log.exception("/recommend llm_failed after %.3fs", time.perf_counter() - t0)
         return {
             "mood": inp.mood,
-            "error": f"OpenAI 호출 실패: {e}",
+            "error": f"LLM 호출 실패: {e}",
             "candidates": cands[:3]
         }
 
     # 3) JSON 파싱 + (선택) 한글 후처리
-    # - OpenAI가 response_format 때문에 {"result": [...]} / {"results": [...]} / {"data": [...]} 같은
-    #   "객체" 형태로 응답할 때가 있어, 항상 List[dict]로 정규화한다.
+    # - 응답 스키마(_RESULTS_SCHEMA)가 {"results": [...]} 라서 List[dict] 로 꺼낸다.
+    #   OpenAI 시절 배열·result·data 로도 왔던 터라 그 모양도 그대로 받아 둔다.
     try:
         parsed = json.loads(answer_str)
 
@@ -1050,7 +996,7 @@ def recommend(inp: RecommendIn):
 
     return {
         "mood": inp.mood,
-        "model": OPENAI_MODEL,
+        "model": LLM_MODEL,
         "style": COMMENT_STYLE,
         "results": results
     }
@@ -1106,7 +1052,7 @@ def _expand_search_query(mood: str, lang: str = "ko") -> str:
     임베딩 검색의 의미 매칭 정확도를 높인다. 키워드는 검색 대상 성경의 언어로
     뽑는다(비한국어 인덱스는 그 언어 본문이므로). 실패 시 원문 그대로(무중단).
     """
-    if not OPENAI_API_KEY:
+    if not llm.configured():
         return mood
     if lang == "ko":
         system = (
@@ -1136,7 +1082,7 @@ def _expand_search_query(mood: str, lang: str = "ko") -> str:
             "rest, comfort, renewal, God's care"
         )
     try:
-        kws = _call_openai_as_text(system, user, max_tokens=120).strip()
+        kws = llm.complete_text(system, user, max_tokens=120).strip()
         if lang == "ko":
             kws = _keep_korean_only(kws).strip()
         return f"{mood} {kws}" if kws else mood
@@ -1152,7 +1098,7 @@ def _make_history_title(mood: str, lang: str = "ko") -> str:
     "미래가 불안해서 아무것도 손에 안 잡혀요" → "미래 불안에 대한 상담" 처럼
     한 걸음 물러선 명사구로 바꾼다. 실패하면 빈 문자열(앱이 원문으로 폴백).
     """
-    if not OPENAI_API_KEY or not mood.strip():
+    if not llm.configured() or not mood.strip():
         return ""
     if lang == "ko":
         system = (
@@ -1180,7 +1126,7 @@ def _make_history_title(mood: str, lang: str = "ko") -> str:
             "→ On anxiety about the future"
         )
     try:
-        title = _call_openai_as_text(system, user, max_tokens=40).strip()
+        title = llm.complete_text(system, user, max_tokens=40).strip()
         if lang == "ko":
             title = _keep_korean_only(title).strip()
         return title.strip('"“” ').strip()
@@ -1196,7 +1142,7 @@ def _select_verses(mood: str, candidates: List[dict], picks: int) -> List[dict]:
     입력 맥락에 맞는 것만 고르게 한다. 실패 시 유사도 상위 picks개로 폴백.
     """
     fallback = candidates[:picks]
-    if not OPENAI_API_KEY or len(candidates) <= picks:
+    if not llm.configured() or len(candidates) <= picks:
         return fallback
     listed = "\n".join(
         f"{n + 1}. {c['ref']} :: {_clip(str(c['text']), 80)}"
@@ -1218,7 +1164,7 @@ def _select_verses(mood: str, candidates: List[dict], picks: int) -> List[dict]:
         '형식: {"picks": [번호, 번호, 번호]}'
     )
     try:
-        parsed = json.loads(_call_openai_as_json(system, user, max_tokens=100))
+        parsed = json.loads(llm.complete_json(system, user, max_tokens=100, schema=_PICKS_SCHEMA))
         nums = parsed.get("picks") if isinstance(parsed, dict) else parsed
         selected: List[dict] = []
         seen: set[int] = set()
@@ -1263,7 +1209,7 @@ def _recommend_stream_response(mood: str, lang: str = "ko") -> StreamingResponse
         meta = {
             "event": "meta",
             "mood": mood,
-            "model": OPENAI_MODEL,
+            "model": LLM_MODEL,
             "style": COMMENT_STYLE,
         }
         yield f"data: {json.dumps(meta, ensure_ascii=False)}\n\n"
@@ -1304,7 +1250,9 @@ def _recommend_stream_response(mood: str, lang: str = "ko") -> StreamingResponse
 
             user = _build_single_comment_prompt(mood, selected, limits, lang)
             try:
-                async for token in _stream_openai(system, user, per_card_tokens, _comment_model(lang)):
+                async for token in llm.stream_json(
+                    system, user, per_card_tokens, _COMMENT_SCHEMA, _comment_model(lang)
+                ):
                     yield f"data: {json.dumps({'event': 'token', 'index': idx, 'content': token}, ensure_ascii=False)}\n\n"
             except Exception as e:
                 log.exception("streaming error for card %d", idx)
@@ -1431,14 +1379,16 @@ def _comment_stream_response(inp: CommentStreamIn) -> StreamingResponse:
             "mood": inp.mood,
             "ref": verse["ref"],
             "index": index_value,
-            "model": OPENAI_MODEL,
+            "model": LLM_MODEL,
             "style": COMMENT_STYLE,
         }
         yield f"data: {json.dumps(meta, ensure_ascii=False)}\n\n"
 
         user = _build_single_comment_prompt(inp.mood, verse, limits, lang)
         try:
-            async for token in _stream_openai(system, user, limits["max_tokens"], _comment_model(lang)):
+            async for token in llm.stream_json(
+                system, user, limits["max_tokens"], _COMMENT_SCHEMA, _comment_model(lang)
+            ):
                 yield f"data: {json.dumps({'event': 'token', 'index': index_value, 'content': token}, ensure_ascii=False)}\n\n"
         except Exception as e:
             log.exception("comment streaming error for card %d", index_value)
@@ -1465,7 +1415,7 @@ def _comment_stream_response(inp: CommentStreamIn) -> StreamingResponse:
             "description": "SSE 스트리밍 응답 (text/event-stream)",
             "content": {
                 "text/event-stream": {
-                    "example": """data: {"event": "meta", "mood": "불안하고 잠이 안 와요", "ref": "시편 23:1", "index": 0, "model": "gpt-4o-mini", "style": "long"}
+                    "example": """data: {"event": "meta", "mood": "불안하고 잠이 안 와요", "ref": "시편 23:1", "index": 0, "model": "claude-haiku-5-5", "style": "long"}
 
 data: {"event": "token", "index": 0, "content": "{\\"tag\\": \\"두려움\\", \\"comment\\": \\"지금은..."}
 ...
@@ -1508,11 +1458,14 @@ app.include_router(languages_router)
 @app.on_event("startup")
 async def startup_notifications() -> None:
     manager = build_notification_manager(APP_SETTINGS)
-    # /daily-verse 응답의 interpretation 을 위해 LLM 풀이 생성기를 주입한다.
+    # /daily-verse 응답의 interpretation 을 위해 풀이기를 주입한다. 한국어는 검토본을 먼저 쓰고,
+    # 외국어(와 검토본이 없는 말씀)는 LLM 이 만든다. cache_tag 로 모델·프롬프트를 바꾸면 캐시가 새로 찬다.
     # 푸시 배치 경로(jobs.run_daily_verse_batch)는 interpreter 없이 동작하므로 풀이를 생성하지 않는다.
     manager.verse_interpreter = VerseInterpreter(
         store=VerseInterpretationStore(APP_SETTINGS.verse_interpretation_store_path),
         generate_fn=_generate_verse_interpretation,
+        curated=load_curated_interpretations(),
+        cache_tag=interpretation_cache_tag(LLM_INTERPRETATION_MODEL),
     )
     scheduler = DailyVerseScheduler(
         manager=manager,

@@ -147,7 +147,16 @@ class VerseInterpretationStore:
             return {}
 
 
-def _cache_key(verse: DailyVerse, lang: str) -> str:
+def text_fingerprint(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()[:8]
+
+
+def curated_key(verse_id: str, text: str) -> str:
+    """검토본 풀이 파일(`daily_interpretations.json`)의 키. 캐시 키와 같은 이유로 본문 지문을 붙인다."""
+    return f"{verse_id}:{text_fingerprint(text)}"
+
+
+def _cache_key(verse: DailyVerse, lang: str, tag: str = "") -> str:
     """풀이 캐시 키. verse_id 만으로는 부족하다.
 
     같은 verse_id 라도 본문이 바뀔 수 있다(합본 범위 조정, 서사 껍데기 제거 규칙 수정
@@ -155,18 +164,34 @@ def _cache_key(verse: DailyVerse, lang: str) -> str:
     실제로 목록을 457개로 교체할 때 `num-6-24` 가 민수기 6:24 에서 6:24-26(아론의
     축복 전체)으로 바뀌었다. 그래서 본문 지문을 키에 섞어 본문이 달라지면 캐시가
     저절로 무효가 되게 한다.
+
+    tag 는 생성 방식(모델·프롬프트)의 지문이다. 방식을 바꿔도 예전 풀이가 캐시에서 계속
+    나가던 문제가 있어(2026-09 품질 개편) 키에 섞는다.
     """
-    fingerprint = hashlib.sha256(verse.text.encode("utf-8")).hexdigest()[:8]
-    if lang == "ko":
-        return f"{verse.verse_id}:{fingerprint}"
-    return f"{verse.verse_id}:{lang}:{fingerprint}"
+    fingerprint = text_fingerprint(verse.text)
+    key = f"{verse.verse_id}:{fingerprint}" if lang == "ko" else f"{verse.verse_id}:{lang}:{fingerprint}"
+    return f"{key}:{tag}" if tag else key
+
+
+# 검토본 한국어 풀이. scripts/build_daily_verses.py --apply 가 만든다.
+_CURATED_PATH = Path(__file__).with_name("daily_interpretations.json")
+
+
+def load_curated_interpretations(path: str | Path = _CURATED_PATH) -> dict[str, str]:
+    """{curated_key: 풀이}. 파일이 없거나 깨져도 죽지 않고 빈 표로 넘어간다(즉석 생성으로 폴백)."""
+    try:
+        data = json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return {str(k): str(v) for k, v in data.items() if v} if isinstance(data, dict) else {}
 
 
 class VerseInterpreter:
-    """'오늘의 말씀 풀이'의 캐시 조회 → LLM 생성 → 폴백을 담당한다.
+    """'오늘의 말씀 풀이'의 검토본 조회 → 캐시 조회 → LLM 생성 → 폴백을 담당한다.
 
     generate_fn 은 (reference, text, lang) -> 풀이 문자열 을 반환하는 콜러블로,
-    운영에서는 app.py 의 OpenAI 백엔드 함수를 주입한다(테스트에서는 mock 을 주입).
+    운영에서는 app.py 의 LLM 백엔드 함수를 주입한다(테스트에서는 mock 을 주입).
+    curated 는 사람이 검토한 한국어 풀이({curated_key: 풀이})로, 있으면 LLM 을 부르지 않는다.
     어떤 경우에도 예외를 밖으로 던지지 않는다 — 풀이가 없어도 말씀은 항상 반환한다.
     """
 
@@ -174,12 +199,21 @@ class VerseInterpreter:
         self,
         store: VerseInterpretationStore,
         generate_fn: Callable[[str, str, str], str],
+        curated: dict[str, str] | None = None,
+        cache_tag: str = "",
     ) -> None:
         self._store = store
         self._generate = generate_fn
+        self._curated = curated or {}
+        self._cache_tag = cache_tag
 
     def interpret(self, verse: DailyVerse, lang: str = "ko") -> str:
-        cache_key = _cache_key(verse, lang)
+        if lang == "ko":
+            reviewed = self._curated.get(curated_key(verse.verse_id, verse.text))
+            if reviewed:
+                return reviewed
+
+        cache_key = _cache_key(verse, lang, self._cache_tag)
         try:
             cached = self._store.get(cache_key)
         except Exception:
