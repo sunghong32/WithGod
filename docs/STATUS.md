@@ -57,12 +57,15 @@ iOS 는 1.5.0 이 App Store 공개 상태(2026-08-11 릴리스).
 
 ## 진행/예정
 
-- [ ] **AI 장애 사과 — 1회성 팝업 + 푸시(11/2 작성·iOS 시뮬레이터 확인, 미커밋·미배포).** 앱: 홈에서 기존 사용자(알림 프라이밍을 이미 본 사람)에게만
+- [x] **AI 장애 사과 — 배포·발송 완료(2026-11-02, `d8b03ad`).** OTA production(runtime 1.5.0, iOS+Android,
+      update group `58618ddb`). 푸시 18:50 KST: 성공 76 · 실패 30(대부분 #24 죽은 토큰).
+      **미주·오클랜드 35대는 서버 타이머 `withgod-notice-push-rerun.timer` 가 11/3 05:30 KST 에 재발송** —
+      결과는 서버 `backend/data/notice_push_rerun.log`. 11/3 에 한 번 볼 것(이미 받은 기기는 건너뜀).
+      앱: 홈에서 기존 사용자(알림 프라이밍을 이미 본 사람)에게만
       `AiNoticeModal` 을 한 번 띄우고, 확인하면 `withgod.notice.aiOutage2026.seen` 으로 다시 안 띄운다. 처음 설치한
       사람은 본 것으로 기록만 하고, 2027-01-01 이후엔 아무에게도 안 띄운다(`aiNotice.ts`). 문구 8개 언어 `aiNotice.*`.
       푸시: `backend/scripts/send_notice_push.py` 를 **운영 서버에서** 실행(기본 미리보기 · `--token` 시험 · `--send` 본발송,
       현지 9–21시 기기만, 받은 기기는 `data/notice_push_sent.json` 에 기록해 재실행 시 건너뜀).
-      순서: OTA 배포 → 시험 발송 → 본발송(시간대가 갈리면 저녁에 `--send` 한 번 더)
 - [x] **Claude 이전 + 풀이 개편 — 운영 배포 완료(2026-11-02, `c8f8b44`).** 서버 venv 에 `anthropic==2.3.0`,
       `/etc/with-god-rag.env` 에 `ANTHROPIC_API_KEY`·`LLM_MODEL` 추가(백업 `.bak-20261102`, OPENAI_* 는 남겨 둠).
       서버 테스트 109개 통과, 재시작 9초. 확인: ko 풀이 = 검토본, en 풀이 새로 생성, 위로의 말씀 3장 끝까지(12초)
@@ -129,6 +132,7 @@ iOS 는 1.5.0 이 App Store 공개 상태(2026-08-11 릴리스).
 
 ## 최근 변경 이력
 
+- 2026-11-02 deploy(app,backend): AI 장애 사과 OTA(58618ddb) + 푸시 발송 76대 성공, 미주 35대는 11/3 05:30 KST 예약
 - 2026-11-02 fix(app): 위로의 말씀 스트림이 카드 도중 실패하면 받은 카드는 두고 안내·다시 검색 표시(#34) — 미배포
 - 2026-11-02 feat(app,backend): AI 장애 사과 — 기존 사용자 1회성 팝업(8개 언어) + 언어별 사과 푸시 발송 스크립트
 - 2026-11-02 deploy(backend): Claude 이전 + 풀이 개편 운영 배포 — 서버 테스트 109개 통과, Anthropic 호출 오류 0
