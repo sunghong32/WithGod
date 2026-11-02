@@ -57,9 +57,9 @@ iOS 는 1.5.0 이 App Store 공개 상태(2026-08-11 릴리스).
 
 ## 진행/예정
 
-- [ ] **Claude 이전 + 풀이 개편 운영 배포(11/2)** — 서버 venv 에 `anthropic` 설치, `/etc/with-god-rag.env` 에
-      `ANTHROPIC_API_KEY`·`LLM_MODEL` 추가 → `git pull` → `python -m unittest discover tests` → 재시작.
-      확인: `/daily-verse?lang=ko` 풀이가 검토본과 같은지, `?lang=en` 이 새로 만들어지는지, 위로의 말씀 3장이 끝까지 오는지
+- [x] **Claude 이전 + 풀이 개편 — 운영 배포 완료(2026-11-02, `c8f8b44`).** 서버 venv 에 `anthropic==2.3.0`,
+      `/etc/with-god-rag.env` 에 `ANTHROPIC_API_KEY`·`LLM_MODEL` 추가(백업 `.bak-20261102`, OPENAI_* 는 남겨 둠).
+      서버 테스트 109개 통과, 재시작 9초. 확인: ko 풀이 = 검토본, en 풀이 새로 생성, 위로의 말씀 3장 끝까지(12초)
 - [ ] **앱이 스트림 중간 오류를 숨긴다** — 코멘트가 실패하면 서버는 error 이벤트를 보내고 멈추는데, 앱 `result.tsx` 는
       타이핑만 멈추고 에러·다시검색 버튼을 안 띄운다(보이는 카드가 0개일 때만 띄움). 이번 장애가 "잘린 채 멈춤"으로 보인 이유
 - [x] **오늘의 말씀 재선정 — 배포 완료(2026-09-15, `7b2a08a`).** 457개 · 절기 고정(설날·추석 포함) ·
@@ -120,6 +120,7 @@ iOS 는 1.5.0 이 App Store 공개 상태(2026-08-11 릴리스).
 
 ## 최근 변경 이력
 
+- 2026-11-02 deploy(backend): Claude 이전 + 풀이 개편 운영 배포 — 서버 테스트 109개 통과, Anthropic 호출 오류 0
 - 2026-11-02 feat(backend): 생성 AI 를 OpenAI(gpt-4o-mini, 결제 정지) → Claude Haiku 5.5 로 이전 — `llm.py`, JSON 스키마, 코멘트 토큰 상한 2배
 - 2026-09-28 check(backend,app): 위로의 말씀이 잘린 채 멈춤 — OpenAI 크레딧 소진(9/18~ 추천 14건 전부 실패) + 앱이 중간 오류를 숨김
 - 2026-09-19 deploy(backend): #32 합본·하반절 외국어 변환 수정 운영 배포 — 서버 테스트 88개 통과
