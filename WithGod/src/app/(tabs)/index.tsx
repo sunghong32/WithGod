@@ -1,10 +1,12 @@
 import { useBookmarks, useToggleBookmark } from "@/features/bookmarks";
 import { useDailyVerse } from "@/features/verse/hooks/useDailyVerse";
+import { AiNoticeModal } from "@/shared/components/AiNoticeModal";
 import { useAppDrawer } from "@/shared/components/AppDrawer";
 import { NotificationPrimingModal } from "@/shared/components/NotificationPrimingModal";
 import { WidgetGuideModal } from "@/shared/components/WidgetGuideModal";
 import { VerseActionRow } from "@/shared/components/VerseActionRow";
 import { useKeyboardVisible, useSafeAreaPadding } from "@/shared/hooks";
+import { markAiNoticeSeen, shouldShowAiNotice } from "@/shared/lib/aiNotice";
 import { logAnalyticsEvent } from "@/shared/lib/analytics";
 import {
   hasSeenNotificationPriming,
@@ -44,6 +46,7 @@ export default function HomeScreen() {
   const { t } = useTranslation();
   const [message, setMessage] = useState("");
   const [showPriming, setShowPriming] = useState(false);
+  const [showAiNotice, setShowAiNotice] = useState(false);
   const [showWidgetPromo, setShowWidgetPromo] = useState(false);
   const [showWidgetGuide, setShowWidgetGuide] = useState(false);
   const { open: openHistoryDrawer } = useAppDrawer();
@@ -82,12 +85,18 @@ export default function HomeScreen() {
   // 첫 실행 프라이밍: 알림 권한이 미결정이고 안내를 아직 안 봤으면,
   // 시스템 팝업 대신 맥락을 설명하는 모달을 먼저 보여준다.
   // (홈이 포커스될 때 = 스플래시가 걷힌 뒤라 스플래시 위에 뜨지 않는다)
+  // 프라이밍을 이미 본 기존 사용자에게는 AI 장애 사과 안내를 한 번 띄운다.
+  // 처음 온 사용자는 장애를 겪지 않았으니 본 것으로 기록만 한다(두 모달도 겹치지 않는다).
   useFocusEffect(
     useCallback(() => {
       let active = true;
       (async () => {
         if (Platform.OS !== "ios" && Platform.OS !== "android") return;
-        if (await hasSeenNotificationPriming()) return;
+        if (await hasSeenNotificationPriming()) {
+          if ((await shouldShowAiNotice()) && active) setShowAiNotice(true);
+          return;
+        }
+        await markAiNoticeSeen();
         const status = await getPushPermissionStatusAsync();
         if (!active) return;
         // Android 는 '한 번도 안 물어봄'과 '거부'를 구분할 수 없어(check=false 뿐)
@@ -118,6 +127,11 @@ export default function HomeScreen() {
   const handlePrimingLater = useCallback(async () => {
     setShowPriming(false);
     await markNotificationPrimingSeen();
+  }, []);
+
+  const handleAiNoticeClose = useCallback(async () => {
+    setShowAiNotice(false);
+    await markAiNoticeSeen();
   }, []);
 
   // 오늘의 말씀 API 호출 (풀이 interpretation 포함, 향상된 에러 핸들링)
@@ -367,6 +381,8 @@ export default function HomeScreen() {
           onAccept={handlePrimingAccept}
           onLater={handlePrimingLater}
         />
+
+        <AiNoticeModal visible={showAiNotice} onClose={handleAiNoticeClose} />
 
         <WidgetGuideModal
           visible={showWidgetGuide}

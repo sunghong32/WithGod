@@ -157,6 +157,13 @@
     "later": "Agora não",
     "laterA11y": "Receber mais tarde"
   },
+  "aiNotice": {
+    "title": "Desculpe pelo\ntranstorno",
+    "body1": "Por um tempo, nossos recursos de IA não funcionaram bem, e o Versículo de conforto e as reflexões dos versículos não chegaram até você como deveriam. Pedimos sinceras desculpas a todos que esperaram.",
+    "body2": "Renovamos e melhoramos nossa IA para levar a você um conforto mais profundo. Vamos continuar com você, com ainda mais cuidado.",
+    "confirm": "OK",
+    "confirmA11y": "Confirmar e fechar o aviso"
+  },
   "push": {
     "fallbackTitle": "Novo versículo para você",
     "fallbackBody": "Confira o versículo",

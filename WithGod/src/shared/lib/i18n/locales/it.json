@@ -157,6 +157,13 @@
     "later": "Più tardi",
     "laterA11y": "Ricevi le notifiche più tardi"
   },
+  "aiNotice": {
+    "title": "Ci scusiamo per\nil disagio",
+    "body1": "Per un periodo le nostre funzioni di IA non hanno funzionato bene, e le Parole di conforto e le riflessioni sui versetti non ti sono arrivate come avrebbero dovuto. Chiediamo sinceramente scusa a tutti coloro che hanno atteso.",
+    "body2": "Abbiamo rinnovato e migliorato la nostra IA per offrirti un conforto più profondo. Continueremo a camminare con te, con ancora più cura.",
+    "confirm": "OK",
+    "confirmA11y": "Conferma e chiudi l'avviso"
+  },
   "push": {
     "fallbackTitle": "Un nuovo versetto per te",
     "fallbackBody": "Prenditi un momento per il versetto di oggi",

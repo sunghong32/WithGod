@@ -157,6 +157,13 @@
     "later": "Plus tard",
     "laterA11y": "Recevoir plus tard"
   },
+  "aiNotice": {
+    "title": "Désolés pour\nla gêne occasionnée",
+    "body1": "Pendant un certain temps, nos fonctions d'IA n'ont pas bien fonctionné, et le Verset de réconfort ainsi que les méditations des versets ne te sont pas parvenus comme il se doit. Nous présentons nos sincères excuses à toutes celles et ceux qui ont patienté.",
+    "body2": "Nous avons renouvelé et amélioré notre IA pour t'apporter un réconfort plus profond. Nous continuerons à t'accompagner, avec encore plus de soin.",
+    "confirm": "OK",
+    "confirmA11y": "Confirmer et fermer l'avis"
+  },
   "push": {
     "fallbackTitle": "Un nouveau verset t'attend",
     "fallbackBody": "Viens découvrir le verset",

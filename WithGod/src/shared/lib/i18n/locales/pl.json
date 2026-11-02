@@ -157,6 +157,13 @@
     "later": "Może później",
     "laterA11y": "Włącz później"
   },
+  "aiNotice": {
+    "title": "Przepraszamy za\nutrudnienia",
+    "body1": "Przez pewien czas nasze funkcje AI nie działały prawidłowo, przez co Słowo pociechy i rozważania wersetów nie docierały do Ciebie tak, jak powinny. Szczerze przepraszamy wszystkich, którzy czekali.",
+    "body2": "Odnowiliśmy i ulepszyliśmy naszą AI, aby nieść Ci głębszą pociechę. Nadal będziemy przy Tobie – z jeszcze większą troską.",
+    "confirm": "OK",
+    "confirmA11y": "Potwierdź i zamknij komunikat"
+  },
   "push": {
     "fallbackTitle": "Nowy werset dla Ciebie",
     "fallbackBody": "Przeczytaj nowy werset",

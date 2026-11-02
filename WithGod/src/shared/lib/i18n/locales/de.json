@@ -157,6 +157,13 @@
     "later": "Vielleicht später",
     "laterA11y": "Später entscheiden"
   },
+  "aiNotice": {
+    "title": "Entschuldige die\nUnannehmlichkeiten",
+    "body1": "Eine Zeit lang haben unsere KI-Funktionen nicht richtig funktioniert, sodass dich die Worte des Trostes und die Vers-Auslegungen nicht wie gewohnt erreicht haben. Allen, die gewartet haben, möchten wir uns aufrichtig entschuldigen.",
+    "body2": "Wir haben unsere KI erneuert und verbessert, um dir noch tieferen Trost zu schenken. Wir begleiten dich weiter – mit noch mehr Sorgfalt.",
+    "confirm": "OK",
+    "confirmA11y": "Hinweis bestätigen und schließen"
+  },
   "push": {
     "fallbackTitle": "Ein neuer Vers für dich",
     "fallbackBody": "Schau dir den Vers an",

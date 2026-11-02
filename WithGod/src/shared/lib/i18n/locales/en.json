@@ -157,6 +157,13 @@
     "later": "Maybe later",
     "laterA11y": "Decide later"
   },
+  "aiNotice": {
+    "title": "We're sorry for\nthe inconvenience",
+    "body1": "For a while, our AI features weren't working properly, and Words of Comfort and verse reflections didn't reach you as they should have. We sincerely apologize to everyone who waited.",
+    "body2": "We've renewed and improved our AI to bring you deeper comfort. We'll keep walking with you, with even more care.",
+    "confirm": "OK",
+    "confirmA11y": "Confirm and close notice"
+  },
   "push": {
     "fallbackTitle": "A New Verse Awaits",
     "fallbackBody": "Take a moment to read today's verse",

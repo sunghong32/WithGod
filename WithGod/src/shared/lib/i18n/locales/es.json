@@ -157,6 +157,13 @@
     "later": "Más tarde",
     "laterA11y": "Recibirlas más tarde"
   },
+  "aiNotice": {
+    "title": "Perdón por\nlas molestias",
+    "body1": "Durante un tiempo, nuestras funciones de IA no funcionaron bien y no pudimos ofrecerte Palabras de consuelo ni las reflexiones de los versículos como debíamos. Pedimos sinceras disculpas a todos los que esperaron.",
+    "body2": "Hemos renovado y mejorado nuestra IA para brindarte un consuelo más profundo. Seguiremos acompañándote con aún más cuidado.",
+    "confirm": "Aceptar",
+    "confirmA11y": "Confirmar y cerrar el aviso"
+  },
   "push": {
     "fallbackTitle": "Nuevo versículo para ti",
     "fallbackBody": "Mira el versículo del día",
