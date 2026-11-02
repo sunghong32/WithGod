@@ -17,15 +17,20 @@ _DEFAULT_TZ = ZoneInfo("Asia/Seoul")
 # ── 절기 고정 배치 ────────────────────────────────────────────────
 # 평소에는 배열 순서대로 하루씩 돌지만(아래 index 계산), 아래 날짜에는 정해진 말씀을 낸다.
 # 회전 주기가 365일이 아니라서(=말씀 개수) 그냥 두면 성탄절에 축도가, 새해에 문장
-# 조각이 나오는 일이 생긴다. 고정한 말씀도 목록에 그대로 남아 있어 제 차례에 또 나온다.
+# 조각이 나오는 일이 생긴다. 고정한 말씀도 목록에 그대로 남아 있어 제 차례에 또 나온다
+# (아래 _HOLIDAY_ONLY 는 예외).
 _FIXED_DATES: dict[tuple[int, int], str] = {
     (1, 1): "jer-29-11",    # 새해 — 너희 장래에 소망을 주려 하는 생각이라
     (12, 24): "isa-9-2",    # 성탄 전야 — 흑암에 행하던 백성이 큰 빛을 보고
     (12, 25): "luk-2-14",   # 성탄절 — 땅에서는 기뻐하심을 입은 사람들 중에 평화로다
 }
 
+# 절기 전용 — 그날에만 내고 평소 회전에서는 뺀다. 그날이라야 와닿는 말씀이다
+# (성탄절이 아닌 날 「땅에서는 … 평화로다」가 나오면 뜬금없다).
+_HOLIDAY_ONLY = {"luk-2-14"}
+
 # 부활절은 해마다 옮겨 다녀서 계산한다(서방 교회 그레고리력 계산법).
-_EASTER_VERSE_ID = "job-19-25"  # 나의 구속자가 살아 계시니
+_EASTER_VERSE_ID = "jhn-16-22"  # 내가 다시 너희를 보리니 … 너희 기쁨을 빼앗을 자가 없느니라
 
 # 설날·추석은 음력이라 계산 대신 날짜표를 쓴다(`lunar_holidays.json`).
 # 표는 한국 음력 라이브러리로 만든다 — 중국 음력으로 계산하면 2027·2028 설날이
@@ -101,7 +106,8 @@ class DailyVerseProvider:
         if pinned:
             item = next((v for v in verses if v.get("verse_id") == pinned), None)
         if item is None:
-            item = verses[current.toordinal() % len(verses)]
+            rotation = [v for v in verses if v.get("verse_id") not in _HOLIDAY_ONLY]
+            item = rotation[current.toordinal() % len(rotation)]
         return DailyVerse(
             verse_id=str(item["verse_id"]),
             reference=str(item["reference"]),

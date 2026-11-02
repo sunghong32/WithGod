@@ -348,8 +348,8 @@ class NotificationFeatureTest(unittest.TestCase):
         # 회전 주기가 365일이 아니라서 절기에는 정해진 말씀을 고정한다.
         expected = {
             date(2026, 1, 1): "jer-29-11",    # 새해
-            date(2026, 4, 5): "job-19-25",    # 부활절(계산)
-            date(2027, 3, 28): "job-19-25",   # 부활절은 해마다 옮겨 다닌다
+            date(2026, 4, 5): "jhn-16-22",    # 부활절(계산)
+            date(2027, 3, 28): "jhn-16-22",   # 부활절은 해마다 옮겨 다닌다
             date(2026, 12, 24): "isa-9-2",    # 성탄 전야
             date(2026, 12, 25): "luk-2-14",   # 성탄절
             date(2026, 2, 17): "num-6-24",    # 설날(음력 1/1)
@@ -361,6 +361,16 @@ class NotificationFeatureTest(unittest.TestCase):
                 self.assertEqual(fixed_verse_id(day), verse_id)
                 served = self.provider.get_daily_verse(now=datetime(day.year, day.month, day.day, 9, 0))
                 self.assertEqual(served.verse_id, verse_id)
+
+        # 성탄절 말씀은 성탄절에만 나온다 — 평소 회전에서는 빠진다.
+        verses = json.loads(self.verse_store_path.read_text(encoding="utf-8"))
+        day = date(2027, 1, 2)
+        for offset in range(len(verses) + 1):
+            current = date.fromordinal(day.toordinal() + offset)
+            if fixed_verse_id(current):
+                continue
+            served = self.provider.get_daily_verse(now=datetime(current.year, current.month, current.day, 9, 0))
+            self.assertNotEqual(served.verse_id, "luk-2-14", current)
 
         # 중국 음력으로 계산하면 2027 설날이 2/6 이 된다. 그날은 고정하지 않아야 한다.
         self.assertIsNone(fixed_verse_id(date(2027, 2, 6)))
