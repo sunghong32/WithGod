@@ -31,10 +31,10 @@ class DailyVerseNotificationManager:
     def get_daily_verse(self, now: datetime | None = None, lang: str = "ko") -> dict[str, str]:
         # naive now(또는 None)가 그대로 흘러가면 서버 OS 타임존(UTC 등) 기준 날짜가
         # 되므로, 항상 push_default_timezone 기준으로 normalize 해서 넘긴다.
-        verse = self.verse_provider.get_daily_verse(now=self._normalize_now(now))
-        verse = self._localize_verse(verse, lang)
+        source = self.verse_provider.get_daily_verse(now=self._normalize_now(now))
+        verse = self._localize_verse(source, lang)
         if self.verse_interpreter is not None:
-            verse.interpretation = self.verse_interpreter.interpret(verse, lang)
+            verse.interpretation = self.verse_interpreter.interpret(verse, lang, source=source)
         return asdict(verse)
 
     @staticmethod

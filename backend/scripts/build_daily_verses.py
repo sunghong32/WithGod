@@ -19,6 +19,10 @@
    `notifications/daily_interpretations.json` 으로 낸다. 풀이가 빠졌거나, 풀이를 쓸 때와
    카드 본문이 달라졌거나, 반말·본문 되옮기기 같은 결함이 있으면 반영하지 않는다.
    풀이는 `scripts/generate_verse_interpretations.py` 로 만든다.
+   외국어 검토본(`docs/verse_picks/interpretations_intl/<lang>.tsv`)은
+   `notifications/daily_interpretations_intl.json` 으로 낸다. 바탕으로 삼은 한국어 카드·풀이가
+   바뀌었거나 결함이 있는 행은 빼고 낸다(빠진 말씀은 운영에서 즉석 생성으로 채운다).
+   외국어 풀이는 `scripts/generate_intl_interpretations.py` 로 만든다.
 
     python scripts/build_daily_verses.py            # 검사만
     python scripts/build_daily_verses.py --apply
@@ -40,11 +44,17 @@ REFLECTIONS = PICKS / "reflections.tsv"
 INTERPRETATIONS = PICKS / "interpretations.tsv"
 OUT = ROOT / "notifications" / "daily_verses.json"
 OUT_INTERPRETATIONS = ROOT / "notifications" / "daily_interpretations.json"
+INTL_DIR = PICKS / "interpretations_intl"
+OUT_INTERPRETATIONS_INTL = ROOT / "notifications" / "daily_interpretations_intl.json"
 
 # notifications 의 두 모듈은 표준 라이브러리만 쓴다(fastapi 가 없어도 된다).
 sys.path.insert(0, str(ROOT))
-from notifications.interpretation import find_problems  # noqa: E402
-from notifications.verse_provider import curated_key  # noqa: E402
+from notifications.interpretation import INTL_LANGS, find_intl_problems, find_problems  # noqa: E402
+from notifications.verse_provider import (  # noqa: E402
+    curated_key,
+    intl_curated_key,
+    intl_source_fingerprint,
+)
 
 
 def canon_codes() -> dict[str, str]:
@@ -127,6 +137,47 @@ def curate_interpretations(entries: list[dict], interps: dict[str, tuple[str, st
     return curated, missing, stale, defects
 
 
+def load_intl_interpretations(lang: str) -> dict[str, tuple[str, str, str]]:
+    """{reference: (바탕 지문, 현지 참조, 풀이)}"""
+    path = INTL_DIR / f"{lang}.tsv"
+    if not path.exists():
+        return {}
+    out = {}
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if not line.strip() or line.startswith("#"):
+            continue
+        parts = line.split("\t")
+        if len(parts) != 4:
+            raise SystemExit(f"{path.name}: 열이 4개가 아닌 행 → {line[:60]}")
+        ref, fp, local_ref, note = (p.strip() for p in parts)
+        out[ref] = (fp, local_ref, note)
+    return out
+
+
+def curate_intl_interpretations(entries: list[dict], interps: dict[str, tuple[str, str]]):
+    """배포할 {intl_curated_key: 풀이} 와 언어별 (빠짐, 낡음, 결함) 목록."""
+    curated, problems = {}, {}
+    for lang in INTL_LANGS:
+        rows = load_intl_interpretations(lang)
+        missing, stale, defects = [], [], []
+        for e in entries:
+            got, ko = rows.get(e["reference"]), interps.get(e["reference"])
+            if not got:
+                missing.append(e["reference"])
+                continue
+            fp, _, note = got
+            if not ko or fp != intl_source_fingerprint(e["text"], ko[1]):
+                stale.append(e["reference"])
+                continue
+            found = find_intl_problems(note, lang)
+            if found:
+                defects.append(f"{e['reference']}: {', '.join(found)}")
+                continue
+            curated[intl_curated_key(lang, e["verse_id"], e["text"])] = note
+        problems[lang] = (missing, stale, defects)
+    return curated, problems
+
+
 def interleave(cards: list[dict]) -> list[dict]:
     """책이 뭉치지 않도록 전체 길이에 고르게 편다.
 
@@ -204,6 +255,14 @@ def main() -> int:
     for label, items in (("풀이 없음", no_interp), ("본문 바뀜 — 풀이 다시 볼 것", stale), ("결함", defects)):
         for r in items[:10]:
             print(f"    {label}: {r}")
+    curated_intl, intl_problems = curate_intl_interpretations(entries, load_interpretations())
+    print(f"외국어 검토본 {len(curated_intl)}개")
+    for lang, (i_missing, i_stale, i_defects) in intl_problems.items():
+        if i_missing or i_stale or i_defects:
+            print(f"  {lang}: 없음 {len(i_missing)} · 바탕 바뀜 {len(i_stale)} · 결함 {len(i_defects)}"
+                  " → scripts/generate_intl_interpretations.py (--submit / --fix)")
+            for r in i_defects[:3]:
+                print(f"    결함: {r}")
 
     if not args.apply:
         print("\n(검사만 했다. 반영하려면 --apply)")
@@ -221,6 +280,10 @@ def main() -> int:
     )
     print(f"\n→ {OUT} ({len(entries)}개)")
     print(f"→ {OUT_INTERPRETATIONS} ({len(curated)}개)")
+    OUT_INTERPRETATIONS_INTL.write_text(
+        json.dumps(curated_intl, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    )
+    print(f"→ {OUT_INTERPRETATIONS_INTL} ({len(curated_intl)}개)")
     return 0
 
 

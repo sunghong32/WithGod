@@ -6,8 +6,11 @@ from types import SimpleNamespace
 from unittest.mock import Mock
 
 from notifications.interpretation import (
+    INTL_LANGS,
     cache_tag,
     find_habits,
+    find_intl_habits,
+    find_intl_problems,
     find_problems,
     generate_interpretation,
     tidy,
@@ -15,8 +18,10 @@ from notifications.interpretation import (
 from notifications.models import DailyVerse
 from notifications.verse_provider import (
     VerseInterpretationStore,
+    CURATED_INTL_PATH,
     VerseInterpreter,
     curated_key,
+    intl_curated_key,
     load_curated_interpretations,
 )
 
@@ -26,6 +31,12 @@ JHN_8_11 = "나도 너를 정죄하지 아니하노니 가서 다시는 죄를 �
 GOOD = (
     "간음하다 붙잡혀 온 여인에게 예수님께서 하신 말씀이에요. "
     "정죄하지 않으신다는 말이 먼저 오고, 새 삶으로 부르심이 뒤에 옵니다."
+)
+EN_GOOD = (
+    "Jesus says this to a woman dragged before a crowd that wanted her punished, after every "
+    "accuser has walked away. He does not pretend the wrong never happened, yet the first word "
+    "she hears is not condemnation. The order matters: being released comes before being sent "
+    "out to live differently. A fresh start is offered first, and the change grows out of it."
 )
 
 
@@ -144,12 +155,39 @@ class GenerateInterpretationTest(unittest.TestCase):
         self.assertEqual(result, habit_only)
 
     def test_other_languages_skip_korean_checks(self) -> None:
-        client = FakeClient("Title\nJesus does not condemn her. Grace comes first.")
+        client = FakeClient("Title\n" + EN_GOOD)
         result = generate_interpretation(
             client, "claude-haiku-5-5", "John 8:11", "Neither do I condemn you.", lang="en", lang_name="English"
         )
-        self.assertEqual(result, "Jesus does not condemn her. Grace comes first.")
+        self.assertEqual(result, EN_GOOD)
+        self.assertEqual(len(client.calls), 1)
         self.assertIn("ONLY in English", client.calls[0]["system"])
+
+    def test_other_languages_write_from_reviewed_korean_note(self) -> None:
+        client = FakeClient(EN_GOOD)
+        generate_interpretation(
+            client, "claude-haiku-5-5", "John 8:11", "Neither do I condemn you.",
+            lang="en", lang_name="English", ko_note=GOOD,
+        )
+        self.assertIn("Reviewed Korean note: " + GOOD, client.calls[0]["messages"][0]["content"])
+
+    def test_other_languages_rewrite_prayer_ending_once(self) -> None:
+        # 2026-11-03 운영 영어 풀이가 맡김 권유로 끝났다 — 결함이면 한 번 고쳐 쓰게 한다
+        prayed = EN_GOOD + " Lord, help me to receive this fresh start today."
+        client = FakeClient(prayed, EN_GOOD)
+        result = generate_interpretation(
+            client, "claude-haiku-5-5", "John 8:11", "Neither do I condemn you.", lang="en", lang_name="English"
+        )
+        self.assertEqual(result, EN_GOOD)
+        self.assertIn("addresses God in prayer", client.calls[1]["messages"][-1]["content"])
+
+    def test_other_languages_raise_when_rewrite_still_prays(self) -> None:
+        prayed = EN_GOOD + " Lord, help me to receive this fresh start today."
+        client = FakeClient(prayed, prayed)
+        with self.assertRaises(ValueError):
+            generate_interpretation(
+                client, "claude-haiku-5-5", "John 8:11", "Neither do I condemn you.", lang="en", lang_name="English"
+            )
 
     def test_model_parameters(self) -> None:
         client = FakeClient(GOOD)
@@ -162,6 +200,26 @@ class GenerateInterpretationTest(unittest.TestCase):
         self.assertEqual(call["output_config"], {"effort": "medium"})
         self.assertEqual(call["thinking"], {"type": "adaptive"})
         self.assertNotIn("temperature", call)
+
+    def test_intl_checks(self) -> None:
+        self.assertEqual(find_intl_problems(EN_GOOD, "en"), [])
+        self.assertEqual(find_intl_habits(EN_GOOD), [])
+        # 문장 첫머리에서 하나님을 부르면 기도다. 문장 안의 「the Lord」는 통과
+        self.assertTrue(find_intl_problems("It is hard. Señor, ayúdame hoy.", "es"))
+        self.assertTrue(find_intl_problems("To trudne. Panie, prowadź mnie.", "pl"))
+        self.assertEqual(find_intl_problems("Paul says the Lord is near, so gentleness is possible.", "en"), [])
+        # 마지막 문장의 기도·맡김 권유는 말버릇(고쳐 쓰게 하되 막지는 않는다). 이탈리아어 「ora」(지금)는 기도가 아니다
+        self.assertTrue(find_intl_habits("Worry is heavy. Today, hand it over to God.", lang="en"))
+        self.assertTrue(find_intl_habits("Le poids est réel. Prie pour cela aujourd'hui.", lang="fr"))
+        self.assertFalse([h for h in find_intl_habits("Il peso è reale. Ora puoi respirare.", lang="it") if "pray" in h])
+        self.assertTrue(find_intl_problems("Jesus speaks first. 정죄하지 않으신다.", "en"))
+        # 실제로 잘못 걸렸던 것 — 스페인어 「se amen」(서로 사랑하라), 포르투갈어 「coração」(마음)
+        self.assertEqual(find_intl_problems("Pedro les pide que se amen de verdad.", "es"), [])
+        self.assertTrue(find_intl_problems("Que assim seja. Amém.", "pt"))
+        self.assertFalse([h for h in find_intl_habits("Hoje, o que o seu coração quer guardar?", lang="pt") if "pray" in h])
+        self.assertTrue(find_intl_habits("Notice how the verse moves. " + EN_GOOD))
+        self.assertTrue(find_intl_habits("The Hebrew word here means a raw cry. " + EN_GOOD))
+        self.assertTrue(find_intl_habits("Too short."))
 
     def test_cache_tag_follows_model(self) -> None:
         self.assertEqual(cache_tag("claude-haiku-5-5"), cache_tag("claude-haiku-5-5"))
@@ -193,11 +251,25 @@ class CuratedInterpretationTest(unittest.TestCase):
         self.assertEqual(interpreter.interpret(changed), "새 본문 풀이예요.")
         generate.assert_called_once()
 
-    def test_other_languages_ignore_korean_review(self) -> None:
+    def test_other_languages_generate_from_korean_review(self) -> None:
         generate = Mock(return_value="An English note.")
         interpreter = VerseInterpreter(self.store, generate, curated=self.curated)
         self.assertEqual(interpreter.interpret(self.verse, "en"), "An English note.")
-        generate.assert_called_once_with(self.verse.reference, self.verse.text, "en")
+        generate.assert_called_once_with(self.verse.reference, self.verse.text, "en", "검토한 풀이예요.")
+
+    def test_other_languages_use_reviewed_note_without_llm(self) -> None:
+        # 외국어 검토본은 현지 본문이 아니라 한국어 카드(source)로 찾는다
+        local = DailyVerse(verse_id="jhn-8-11", reference="John 8:11", text="Neither do I condemn you.", reflection="")
+        generate = Mock(return_value="불리면 안 됨")
+        interpreter = VerseInterpreter(
+            self.store, generate, curated=self.curated,
+            curated_intl={intl_curated_key("en", "jhn-8-11", JHN_8_11): "A reviewed English note."},
+        )
+        self.assertEqual(interpreter.interpret(local, "en", source=self.verse), "A reviewed English note.")
+        generate.assert_not_called()
+        # 검토본이 없는 언어는 한국어 검토본을 바탕으로 즉석 생성한다
+        interpreter.interpret(local, "fr", source=self.verse)
+        generate.assert_called_once_with("John 8:11", "Neither do I condemn you.", "fr", "검토한 풀이예요.")
 
     def test_changing_generation_method_regenerates_cache(self) -> None:
         # 모델·프롬프트를 바꾼 뒤에도 예전 풀이가 캐시에서 나가면 안 된다
@@ -226,6 +298,17 @@ class ShippedInterpretationsTest(unittest.TestCase):
                 interp = curated.get(curated_key(v["verse_id"], v["text"]))
                 self.assertTrue(interp)
                 self.assertEqual(find_problems(interp, v["text"]), [])
+
+    def test_every_daily_verse_has_a_clean_foreign_interpretation(self) -> None:
+        verses = json.loads((BACKEND / "notifications" / "daily_verses.json").read_text(encoding="utf-8"))
+        curated = load_curated_interpretations(CURATED_INTL_PATH)
+        self.assertEqual(len(curated), len(verses) * len(INTL_LANGS))
+        for v in verses:
+            for lang in INTL_LANGS:
+                with self.subTest(reference=v["reference"], lang=lang):
+                    interp = curated.get(intl_curated_key(lang, v["verse_id"], v["text"]))
+                    self.assertTrue(interp)
+                    self.assertEqual(find_intl_problems(interp, lang), [])
 
 
 if __name__ == "__main__":

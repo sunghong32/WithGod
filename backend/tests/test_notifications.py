@@ -287,7 +287,7 @@ class NotificationFeatureTest(unittest.TestCase):
         verse = manager.get_daily_verse(now=now)
 
         # (a) 첫 호출 시 LLM 이 1회 호출되어 풀이가 생성된다.
-        generate.assert_called_once_with(verse["reference"], verse["text"], "ko")
+        generate.assert_called_once_with(verse["reference"], verse["text"], "ko", "")
         self.assertEqual(verse["interpretation"], "풀이 첫 문장이에요. 두 번째 문장이에요.")
         # 풀이가 파일 캐시에 영속되어야 한다. 키는 verse_id 에 본문 지문을 붙인 것이다
         # (같은 verse_id 라도 본문이 바뀌면 예전 풀이를 쓰지 않기 위해 — 아래 테스트 참고).

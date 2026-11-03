@@ -46,6 +46,7 @@ from notifications.jobs import build_notification_manager
 from notifications.manager import DailyVerseNotificationManager
 from notifications.scheduler import DailyVerseScheduler
 from notifications.verse_provider import (
+    CURATED_INTL_PATH,
     VerseInterpretationStore,
     VerseInterpreter,
     load_curated_interpretations,
@@ -532,8 +533,8 @@ _PICKS_SCHEMA = {
 # 프롬프트와 결함 검사는 notifications/interpretation.py 에 있다(사전 생성 스크립트와 공유).
 # 한국어는 검토본(notifications/daily_interpretations.json)이 먼저 나가므로 여기까지
 # 오는 것은 외국어와, 검토본이 없는 말씀뿐이다. 말씀·언어당 1회만 호출된다(파일 캐시).
-def _generate_verse_interpretation(reference: str, text: str, lang: str = "ko") -> str:
-    """구절(reference, text)을 받아 해당 언어의 '풀이'를 생성한다.
+def _generate_verse_interpretation(reference: str, text: str, lang: str = "ko", ko_note: str = "") -> str:
+    """구절(reference, text)을 받아 해당 언어의 '풀이'를 생성한다. 외국어는 한국어 검토본(ko_note)을 바탕으로 쓴다.
 
     키가 없거나 호출·검사가 실패하면 예외를 올려 상위(VerseInterpreter)가 reflection 으로 폴백한다.
     """
@@ -546,6 +547,7 @@ def _generate_verse_interpretation(reference: str, text: str, lang: str = "ko") 
         text,
         lang=lang,
         lang_name=LANGUAGE_NAMES_EN.get(lang, lang),
+        ko_note=ko_note,
     )
     return _keep_korean_only(interpretation) if lang == "ko" else interpretation
 
@@ -1458,14 +1460,16 @@ app.include_router(languages_router)
 @app.on_event("startup")
 async def startup_notifications() -> None:
     manager = build_notification_manager(APP_SETTINGS)
-    # /daily-verse 응답의 interpretation 을 위해 풀이기를 주입한다. 한국어는 검토본을 먼저 쓰고,
-    # 외국어(와 검토본이 없는 말씀)는 LLM 이 만든다. cache_tag 로 모델·프롬프트를 바꾸면 캐시가 새로 찬다.
+    # /daily-verse 응답의 interpretation 을 위해 풀이기를 주입한다. 한국어·외국어 모두 검토본을 먼저 쓰고,
+    # 검토본이 없는 말씀만 LLM 이 만든다(외국어는 한국어 검토본을 바탕으로). cache_tag 로 모델·프롬프트를
+    # 바꾸면 캐시가 새로 찬다.
     # 푸시 배치 경로(jobs.run_daily_verse_batch)는 interpreter 없이 동작하므로 풀이를 생성하지 않는다.
     manager.verse_interpreter = VerseInterpreter(
         store=VerseInterpretationStore(APP_SETTINGS.verse_interpretation_store_path),
         generate_fn=_generate_verse_interpretation,
         curated=load_curated_interpretations(),
         cache_tag=interpretation_cache_tag(LLM_INTERPRETATION_MODEL),
+        curated_intl=load_curated_interpretations(CURATED_INTL_PATH),
     )
     scheduler = DailyVerseScheduler(
         manager=manager,

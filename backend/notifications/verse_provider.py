@@ -162,6 +162,18 @@ def curated_key(verse_id: str, text: str) -> str:
     return f"{verse_id}:{text_fingerprint(text)}"
 
 
+def intl_curated_key(lang: str, verse_id: str, ko_text: str) -> str:
+    """외국어 검토본(`daily_interpretations_intl.json`)의 키. 현지 본문이 아니라 **한국어 카드**의
+    지문을 쓴다 — 외국어 풀이는 한국어 검토본을 바탕으로 쓰므로 한국어 카드가 바뀌면 같이 낡는다."""
+    return f"{lang}:{curated_key(verse_id, ko_text)}"
+
+
+def intl_source_fingerprint(ko_text: str, ko_note: str) -> str:
+    """외국어 검토본이 바탕으로 삼은 한국어 카드·풀이의 지문. 한국어 풀이를 고치면 달라져서
+    빌드가 그 외국어 풀이를 낡은 것으로 본다(scripts/generate_intl_interpretations.py 로 다시 만든다)."""
+    return text_fingerprint(f"{ko_text}\n{ko_note}")
+
+
 def _cache_key(verse: DailyVerse, lang: str, tag: str = "") -> str:
     """풀이 캐시 키. verse_id 만으로는 부족하다.
 
@@ -179,8 +191,9 @@ def _cache_key(verse: DailyVerse, lang: str, tag: str = "") -> str:
     return f"{key}:{tag}" if tag else key
 
 
-# 검토본 한국어 풀이. scripts/build_daily_verses.py --apply 가 만든다.
+# 검토본 풀이. scripts/build_daily_verses.py --apply 가 만든다.
 _CURATED_PATH = Path(__file__).with_name("daily_interpretations.json")
+CURATED_INTL_PATH = Path(__file__).with_name("daily_interpretations_intl.json")
 
 
 def load_curated_interpretations(path: str | Path = _CURATED_PATH) -> dict[str, str]:
@@ -195,27 +208,38 @@ def load_curated_interpretations(path: str | Path = _CURATED_PATH) -> dict[str, 
 class VerseInterpreter:
     """'오늘의 말씀 풀이'의 검토본 조회 → 캐시 조회 → LLM 생성 → 폴백을 담당한다.
 
-    generate_fn 은 (reference, text, lang) -> 풀이 문자열 을 반환하는 콜러블로,
+    generate_fn 은 (reference, text, lang, ko_note) -> 풀이 문자열 을 반환하는 콜러블로,
     운영에서는 app.py 의 LLM 백엔드 함수를 주입한다(테스트에서는 mock 을 주입).
-    curated 는 사람이 검토한 한국어 풀이({curated_key: 풀이})로, 있으면 LLM 을 부르지 않는다.
+    curated 는 사람이 검토한 한국어 풀이({curated_key: 풀이}), curated_intl 은 그것을 바탕으로
+    미리 만들어 검사한 외국어 풀이({intl_curated_key: 풀이})다. 있으면 LLM 을 부르지 않는다.
+    외국어를 즉석 생성할 때도 한국어 검토본을 바탕으로 준다(ko_note).
     어떤 경우에도 예외를 밖으로 던지지 않는다 — 풀이가 없어도 말씀은 항상 반환한다.
     """
 
     def __init__(
         self,
         store: VerseInterpretationStore,
-        generate_fn: Callable[[str, str, str], str],
+        generate_fn: Callable[[str, str, str, str], str],
         curated: dict[str, str] | None = None,
         cache_tag: str = "",
+        curated_intl: dict[str, str] | None = None,
     ) -> None:
         self._store = store
         self._generate = generate_fn
         self._curated = curated or {}
+        self._curated_intl = curated_intl or {}
         self._cache_tag = cache_tag
 
-    def interpret(self, verse: DailyVerse, lang: str = "ko") -> str:
+    def interpret(self, verse: DailyVerse, lang: str = "ko", source: DailyVerse | None = None) -> str:
+        """source 는 현지화하기 전의 한국어 카드다(외국어에서 검토본을 찾는 데 쓴다).
+        주지 않으면 verse 를 한국어 카드로 본다."""
+        source = source or verse
+        ko_note = self._curated.get(curated_key(source.verse_id, source.text), "")
         if lang == "ko":
-            reviewed = self._curated.get(curated_key(verse.verse_id, verse.text))
+            if ko_note:
+                return ko_note
+        else:
+            reviewed = self._curated_intl.get(intl_curated_key(lang, source.verse_id, source.text))
             if reviewed:
                 return reviewed
 
@@ -228,7 +252,7 @@ class VerseInterpreter:
             return cached
 
         try:
-            generated = self._generate(verse.reference, verse.text, lang)
+            generated = self._generate(verse.reference, verse.text, lang, "" if lang == "ko" else ko_note)
             text = (generated or "").strip()
         except Exception:
             # 키 없음/네트워크/파싱 등 어떤 예외든 풀이 없이도 말씀은 반환한다.

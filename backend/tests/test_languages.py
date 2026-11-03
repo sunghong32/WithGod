@@ -24,6 +24,14 @@ DAILY_VERSES = BACKEND / "notifications" / "daily_verses.json"
 FOREIGN_LANGS = [lang for lang in languages.SUPPORTED_LANGUAGES if lang != "ko"]
 
 
+class IntlLangsTest(unittest.TestCase):
+    def test_interpretation_langs_match_supported_languages(self) -> None:
+        # interpretation.py 는 languages 를 import 하지 않아 목록을 따로 둔다 — 둘이 어긋나면 검토본이 빠진다
+        from notifications.interpretation import INTL_LANGS
+
+        self.assertEqual(list(INTL_LANGS), FOREIGN_LANGS)
+
+
 class LanguageStoreTestBase(unittest.TestCase):
     """languages 모듈 전역(스토어·한국어 절수 캐시·임베더)을 테스트마다 갈아 끼운다."""
 

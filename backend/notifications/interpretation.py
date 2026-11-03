@@ -98,7 +98,31 @@ def ko_user_prompt(
     return "\n".join(lines)
 
 
+# 앱 화면 문구(WithGod/src/shared/lib/i18n/locales)와 같은 말씨. 정해 주지 않으면 프랑스어
+# 풀이가 장마다 vous 와 tu 를 오갔다(2026-11-03 표본).
+# 「Notice…」처럼 관찰을 예고하는 첫머리. 일반 지시만으로는 Haiku 가 23%에서 썼다(2026-11-03 배치
+# 2,632건 중 599건) — 언어마다 실제로 나온 말을 짚어 준다. 검사(_ANNOUNCE_OPENING)와 짝이다.
+_INTL_ANNOUNCE_EXAMPLES = {
+    "English": "'Notice', 'Note that', 'What stands out'",
+    "Spanish": "'Fíjate', 'Observa', 'Lo que (más) llama la atención'",
+    "Portuguese": "'Repare', 'O que chama a atenção'",
+    "German": "'Auffällig ist', 'Beachte', 'Bemerkenswert ist'",
+    "French": "'Remarquez', 'Notez', 'Ce qui frappe'",
+    "Italian": "'Colpisce', 'Nota che', 'Ciò che colpisce'",
+    "Polish": "'Zwróć uwagę', 'Zauważ', 'Warto zauważyć'",
+}
+_INTL_ADDRESS = {
+    "German": "informal 'du'", "French": "informal 'tu' (never 'vous')", "Spanish": "informal 'tú'",
+    "Portuguese": "'você'", "Italian": "informal 'tu'", "Polish": "informal 'ty'",
+}
+
+
 def intl_system(lang_name: str) -> str:
+    address = _INTL_ADDRESS.get(lang_name)
+    announce = _INTL_ANNOUNCE_EXAMPLES.get(lang_name, "'Notice', 'It is easy to miss'")
+    address_line = (
+        f"When you speak to the reader, use {address}, as the rest of the app does.\n\n" if address else ""
+    )
     return (
         f"You know the Bible deeply and explain it warmly in plain words, writing ONLY in {lang_name}. "
         "You write the short devotional note shown under an app's 'verse of the day' card. "
@@ -109,7 +133,7 @@ def intl_system(lang_name: str) -> str:
         "- what the verse means — do not restate it; if knowing who said it to whom, and "
         "in what situation, brings the verse to life, give that background briefly;\n"
         "- one deeper observation (a word, the order, the contrast in a parallelism) — state "
-        "it directly, without announcing it ('It is easy to miss...', 'Notice...');\n"
+        f"it directly; never open a sentence by announcing it ({announce});\n"
         "- something concrete to carry into today — a scene or an attitude, not a vague resolution.\n"
         "Match the verse: comfort verses get a gentle, consoling voice; wisdom or exhortation "
         "gets a clear voice, never lecturing.\n\n"
@@ -123,12 +147,25 @@ def intl_system(lang_name: str) -> str:
         "something anyone can carry into the day;\n"
         "- assume the reader is a believer, or use church words (gospel, salvation, the Holy Spirit, "
         "holiness, glory) without plain language. Saying what God does, as the verse says it, is fine.\n\n"
-        "Output the paragraph only — no heading, no quotation of the verse, no reference."
+        "A reviewed Korean note may be given. It already follows these rules: write that same note "
+        f"for {lang_name} readers. Keep its meaning and its background facts, and let your last "
+        "sentence do what its last sentence does — the same suggestion, the same reassurance or the "
+        "same question. Add nothing it does not say: no extra facts, no remarks on Hebrew or Greek "
+        "words, no new advice. It may comment on the wording of the Korean Bible; keep such a remark "
+        f"only if it fits the {lang_name} verse text, quote only words that appear in that text, and "
+        "otherwise leave it out.\n\n"
+        + address_line
+        + "Output the paragraph only — no heading, no quotation of the verse, no reference."
     )
 
 
-def intl_user_prompt(reference: str, text: str, lang_name: str) -> str:
-    return f"Verse: {reference}\nText: {text}\n\nDevotional note in {lang_name}:"
+def intl_user_prompt(reference: str, text: str, lang_name: str, ko_note: str = "") -> str:
+    """ko_note 는 한국어 검토본 풀이다. 외국어 풀이가 같은 기준(비신자 기준·기도 끝 없음)을
+    물려받도록 바탕으로 준다 — 2026-11-03 전에는 외국어만 아무 검토 없이 즉석 생성했다."""
+    lines = [f"Verse: {reference}", f"Text: {text}"]
+    if ko_note:
+        lines.append(f"Reviewed Korean note: {ko_note}")
+    return "\n".join(lines) + f"\n\nDevotional note in {lang_name}:"
 
 
 # ── 말투 검사(한국어) ─────────────────────────────────────────────
@@ -199,6 +236,102 @@ _RETRY_NOTE_KO = (
     "모든 문장을 존댓말로 끝내고, 제목이나 본문 인용 없이 풀이 문장으로 바로 시작합니다."
 )
 
+
+# ── 외국어 검사 ─────────────────────────────────────────────────
+# 외국어 검토본을 두는 언어. languages.SUPPORTED_LANGUAGES 에서 ko 를 뺀 것과 같아야 한다
+# (이 모듈은 표준 라이브러리만 써서 languages 를 import 하지 않는다 — 테스트가 맞춰 본다).
+INTL_LANGS = ("en", "es", "pt", "de", "fr", "it", "pl")
+# 프롬프트로 막아도 Haiku 가 되살리는 것들이다(2026-11-03 운영 캐시): 기도로 맺기,
+# 「hand over to God」 같은 맡김 권유, 「Notice…」「Remarquez…」 같은 예고.
+# 한국어 검토본을 바탕으로 쓰게 한 뒤에도 남으면 한 번 고쳐 쓰게 한다.
+_HANGUL = re.compile(r"[가-힣]")
+# 문장 첫머리에서 하나님을 부르는 말 = 기도. 「the Lord is near」처럼 문장 안에 오는 것은 통과.
+_PRAYER_OPENING = re.compile(
+    r"(?:^|[.!?]\s+)[\"“«„]?(?:O\s+|Oh\s+|Ó\s+|Ô\s+)?"
+    r"(?:Lord|God|Father|Jesus|Señor|Dios|Padre|Senhor|Deus|Pai|Herr|Gott|Vater|"
+    r"Seigneur|Dieu|Père|Signore|Dio|Panie|Boże|Ojcze|Jezu)\s*[,!]"
+)
+# 대소문자를 가리고 문장부호까지 본다 — 스페인어 「que se amen」(서로 사랑하라)이 걸렸다.
+_AMEN = re.compile(r"\b(?:Amen|Amén|Amém)[.!]")
+# 마지막 문장에서 기도·맡김을 오늘 할 일로 권하는 말. 언어마다 따로 둔다 — 스페인어
+# 「ora」(기도하라)가 이탈리아어에서는 「지금」이다.
+_PRACTICE_CLOSING = {
+    lang: re.compile(pattern, re.I)
+    for lang, pattern in {
+        "en": r"\bpray|\bprayer|hand (?:\w+ )?over to God|\bentrust|(?:give|bring) (?:it|them|this|that) to God",
+        "es": r"\bor(?:a|ar|e|emos|ad)\b|\boración|entr[eé]ga\w* .{0,30}a Dios|en (?:las )?manos de Dios",
+        # 「coração」(마음) 안에 「oração」(기도)가 들어 있다 — 낱말 경계를 꼭 둔다
+        "pt": r"\bor(?:e|ar|emos)\b|\boração|entregue? .{0,30}a Deus|nas mãos de Deus",
+        "de": r"\bbet(?:e|en|et)\b|Gebet|Gott (?:an)?vertrau|in Gottes Hände|Gott (?:hin|ab)geben",
+        "fr": r"\bpri(?:e|ez|ons|er|ère)s?\b|confie[rz]? .{0,30}à Dieu|entre les mains de Dieu",
+        "it": r"\bpreg(?:a|hi|hiera|are|ate)\b|affida\w* .{0,30}a Dio|nelle mani di Dio",
+        "pl": r"módl|modlitw|powierz\w* .{0,30}Bogu|oddaj\w* .{0,30}Bogu",
+    }.items()
+}
+_ANNOUNCE_OPENING = re.compile(
+    r"(?:^|[.!?]\s+)(?:Notice|Note (?:that|how)|It is easy to miss|Look at how|What stands out|"
+    r"Remarquez|Notez|Observez|Ce qui frappe|Fíjate|Observa(?:d)?|Nota (?:que|cómo|come|che)|Notemos|"
+    r"Lo que (?:más )?llama la atención|Repare|O que (?:mais )?chama a atenção|"
+    r"Beachten Sie|Beachte|Auffällig ist|Bemerkenswert ist|Notate|Osserva|Colpisce|Ciò che colpisce|"
+    r"Zwróć uwagę|Zauważ|Warto zauważyć|Uderza)\b"
+)
+# 한국어 검토본에는 원어 풀이가 없다(지어낸 원어 풀이 금지) — 외국어에서 생기면 덧붙인 것이다.
+_ORIGINAL_LANGUAGE = re.compile(
+    r"\b(?:Hebrew|Greek|hebreo|griego|hebraico|grego|hebräisch\w*|griechisch\w*|hébreu|grec|grecque|"
+    r"ebraico|greco|hebrajsk\w*|greck\w*)\b",
+    re.I,
+)
+_INTL_WORDS = (30, 140)
+_INTL_SENTENCE = re.compile(r"[^.!?]+[.!?]*")
+
+
+def _words(s: str) -> list[str]:
+    return re.findall(r"[^\W\d_]+", s.lower())
+
+
+def find_intl_problems(text: str, lang: str = "") -> list[str]:
+    """외국어 풀이의 결함 — 한글 섞임, 기도문(하나님을 부르기·아멘). 빈 리스트면 통과."""
+    problems = []
+    if _HANGUL.search(text):
+        problems.append("contains Korean characters")
+    if _PRAYER_OPENING.search(text) or _AMEN.search(text):
+        problems.append("addresses God in prayer")
+    return problems
+
+
+def find_intl_habits(text: str, verse_text: str = "", lang: str = "") -> list[str]:
+    """외국어 풀이의 말버릇 — 기도·맡김 권유로 맺기, 예고 문구, 원어 풀이, 길이, 본문 되옮기기.
+
+    결함이 아니라서 고쳐 쓴 답이 더 나쁘면 첫 답을 쓴다. 기도 권유를 결함으로 두지 않는 까닭:
+    예레미야 33:3 「부르짖으라」처럼 본문이 기도를 말하는 구절은 한국어 검토본도 「부르짖는 사람에게
+    하나님은 귀를 기울이십니다」로 맺는다. 그 평서문을 옮기면 기도라는 말이 마지막 문장에 남는다.
+    """
+    habits = []
+    sentences = [s.strip() for s in _INTL_SENTENCE.findall(text) if s.strip()]
+    practice = _PRACTICE_CLOSING.get(lang)
+    if practice and sentences and practice.search(sentences[-1]):
+        habits.append("the closing sentence tells the reader to pray or hand things over to God")
+    if _ANNOUNCE_OPENING.search(text):
+        habits.append("announces an observation ('Notice…', 'What stands out…') instead of stating it")
+    if _ORIGINAL_LANGUAGE.search(text):
+        habits.append("adds a remark on Hebrew or Greek wording")
+    n = len(_words(text))
+    if not _INTL_WORDS[0] <= n <= _INTL_WORDS[1]:
+        habits.append(f"{n} words (aim for 60-90)")
+    v = _words(verse_text)
+    if len(v) >= 8:
+        t = " ".join(_words(text))
+        if any(" ".join(v[i:i + 8]) in t for i in range(len(v) - 7)):
+            habits.append("copies the verse text")
+    return habits
+
+
+_RETRY_NOTE_INTL = (
+    "The note you wrote has these problems: {problems}.\n"
+    "Rewrite it as one paragraph following the rules. Do not pray or address God, do not tell the "
+    "reader to pray or hand things over to God, and state any observation directly."
+)
+
 # 생각(thinking) 강도. 운영 즉석 생성은 low, 사전 생성은 medium(더 정확하다).
 # gpt-5.5 시절 low 3~5초·medium 5~11초였다.
 REASONING_EFFORT = "low"
@@ -237,7 +370,8 @@ def cache_tag(model: str, reasoning_effort: str = REASONING_EFFORT) -> str:
         KO_SYSTEM,
         ko_user_prompt("{reference}", "{text}"),
         intl_system("{lang}"),
-        intl_user_prompt("{reference}", "{text}", "{lang}"),
+        intl_user_prompt("{reference}", "{text}", "{lang}", "{ko_note}"),
+        _RETRY_NOTE_INTL,
     ])
     return hashlib.sha256(basis.encode("utf-8")).hexdigest()[:6]
 
@@ -268,6 +402,7 @@ def generate_interpretation(
     reasoning_effort: str = REASONING_EFFORT,
     check_habits: bool = False,
     form: str | None = None,
+    ko_note: str = "",
 ) -> str:
     """풀이 한 단락을 만든다.
 
@@ -275,14 +410,31 @@ def generate_interpretation(
     쓰게 한다. 그래도 걸리면 예외를 올린다 — 상위(VerseInterpreter)가 한 줄 적용문으로
     폴백하고 캐시에는 남기지 않는다. `check_habits` 는 사전 생성용으로, 말버릇도
     고쳐 쓰게 하되 끝내 남으면 예외 없이 그대로 돌려준다(사람이 검토한다).
+
+    외국어는 한국어 검토본(`ko_note`)을 바탕으로 쓰고, 결함(`find_intl_problems`)이나
+    말버릇(`find_intl_habits`)이 있으면 한 번 고쳐 쓰게 한다. 처리 규칙은 한국어와 같다.
     """
     if lang != "ko":
         name = lang_name or lang
         messages = [
             {"role": "system", "content": intl_system(name)},
-            {"role": "user", "content": intl_user_prompt(reference, text, name)},
+            {"role": "user", "content": intl_user_prompt(reference, text, name, ko_note)},
         ]
-        return tidy(_complete(client, model, messages, reasoning_effort), text)
+        raw = _complete(client, model, messages, reasoning_effort)
+        first = tidy(raw, text)
+        defects, habits = find_intl_problems(first, lang), find_intl_habits(first, text, lang)
+        if not defects and not habits:
+            return first
+        messages += [
+            {"role": "assistant", "content": raw},
+            {"role": "user", "content": _RETRY_NOTE_INTL.format(problems="; ".join(defects + habits))},
+        ]
+        second = tidy(_complete(client, model, messages, reasoning_effort), text)
+        if not find_intl_problems(second, lang):
+            return second
+        if not defects:
+            return first
+        raise ValueError(f"풀이 검사 실패({reference}, {lang}): {'; '.join(find_intl_problems(second, lang))}")
 
     messages = [
         {"role": "system", "content": KO_SYSTEM},
