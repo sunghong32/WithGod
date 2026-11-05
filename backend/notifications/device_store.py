@@ -30,8 +30,8 @@ class DeviceStore:
         device_id: str = "",
         app_version: str = "",
         os_version: str = "",
-        language: str = "ko",
-        enabled: bool = True,
+        language: str | None = None,
+        enabled: bool | None = None,
         schedule_hour: int | None = None,
         schedule_minute: int | None = None,
     ) -> tuple[DeviceRegistration, bool]:
@@ -42,17 +42,25 @@ class DeviceStore:
             match_index = self._find_index(devices, token=token, device_id=device_id)
             if match_index is not None:
                 existing = devices[match_index]
+                # 부분 병합(이슈 #23): 요청에 온 필드만 바꾸고, 빈 문자열·None(= 안 보냄)은
+                # 기존 값을 둔다. 통째로 바꾸면 language 를 안 보내는 구버전 앱(1.3.0 미만)
+                # 등록 한 번에 외국어 사용자가 ko 로, 개인 알림 시각이 전역 기본으로 돌아간다.
+                # token(device_id 로 찾았으면 새 토큰)·platform·timezone 은 늘 와서 그대로 쓴다.
                 devices[match_index] = DeviceRegistration(
                     token=token,
                     platform=platform,
                     timezone=timezone,
-                    device_id=device_id,
-                    app_version=app_version,
-                    os_version=os_version,
-                    language=language,
-                    enabled=enabled,
-                    schedule_hour=schedule_hour,
-                    schedule_minute=schedule_minute,
+                    device_id=device_id or existing.device_id,
+                    app_version=app_version or existing.app_version,
+                    os_version=os_version or existing.os_version,
+                    language=language or existing.language,
+                    enabled=existing.enabled if enabled is None else enabled,
+                    schedule_hour=(
+                        existing.schedule_hour if schedule_hour is None else schedule_hour
+                    ),
+                    schedule_minute=(
+                        existing.schedule_minute if schedule_minute is None else schedule_minute
+                    ),
                     created_at=existing.created_at or now,
                     updated_at=now,
                     last_daily_sent_on=existing.last_daily_sent_on,
@@ -67,8 +75,8 @@ class DeviceStore:
                 device_id=device_id,
                 app_version=app_version,
                 os_version=os_version,
-                language=language,
-                enabled=enabled,
+                language=language or "ko",
+                enabled=True if enabled is None else enabled,
                 schedule_hour=schedule_hour,
                 schedule_minute=schedule_minute,
                 created_at=now,
