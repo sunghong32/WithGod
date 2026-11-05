@@ -8,9 +8,9 @@ import {
 } from "@/features/history";
 import { useSafeAreaPadding } from "@/shared/hooks";
 import { useAppDrawer } from "./AppDrawer";
-import { t } from "@/shared/lib/i18n";
 import { baseFontFamily, colors, scaleFont } from "@/shared/styles";
 import { Ionicons } from "@expo/vector-icons";
+import type { TFunction } from "i18next";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -45,7 +45,7 @@ type Group = { key: string; label: string; items: HistoryEntry[] };
 const startOfDay = (date: Date): number =>
   new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
 
-const groupByDate = (entries: HistoryEntry[]): Group[] => {
+const groupByDate = (entries: HistoryEntry[], t: TFunction): Group[] => {
   const today = startOfDay(new Date());
   const day = 24 * 60 * 60 * 1000;
   const buckets: Record<string, HistoryEntry[]> = {
@@ -80,7 +80,11 @@ const displayTitle = (entry: HistoryEntry): string =>
   (entry.title || "").trim() || entry.mood;
 
 export function HistorySidebar({ onSelect }: HistorySidebarProps) {
-  useTranslation(); // 언어 변경 시 다시 그리기
+  // 문구는 반드시 이 훅의 t 로 그린다. 모듈의 전역 t 를 쓰면 React Compiler 가
+  // 그 호출을 "입력이 안 변하는 값"으로 보고 첫 렌더 결과를 계속 재사용해서,
+  // 언어가 바뀌어도 사이드바가 처음 그린 언어(앱 시작 시 ko)로 남는다(이슈 #30).
+  // 이 훅의 t 는 언어가 바뀔 때마다 새 함수라 캐시가 함께 무효화된다.
+  const { t } = useTranslation();
   const { insets, headerPaddingTop } = useSafeAreaPadding();
   const { data: entries = [], refetch } = useHistory();
   const removeEntry = useRemoveHistoryEntry();
@@ -145,7 +149,7 @@ export function HistorySidebar({ onSelect }: HistorySidebarProps) {
     });
   }, [entries, query]);
 
-  const groups = useMemo(() => groupByDate(filtered), [filtered]);
+  const groups = useMemo(() => groupByDate(filtered, t), [filtered, t]);
 
   const closeSearch = () => {
     setSearching(false);
