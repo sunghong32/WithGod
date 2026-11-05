@@ -23,6 +23,9 @@ import {
  * 목록에서는 요약 제목만 보이므로, 내용을 확인할 수단이 여기 필요하다.
  */
 
+/** 미리보기·메뉴의 최대 폭(dp). 태블릿에서 화면 폭만큼 늘어나지 않게 묶는다 */
+const SHEET_MAX_WIDTH = 480;
+
 type HistoryActionSheetProps = {
   entry: HistoryEntry | null;
   onClose: () => void;
@@ -68,7 +71,12 @@ export function HistoryActionSheet({
           pointerEvents="box-none"
           style={[
             styles.sheet,
-            { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 24 },
+            {
+              paddingTop: insets.top + 24,
+              paddingBottom: insets.bottom + 24,
+              paddingLeft: 20 + insets.left,
+              paddingRight: 20 + insets.right,
+            },
           ]}
         >
           <Animated.View
@@ -144,6 +152,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   previewCard: {
+    width: "100%",
+    maxWidth: SHEET_MAX_WIDTH,
+    alignSelf: "center",
+    // 높이가 낮은 창(태블릿 가로·분할 화면)에서는 미리보기가 줄어들어 메뉴가 화면 안에 남는다
+    flexShrink: 1,
     backgroundColor: "#FFFFFF",
     borderRadius: 20,
     maxHeight: "58%",
@@ -197,6 +210,9 @@ const styles = StyleSheet.create({
     fontFamily: baseFontFamily,
   },
   menu: {
+    width: "100%",
+    maxWidth: SHEET_MAX_WIDTH,
+    alignSelf: "center",
     marginTop: 16,
     backgroundColor: "#FFFFFF",
     borderRadius: 16,

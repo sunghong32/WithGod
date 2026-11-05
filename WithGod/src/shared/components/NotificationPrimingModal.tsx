@@ -2,6 +2,7 @@ import { baseFontFamily, colors, scaleFont } from "@/shared/styles";
 import { Ionicons } from "@expo/vector-icons";
 import { useTranslation } from "react-i18next";
 import { Modal, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ModalBackdrop } from "./ModalBackdrop";
 
 type Props = {
   visible: boolean;
@@ -25,7 +26,7 @@ export function NotificationPrimingModal({ visible, onAccept, onLater }: Props) 
       animationType="fade"
       onRequestClose={onLater}
     >
-      <View style={styles.backdrop}>
+      <ModalBackdrop>
         <View style={styles.card}>
           <View style={styles.iconCircle}>
             <Ionicons name="notifications-outline" size={28} color={colors.primary} />
@@ -51,19 +52,12 @@ export function NotificationPrimingModal({ visible, onAccept, onLater }: Props) 
             <Text style={styles.laterButtonText}>{t("notifPriming.later")}</Text>
           </TouchableOpacity>
         </View>
-      </View>
+      </ModalBackdrop>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    backgroundColor: "rgba(16, 24, 40, 0.45)",
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: 32,
-  },
   card: {
     width: "100%",
     maxWidth: 340,

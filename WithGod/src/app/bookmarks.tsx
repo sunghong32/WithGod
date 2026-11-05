@@ -48,7 +48,7 @@ function formatSavedDate(iso: string): string {
 
 export default function BookmarksScreen() {
   const { t } = useTranslation();
-  const { insets } = useSafeAreaPadding();
+  const { insets, getContentPadding } = useSafeAreaPadding();
   const { data: bookmarks, isLoading } = useBookmarks();
   const removeBookmark = useRemoveBookmark();
   const [filter, setFilter] = useState<Filter>("all");
@@ -145,7 +145,7 @@ export default function BookmarksScreen() {
     <View style={styles.container}>
       <ScreenHeader title={t("bookmarks.headerTitle")} />
 
-      <View style={styles.filterRow}>
+      <View style={[styles.filterRow, getContentPadding(16)]}>
         {FILTERS.map(({ key, labelKey }) => {
           const isActive = filter === key;
           const label = t(labelKey);
@@ -187,6 +187,7 @@ export default function BookmarksScreen() {
           contentContainerStyle={[
             styles.listContent,
             { paddingBottom: insets.bottom + 32 },
+            getContentPadding(16),
             filtered.length === 0 && styles.listContentEmpty,
           ]}
           showsVerticalScrollIndicator={false}

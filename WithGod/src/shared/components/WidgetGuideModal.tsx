@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { ModalBackdrop } from "./ModalBackdrop";
 
 const WIDGET_PREVIEW = require("../assets/widget/daily-verse-preview.png");
 
@@ -45,7 +46,7 @@ export function WidgetGuideModal({ visible, onClose }: Props) {
       animationType="fade"
       onRequestClose={onClose}
     >
-      <View style={styles.backdrop}>
+      <ModalBackdrop>
         <View style={styles.card}>
           <Text style={styles.title}>{t("widgetGuide.title")}</Text>
           <Text style={styles.description}>{t("widgetGuide.body")}</Text>
@@ -78,19 +79,12 @@ export function WidgetGuideModal({ visible, onClose }: Props) {
             <Text style={styles.confirmButtonText}>{t("widgetGuide.confirm")}</Text>
           </TouchableOpacity>
         </View>
-      </View>
+      </ModalBackdrop>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    backgroundColor: "rgba(16, 24, 40, 0.45)",
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: 32,
-  },
   card: {
     width: "100%",
     maxWidth: 340,

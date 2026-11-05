@@ -70,7 +70,7 @@ export default function ResultScreen() {
   const [replayMood, setReplayMood] = useState("");
   const [isReplayLoading, setIsReplayLoading] = useState(isReplay);
   const mood = isReplay ? replayMood : (moodParam ?? "");
-  const { insets } = useSafeAreaPadding();
+  const { insets, getContentPadding } = useSafeAreaPadding();
   const [results, setResults] = useState<RecommendItem[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamError, setStreamError] = useState<string | null>(null);
@@ -1197,7 +1197,11 @@ export default function ResultScreen() {
         scrollEventThrottle={16}
       >
         <View
-          style={[styles.scrollContent, { paddingBottom: insets.bottom + 32 }]}
+          style={[
+            styles.scrollContent,
+            { paddingBottom: insets.bottom + 32 },
+            getContentPadding(16),
+          ]}
         >
           {/* 유저 입력 말풍선 - 오른쪽 정렬 */}
           <View style={styles.userMessageContainer}>
