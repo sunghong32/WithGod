@@ -246,6 +246,207 @@ class NotificationFeatureTest(unittest.TestCase):
         self.assertEqual(next_day_sent["result"]["success_count"], 1)
         self.assertEqual(self.store.list_devices()[0].last_daily_sent_on, "2026-04-22")
 
+    # --- #25: 알림 시각이 지난 뒤 새로 등록된 기기에 즉시 푸시가 가던 문제 ---
+
+    def test_new_device_registered_after_target_waits_until_next_day(self) -> None:
+        # 15:00 에 처음 등록(전역 9:00)하면 캐치업으로 곧바로 보내지 않고 다음 날 9:00 부터 받는다.
+        result = self.manager.register_device(
+            token="late-token",
+            platform="android",
+            timezone="Asia/Seoul",
+            device_id="install-late",
+            now=datetime(2026, 4, 21, 15, 0),
+        )
+        self.assertTrue(result["created"])
+        self.assertEqual(result["device"]["last_daily_sent_on"], "2026-04-21")
+        scheduler = DailyVerseScheduler(self.manager, poll_seconds=30)
+
+        right_after = scheduler.run_once(now=datetime(2026, 4, 21, 15, 0, 30))
+        self.assertEqual(right_after["scheduled_count"], 0)
+        self.assertEqual(self.gateway.sent_batches, [])
+
+        next_day_early = scheduler.run_once(now=datetime(2026, 4, 22, 8, 59))
+        self.assertEqual(next_day_early["scheduled_count"], 0)
+
+        next_day_sent = scheduler.run_once(now=datetime(2026, 4, 22, 9, 0))
+        self.assertEqual(next_day_sent["result"]["success_count"], 1)
+        self.assertEqual(self.store.list_devices()[0].last_daily_sent_on, "2026-04-22")
+
+    def test_new_device_registered_before_target_gets_push_same_day(self) -> None:
+        result = self.manager.register_device(
+            token="early-token",
+            platform="ios",
+            timezone="Asia/Seoul",
+            device_id="install-early",
+            now=datetime(2026, 4, 21, 8, 0),
+        )
+        self.assertEqual(result["device"]["last_daily_sent_on"], "")
+        scheduler = DailyVerseScheduler(self.manager, poll_seconds=30)
+
+        self.assertEqual(scheduler.run_once(now=datetime(2026, 4, 21, 8, 59))["scheduled_count"], 0)
+        sent = scheduler.run_once(now=datetime(2026, 4, 21, 9, 0))
+        self.assertEqual(sent["result"]["success_count"], 1)
+
+    def test_new_device_uses_personal_schedule_for_initial_sent_date(self) -> None:
+        # 개인 시각 기준으로 판정한다: 15:00 등록 시 7:30 은 이미 지났고 20:30 은 아직이다.
+        passed = self.manager.register_device(
+            token="morning-token",
+            platform="ios",
+            timezone="Asia/Seoul",
+            device_id="install-morning",
+            schedule_hour=7,
+            schedule_minute=30,
+            now=datetime(2026, 4, 21, 15, 0),
+        )
+        upcoming = self.manager.register_device(
+            token="evening-token",
+            platform="ios",
+            timezone="Asia/Seoul",
+            device_id="install-evening",
+            schedule_hour=20,
+            schedule_minute=30,
+            now=datetime(2026, 4, 21, 15, 0),
+        )
+        self.assertEqual(passed["device"]["last_daily_sent_on"], "2026-04-21")
+        self.assertEqual(upcoming["device"]["last_daily_sent_on"], "")
+        scheduler = DailyVerseScheduler(self.manager, poll_seconds=30)
+
+        self.assertEqual(scheduler.run_once(now=datetime(2026, 4, 21, 15, 1))["scheduled_count"], 0)
+        evening = scheduler.run_once(now=datetime(2026, 4, 21, 20, 30))
+        self.assertEqual(self.gateway.sent_batches, [["evening-token"]])
+        self.assertEqual(evening["result"]["success_count"], 1)
+
+        next_morning = scheduler.run_once(now=datetime(2026, 4, 22, 7, 30))
+        self.assertEqual(next_morning["result"]["success_count"], 1)
+        self.assertEqual(self.gateway.sent_batches[-1], ["morning-token"])
+
+    def test_new_device_initial_sent_date_uses_device_local_date(self) -> None:
+        # 서버 기본은 Asia/Seoul. KST 4/21 15:00 = LA 4/20 23:00 → LA 기준 4/20 몫만 보낸 것으로 친다.
+        la = self.manager.register_device(
+            token="la-token",
+            platform="android",
+            timezone="America/Los_Angeles",
+            device_id="install-la",
+            now=datetime(2026, 4, 21, 15, 0),
+        )
+        self.assertEqual(la["device"]["last_daily_sent_on"], "2026-04-20")
+        # KST 4/21 23:00 = LA 4/21 07:00 → 아직 9:00 전이라 비워 둔다.
+        la_morning = self.manager.register_device(
+            token="la-morning-token",
+            platform="android",
+            timezone="America/Los_Angeles",
+            device_id="install-la-morning",
+            now=datetime(2026, 4, 21, 23, 0),
+        )
+        self.assertEqual(la_morning["device"]["last_daily_sent_on"], "")
+        scheduler = DailyVerseScheduler(self.manager, poll_seconds=30)
+
+        # LA 4/21 08:59 (KST 4/22 00:59) 에는 둘 다 아직.
+        early = scheduler.run_once(now=datetime(2026, 4, 22, 0, 59))
+        self.assertEqual(early["scheduled_count"], 0)
+        # LA 4/21 09:00 (KST 4/22 01:00) 에 둘 다 받는다 — 서버 날짜(4/21)를 썼다면 la-token 이 빠진다.
+        sent = scheduler.run_once(now=datetime(2026, 4, 22, 1, 0))
+        self.assertEqual(sorted(self.gateway.sent_batches[-1]), ["la-morning-token", "la-token"])
+        self.assertEqual(sent["result"]["success_count"], 2)
+
+    def test_token_rotation_keeps_sent_date_so_no_second_push(self) -> None:
+        # 같은 설치(device_id)에서 토큰만 바뀌면 기존 행 갱신 — 이미 받은 날 다시 보내지 않는다.
+        self.manager.register_device(
+            token="old-token",
+            platform="ios",
+            timezone="Asia/Seoul",
+            device_id="install-rotate",
+            now=datetime(2026, 4, 21, 8, 0),
+        )
+        scheduler = DailyVerseScheduler(self.manager, poll_seconds=30)
+        self.assertEqual(scheduler.run_once(now=datetime(2026, 4, 21, 9, 0))["scheduled_count"], 1)
+
+        rotated = self.manager.register_device(
+            token="new-token",
+            platform="ios",
+            timezone="Asia/Seoul",
+            device_id="install-rotate",
+            now=datetime(2026, 4, 21, 15, 0),
+        )
+        self.assertFalse(rotated["created"])
+        self.assertEqual(rotated["device"]["token"], "new-token")
+        self.assertEqual(rotated["device"]["last_daily_sent_on"], "2026-04-21")
+        self.assertEqual(scheduler.run_once(now=datetime(2026, 4, 21, 15, 1))["scheduled_count"], 0)
+
+    def test_existing_device_moving_schedule_later_still_gets_today(self) -> None:
+        # 기존 사용자가 알림 시각을 '지금 이후'로 바꾸면 그날 바뀐 시각에 그대로 받는다.
+        self.manager.register_device(
+            token="move-token",
+            platform="android",
+            timezone="Asia/Seoul",
+            device_id="install-move",
+            schedule_hour=21,
+            schedule_minute=0,
+            now=datetime(2026, 4, 20, 8, 0),
+        )
+        scheduler = DailyVerseScheduler(self.manager, poll_seconds=30)
+        self.assertEqual(scheduler.run_once(now=datetime(2026, 4, 20, 21, 0))["scheduled_count"], 1)
+
+        moved = self.manager.register_device(
+            token="move-token",
+            platform="android",
+            timezone="Asia/Seoul",
+            device_id="install-move",
+            schedule_hour=18,
+            schedule_minute=0,
+            now=datetime(2026, 4, 21, 15, 0),
+        )
+        self.assertFalse(moved["created"])
+        self.assertEqual(moved["device"]["last_daily_sent_on"], "2026-04-20")
+        self.assertEqual(scheduler.run_once(now=datetime(2026, 4, 21, 17, 59))["scheduled_count"], 0)
+        self.assertEqual(scheduler.run_once(now=datetime(2026, 4, 21, 18, 0))["scheduled_count"], 1)
+
+    def test_existing_device_reregistered_after_target_keeps_catch_up(self) -> None:
+        # 초기화는 새 행에만 한다: 오늘 아직 못 받은 기존 행이 시각이 지난 뒤 재등록돼도
+        # (앱 실행 시 재등록 등) 캐치업 발송은 그대로 나간다.
+        self.manager.register_device(
+            token="kept-token",
+            platform="ios",
+            timezone="Asia/Seoul",
+            device_id="install-kept",
+            now=datetime(2026, 4, 21, 8, 0),
+        )
+        again = self.manager.register_device(
+            token="kept-token",
+            platform="ios",
+            timezone="Asia/Seoul",
+            device_id="install-kept",
+            now=datetime(2026, 4, 21, 15, 0),
+        )
+        self.assertFalse(again["created"])
+        self.assertEqual(again["device"]["last_daily_sent_on"], "")
+        scheduler = DailyVerseScheduler(self.manager, poll_seconds=30)
+        self.assertEqual(scheduler.run_once(now=datetime(2026, 4, 21, 15, 0, 30))["scheduled_count"], 1)
+
+    def test_new_device_registered_disabled_then_enabled_same_day(self) -> None:
+        # 알림을 끈 채 시각 이후에 처음 등록했다가 그날 켜도 곧바로 보내지 않는다.
+        self.manager.register_device(
+            token="off-token",
+            platform="android",
+            timezone="Asia/Seoul",
+            device_id="install-off",
+            enabled=False,
+            now=datetime(2026, 4, 21, 15, 0),
+        )
+        enabled = self.manager.register_device(
+            token="off-token",
+            platform="android",
+            timezone="Asia/Seoul",
+            device_id="install-off",
+            enabled=True,
+            now=datetime(2026, 4, 21, 16, 0),
+        )
+        self.assertTrue(enabled["device"]["enabled"])
+        self.assertEqual(enabled["device"]["last_daily_sent_on"], "2026-04-21")
+        scheduler = DailyVerseScheduler(self.manager, poll_seconds=30)
+        self.assertEqual(scheduler.run_once(now=datetime(2026, 4, 21, 16, 1))["scheduled_count"], 0)
+        self.assertEqual(scheduler.run_once(now=datetime(2026, 4, 22, 9, 0))["scheduled_count"], 1)
+
     def test_daily_verse_is_deterministic_for_same_day(self) -> None:
         verse_a = self.provider.get_daily_verse(now=datetime(2026, 4, 21, 9, 0))
         verse_b = self.provider.get_daily_verse(now=datetime(2026, 4, 21, 23, 59))
