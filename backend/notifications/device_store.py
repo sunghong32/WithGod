@@ -34,6 +34,8 @@ class DeviceStore:
         enabled: bool = True,
         schedule_hour: int | None = None,
         schedule_minute: int | None = None,
+        # 새 행에만 쓰는 초기 last_daily_sent_on. 기존 행은 보존값을 그대로 둔다(#25).
+        last_daily_sent_on_if_created: str = "",
     ) -> tuple[DeviceRegistration, bool]:
         with self._lock:
             devices = self._read_all()
@@ -73,6 +75,7 @@ class DeviceStore:
                 schedule_minute=schedule_minute,
                 created_at=now,
                 updated_at=now,
+                last_daily_sent_on=last_daily_sent_on_if_created,
             )
             devices.append(created)
             self._write_all(devices)
