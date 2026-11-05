@@ -16,9 +16,17 @@
 결과 절 수가 그 장의 실제 절 수와 맞아야 한다. 실제 절 수는 같은 `data_raw/` 의
 영어 WEB 원본에서 가져온다(독어·불어·이어까지 5개 언어가 모두 일치함을 확인했다).
 
-**절 수가 맞지 않는 장은 손대지 않는다.** 본문이 원본에서 아예 빠졌거나
-(예레미야 25:21, 잠언 30:32) 다른 장의 본문이 섞여 들어온 경우라
-(이사야 27 에 히스기야 이야기) 성경 본문을 지어내지 않고는 복구할 수 없다.
+**절 수가 맞지 않는 장은 손대지 않는다.** 처음(9/3)엔 6개 장이 그랬는데, 원인을 절 단위로
+따라가 보니 두 가지였다(11/5). 둘 다 아래 표에 적힌 것만 처리한다.
+
+- `INTRUDED` — **다른 곳의 절이 끼어 있었다.** 이사야 27:11 자리의 히스기야 이야기는
+  이사야 37:10 이다. 이 문장을 빼면 남은 단위가 정확히 그 장의 절 수가 되고, 그 장의 진짜
+  본문은 원본의 대괄호 꼬리에 다 들어 있다 — 새 본문이 필요 없다.
+- `MISSING` — **원본에 이 절이 없다.** 그 자리에 다음 절을 한 번 더 적었다(예레미야 25:21 =
+  25:22). 이건 원본만으로는 못 고친다. 채우는 본문은 대한성서공회 공식 온라인 개역한글과
+  getbible·bolls·위키문헌 4곳이 글자까지 같은 것만 쓴다.
+
+개역한글판(1961)은 저작재산권 보호기간이 2011-12-31 에 끝났다(대한성서공회 저작권 안내 표).
 
     python scripts/repair_verse_numbering.py            # 검사만 (기본)
     python scripts/repair_verse_numbering.py --apply    # verses.csv 에 반영
@@ -40,6 +48,31 @@ ENG = ROOT / "data_raw" / "engwebp_usfm.zip"
 # 밀려난 꼬리 절이 앞 절 끝에 이 모양으로 붙어 있다. 책 이름 표기가 제각각이라
 # ('Psalms 3:9', 'I Samuel 129', 'Acts 22:31') 느슨하게 잡는다.
 BRACKET = re.compile(r"\[\s*\((?:[IVX]+\s+)?[A-Za-z]+\.?\s*\d+:?\d*\)\s*(.*?)\s*\]")
+
+# 다른 곳의 절이 끼어든 자리 — 이 문장은 그 장의 절이 아니므로 버린다(주석은 진짜 자리).
+INTRUDED: dict[tuple[str, int], str] = {
+    ("시편", 10): "주께서 생명의 길로 내게 보이시리니 주의 앞에는 기쁨이 충만하고 "
+                  "주의 우편에는 영원한 즐거움이 있나이다",  # 시편 16:11
+    ("잠언", 8): "[사37:26]",  # 본문 대신 들어간 교차 참조 표지
+    ("이사야", 27): "너희는 유다 왕 히스기야에게 이같이 고하여 이르기를 너는 너의 의뢰하는 하나님이 "
+                    "예루살렘이 앗수르 왕의 손에 넘어가지 아니하리라 하는 말에 속지 말라",  # 이사야 37:10
+    ("사도행전", 22): "바울이 한 백부장을 청하여 가로되 `이 청년을 천부장에게로 인도하라 "
+                      "그에게 무슨 할 말이 있다' 하니",  # 사도행전 23:17
+}
+
+# 원본에 없는 절 — 그 자리에 이웃 절이 한 번 더 적혀 있다. 공식·외부 4곳이 같은 본문.
+MISSING: dict[tuple[str, int, int], str] = {
+    ("예레미야", 25, 21): "에돔과 모압과 암몬 자손과",
+    ("잠언", 30, 32): "만일 네가 미련하여 스스로 높은체 하였거나 혹 악한 일을 도모하였거든 "
+                      "네 손으로 입을 막으라",
+}
+
+# 이슈 #13 이 getbible 로 통째 채운 장에서 구가 빠진 절 — (지금 본문, 고칠 본문).
+# 시편 10 에 끼어 있던 문장이 바로 이 절의 온전한 본문이고, 공식 본문과도 같다.
+TRUNCATED: dict[tuple[str, int, int], tuple[str, str]] = {
+    ("시편", 16, 11): ("주께서 생명의 길로 내게 보이시리니 주의 우편에는 영원한 즐거움이 있나이다",
+                     INTRUDED[("시편", 10)]),
+}
 
 
 def norm(s: str) -> str:
@@ -129,14 +162,17 @@ def main() -> int:
         code = code_of.get(book)
         if not code or code not in kor:
             continue
-        seen: set[str] = set()
+        seen: set[str] = {norm(INTRUDED.get((book, ch), ""))}
         rebuilt: list[str] = []
         for _, vtext in re.findall(r"\\v (\d+) (.*)", chapter_body(kor[code], ch)):
             for u in units(vtext):
                 k = norm(u)
-                if k not in seen:
+                if k and k not in seen:
                     seen.add(k)
                     rebuilt.append(k)
+        for (b, c, v), text in sorted(MISSING.items()):
+            if (b, c) == (book, ch):
+                rebuilt.insert(v - 1, norm(text))
         want = truth.get((code, ch), 0)
         if want and len(rebuilt) == want:
             fixed[(book, ch)] = rebuilt
@@ -150,11 +186,16 @@ def main() -> int:
         moved = sum(1 for i, t in enumerate(new, 1) if norm(old.get(i, "")) != t)
         print(f"  ✅ {book} {ch:>3d}장 — {len(new)}절 · 본문이 바뀌는 절 {moved}개")
     if skipped:
-        print("\n  아래는 손대지 않는다. 원본에 본문이 없거나 다른 장이 섞여 있어")
-        print("  성경 본문을 지어내지 않고는 복구할 수 없다:")
+        print("\n  아래는 손대지 않는다. 원본에 본문이 없거나 다른 곳의 절이 섞여 있다 —")
+        print("  원인을 확인해 INTRUDED·MISSING 에 적기 전에는 고치지 않는다:")
         for book, ch, got, want in skipped:
             why = "본문 누락" if got < want else "다른 본문 혼입"
             print(f"  ❌ {book} {ch:>3d}장 — 복원 {got}절 / 실제 {want}절 ({why})")
+
+    current = {(r["book"], int(r["chapter"]), int(r["verse"])): r["text"] for r in rows}
+    restored = {k: new for k, (old, new) in TRUNCATED.items() if current.get(k) == old}
+    for (book, ch, v) in restored:
+        print(f"  ✅ {book} {ch}:{v} — 빠진 구를 되살린다")
 
     if not args.apply:
         print("\n(검사만 했다. 반영하려면 --apply)")
@@ -170,12 +211,15 @@ def main() -> int:
             new = fixed[key]
             if v <= len(new):
                 r = {**r, "text": new[v - 1]}
+        verse_key = (r["book"], int(r["chapter"]), int(r["verse"]))
+        if verse_key in restored:
+            r = {**r, "text": restored[verse_key]}
         out.append(r)
     with open(CSV, "w", encoding="utf-8", newline="") as f:
         w = csv.DictWriter(f, fieldnames=["book", "chapter", "verse", "text"])
         w.writeheader()
         w.writerows(out)
-    print(f"\n{len(fixed)}개 장 반영 완료. 원본은 {backup.name} 에 남겼다.")
+    print(f"\n{len(fixed)}개 장 · {len(restored)}개 절 반영 완료. 원본은 {backup.name} 에 남겼다.")
     return 0
 
 
