@@ -248,5 +248,75 @@ class DailyVersesLocalizationDataTest(LanguageStoreTestBase):
         self.assert_all_localize()
 
 
+# 원래 전부 대문자인 낱말 — 신명 JAH(시편 130:3), 벽에 쓰인 글자(다니엘 5:27-28).
+_ES_CAPS_WORDS = {"JAH", "TEKEL", "PERES"}
+# 시편 표제의 머리 — 「Salmo de David」「Al Músico principal」「Cántico gradual」 …
+_RE_ES_PSALM_TITLE = re.compile(
+    r"^(?:Salmo|Al Músico|Cántico gradual|Canción|Masquil|Michta?h?m|Sigaión|Oración del?|Para Salomón|A los hijos)\b"
+)
+
+
+@unittest.skipUnless((languages.LANG_DIR / "es" / "verses.csv").exists(), "es verses.csv 없음")
+class SpanishCleanupDataTest(unittest.TestCase):
+    """es(RV1909) 인쇄본 조판 흔적이 본문에 다시 들어오지 않는지 (이슈 #35).
+
+    원본 spaRV1909 는 시편 표제를 1절 본문에 넣었고(「Salmo de David: Masquil. BIENAVENTURADO…」),
+    장 첫 낱말을 드롭캡 대문자로 남겼다(「NO juzguéis」). 오늘의 말씀 15개가 그대로 나갔다.
+    `scripts/build_language_data.py` 를 다시 돌려도 이 정리가 빠지지 않아야 한다.
+    """
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        with open(languages.LANG_DIR / "es" / "verses.csv", encoding="utf-8", newline="") as f:
+            cls.rows = {
+                (r["book_code"], int(r["chapter"]), int(r["verse"])): r["text"]
+                for r in csv.DictReader(f)
+            }
+
+    @staticmethod
+    def _caps(tok: str) -> bool:
+        w = re.sub(r"[\W\d_]", "", tok)
+        return len(w) >= 2 and w.isupper()
+
+    def test_no_dropcap_or_psalm119_letter_at_verse_start(self) -> None:
+        bad = []
+        for key, text in self.rows.items():
+            toks = text.split()
+            first = re.sub(r"[\W\d_]", "", toks[0])
+            # 「NO juzguéis」「ALEPH.」, 한 글자 드롭캡 「Y FUERON」「A TODOS」
+            if (self._caps(toks[0]) and first not in _ES_CAPS_WORDS) or (
+                len(first) == 1 and len(toks) > 1 and self._caps(toks[1])
+            ):
+                bad.append((key, text[:40]))
+        self.assertEqual(bad, [], f"드롭캡 대문자가 남은 절 {len(bad)}개")
+
+    def test_psalm_titles_are_not_in_verse_one(self) -> None:
+        bad = []
+        for ch in range(1, 151):
+            text = self.rows[("PSA", ch, 1)]
+            # 표제 뒤 드롭캡은 절 중간에 대문자로 남는다 — 「Cántico gradual. ALZARÉ」
+            caps = [t for t in text.split() if self._caps(t) and re.sub(r"\W", "", t) not in _ES_CAPS_WORDS]
+            if _RE_ES_PSALM_TITLE.match(text) or caps:
+                bad.append((ch, text[:50]))
+        self.assertEqual(bad, [], f"표제가 남은 시편 {len(bad)}개")
+
+    def test_known_verses(self) -> None:
+        self.assertEqual(
+            self.rows[("PSA", 32, 1)],
+            "Bienaventurado aquel cuyas iniquidades son perdonadas, y borrados sus pecados.",
+        )
+        self.assertTrue(self.rows[("MAT", 7, 1)].startswith("No juzguéis,"))
+        self.assertTrue(self.rows[("ISA", 55, 1)].startswith("A todos los sedientos:"))
+        # 「Aleluya.」는 표제가 아니라 1절 본문이다
+        self.assertTrue(self.rows[("PSA", 111, 1)].startswith("Aleluya. Alabaré á Jehová"))
+        # 드롭캡 둘째 낱말이 고유명사면 첫 글자를 살린다
+        self.assertTrue(self.rows[("GEN", 7, 1)].startswith("Y Jehová dijo á Noé"))
+        self.assertTrue(self.rows[("1KI", 19, 1)].startswith("Y Achab dió"))
+        self.assertTrue(self.rows[("PSA", 147, 1)].startswith("Alabad á JAH,"))
+        self.assertTrue(self.rows[("PSA", 119, 105)].startswith("Lámpara es á mis pies"))
+        # 잠언 10:1 의 「Las sentencias de Salomón.」은 표제가 아니라 본문이다(시편만 뗀다)
+        self.assertTrue(self.rows[("PRO", 10, 1)].startswith("Las sentencias de Salomón. El hijo sabio"))
+
+
 if __name__ == "__main__":
     unittest.main()
