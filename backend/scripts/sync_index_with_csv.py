@@ -20,6 +20,11 @@
     pip install sentence-transformers faiss-cpu pandas pyarrow
     python scripts/sync_index_with_csv.py            # 검사만
     python scripts/sync_index_with_csv.py --apply
+    python scripts/sync_index_with_csv.py --lang es --index-dir /tmp/es --apply  # 외국어, 사본에 반영
+
+외국어(`data/langs/<lang>/`)는 `build_language_index.py` 로 만든 같은 모델·같은 전처리다.
+`--index-dir` 를 주면 그 폴더의 parquet·npy·faiss 를 읽고 고쳐 쓴다 — 서버에 올릴 사본을
+만들 때 쓴다(이슈 #35, es 1,211행).
 """
 from __future__ import annotations
 
@@ -31,10 +36,6 @@ import pandas as pd
 
 ROOT = Path(__file__).resolve().parent.parent
 DATA = ROOT / "data"
-CSV = DATA / "verses.csv"
-META = DATA / "verses_meta.parquet"
-NPY = DATA / "verses.npy"
-IDX = DATA / "verses.faiss"
 
 MODEL = "intfloat/multilingual-e5-small"  # index.py 와 같아야 한다
 GATE_SAMPLES = 200
@@ -56,7 +57,15 @@ def embed(model, texts: list[str]) -> np.ndarray:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--apply", action="store_true")
+    ap.add_argument("--lang", help="외국어 코드(es 등). 비우면 한국어 data/")
+    ap.add_argument("--index-dir", type=Path, help="parquet·npy·faiss 폴더(기본: CSV 와 같은 폴더)")
     args = ap.parse_args()
+
+    src = DATA / "langs" / args.lang if args.lang else DATA
+    out = args.index_dir or src
+    CSV = src / "verses.csv"
+    META, NPY, IDX = out / "verses_meta.parquet", out / "verses.npy", out / "verses.faiss"
+    print(f"CSV {CSV}\n인덱스 {out}")
 
     csv = pd.read_csv(CSV)
     meta = pd.read_parquet(META)
