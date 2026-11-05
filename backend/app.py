@@ -627,7 +627,9 @@ class DeviceRegisterIn(BaseModel):
         validation_alias=AliasChoices("device_id", "deviceId"),
         examples=["iphone-15-pro-max"],
     )
-    # 앱 표시 언어 — 오늘의 말씀 푸시 제목·본문 현지화용(없으면 ko)
+    # 앱 표시 언어 — 오늘의 말씀 푸시 제목·본문 현지화용.
+    # 이미 등록된 기기는 안 보낸 필드(None)를 기존 값으로 둔다(부분 병합, 이슈 #23).
+    # language 는 새 기기일 때만 ko, enabled 는 새 기기일 때만 True 가 기본값이다.
     language: Optional[str] = Field(default=None, examples=["ko"])
     schedule_hour: Optional[int] = Field(default=None, ge=0, le=23, examples=[9])
     schedule_minute: Optional[int] = Field(default=None, ge=0, le=59, examples=[0])
@@ -642,7 +644,7 @@ class DeviceRegisterIn(BaseModel):
         validation_alias=AliasChoices("os_version", "osVersion"),
         examples=["17.4.1"],
     )
-    enabled: bool = Field(True, examples=[True])
+    enabled: Optional[bool] = Field(None, examples=[True])
 
 
 class DeviceDeleteOut(BaseModel):
