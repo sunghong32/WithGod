@@ -66,6 +66,7 @@
       ],
       "./plugins/with-rnfirebase-static-framework",
       "./plugins/with-remove-ad-id-permission",
+      "./plugins/with-large-screen-config-changes",
       "@bacons/apple-targets",
       [
         "react-native-android-widget",
