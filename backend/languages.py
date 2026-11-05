@@ -74,6 +74,7 @@ _CANON_CODES = [
     "1PE", "2PE", "1JN", "2JN", "3JN", "JUD", "REV",
 ]
 KO_NAME_TO_CODE = dict(zip(_KO_BOOKS, _CANON_CODES))
+_CODE_TO_KO_NAME = dict(zip(_CANON_CODES, _KO_BOOKS))
 
 
 # ---------- 활성 언어 스위치 ----------
@@ -122,19 +123,22 @@ class VerseStore:
         self.lang = lang
         self.df = df
         self.index = index
-        self._chapter_counts: dict[tuple[str, int], int] | None = None
+        self._last_verses: dict[tuple[str, int], int] | None = None
 
-    def chapter_verse_count(self, book_code: str, chapter: int) -> int | None:
-        """(책, 장)의 절 수 — 번역본 간 절번호 오프셋 계산용(캐시)."""
-        if self._chapter_counts is None:
-            counts: dict[tuple[str, int], int] = {}
-            codes = self.df["book_code"].tolist()
-            chapters = self.df["chapter"].tolist()
-            for code, ch in zip(codes, chapters):
-                key = (str(code), int(ch))
-                counts[key] = counts.get(key, 0) + 1
-            self._chapter_counts = counts
-        return self._chapter_counts.get((book_code, int(chapter)))
+    def chapter_last_verse(self, book_code: str, chapter: int) -> int | None:
+        """(책, 장)의 마지막 절 번호 — 번역본 간 절번호 오프셋 계산용(캐시)."""
+        if self._last_verses is None:
+            self._last_verses = _last_verse_numbers(
+                self.df["book_code"].tolist(), self.df["chapter"].tolist(),
+                self.df["verse"].tolist(),
+            )
+        return self._last_verses.get((book_code, int(chapter)))
+
+    def chapter_texts(self, book_code: str, chapter: int) -> dict[int, str]:
+        """(책, 장)의 {절 번호: 본문} — 구절 정렬의 앞뒤 문맥용."""
+        df = self.df
+        m = df[(df["book_code"] == book_code) & (df["chapter"].astype(int) == int(chapter))]
+        return {int(v): str(t) for v, t in zip(m["verse"], m["text"])}
 
     def find_verse(self, book_code: str, chapter: int, verse: int) -> dict | None:
         df = self.df
@@ -171,7 +175,7 @@ _stores: dict[str, VerseStore] = {}
 _store_lock = Lock()
 _store_failed_at: dict[str, float] = {}  # 로드 실패 부정 캐시(요청마다 디스크 재시도 방지)
 _STORE_RETRY_SECONDS = 60.0
-_ko_chapter_counts: dict[tuple[str, int], int] | None = None
+_ko_last_verses: dict[tuple[str, int], int] | None = None
 _encoder = None  # app.py 가 주입하는 다국어 쿼리 임베더(model.encode)
 
 
@@ -232,26 +236,52 @@ def get_store(lang: str) -> VerseStore:
             return _stores["ko"]
 
 
-def _ko_counts() -> dict[tuple[str, int], int]:
-    """한국어(≈KJV 절번호 체계) 기준 (책코드, 장) → 절 수. 오프셋 기준점."""
-    global _ko_chapter_counts
-    if _ko_chapter_counts is None:
+def _last_verse_numbers(codes, chapters, verses) -> dict[tuple[str, int], int]:
+    last: dict[tuple[str, int], int] = {}
+    for code, ch, v in zip(codes, chapters, verses):
+        if code:
+            key = (str(code), int(ch))
+            last[key] = max(last.get(key, 0), int(v))
+    return last
+
+
+def _ko_last_verse_numbers() -> dict[tuple[str, int], int]:
+    """한국어(≈KJV 절번호 체계) 기준 (책코드, 장) → 마지막 절 번호. 오프셋 기준점.
+
+    절 수가 아니라 마지막 절 번호를 쓴다. 개역한글은 사본에 없는 절을 번호째 비워 둔다
+    (막 9:44·46, 눅 17:36, 데이터 결손인 사 30:2 등 15개 장). 절 수로 재면 이런 장이
+    모든 언어에서 1~2절 밀린 것처럼 보여 임베딩으로 고르게 되지만, 번호는 그대로
+    같다 — 같은 번호 절이 정답이다.
+    """
+    global _ko_last_verses
+    if _ko_last_verses is None:
         ko = _stores["ko"].df
-        counts: dict[tuple[str, int], int] = {}
-        books = ko["book"].tolist()
-        chapters = ko["chapter"].tolist()
-        for book, ch in zip(books, chapters):
-            code = KO_NAME_TO_CODE.get(str(book))
-            if code:
-                key = (code, int(ch))
-                counts[key] = counts.get(key, 0) + 1
-        _ko_chapter_counts = counts
-    return _ko_chapter_counts
+        _ko_last_verses = _last_verse_numbers(
+            [KO_NAME_TO_CODE.get(str(b)) for b in ko["book"].tolist()],
+            ko["chapter"].tolist(), ko["verse"].tolist(),
+        )
+    return _ko_last_verses
+
+
+# 한국어 시편 1절 본문 앞의 표제 「(다윗의 시. 영장으로 한 노래)」. LSG 는 표제를 따로
+# 1~2절로 세므로, 문맥으로 비교할 때 붙여 두면 표제 절과 엮여 오프셋을 잘못 고른다.
+_RE_KO_TITLE = re.compile(r"^\([^)]*\)\s*")
+
+
+def _ko_chapter_texts(book_code: str, chapter: int) -> dict[int, str]:
+    """한국어 (책코드, 장)의 {절 번호: 본문}(표제 제외) — 구절 정렬의 앞뒤 문맥용."""
+    ko = _stores["ko"].df
+    name = _CODE_TO_KO_NAME.get(book_code)
+    m = ko[(ko["book"] == name) & (ko["chapter"].astype(int) == int(chapter))]
+    return {int(v): _RE_KO_TITLE.sub("", str(t)) for v, t in zip(m["verse"], m["text"])}
 
 
 # 임베딩 내용 검증에서 이 코사인 미만이면 정렬 실패로 본다(전혀 다른 구절 방지).
 # e5 계열의 언어 간 동일-구절 유사도는 통상 0.8 이상이다.
 _ALIGN_MIN_SCORE = 0.7
+
+# 후보를 고를 때 오늘의 말씀 앞뒤로 함께 비교하는 절 수(한쪽).
+_ALIGN_CONTEXT = 2
 
 
 def find_aligned_verse(
@@ -264,12 +294,21 @@ def find_aligned_verse(
 ) -> dict | None:
     """한국어 기준 (책, 장, 절)에 해당하는 다른 언어 구절을 찾는다.
 
-    장 절수 차이(1~3)는 두 가지 상반된 원인이 있어 번호만으로는 판별 불가:
+    장 마지막 절 번호 차이(1~3)는 두 가지 상반된 원인이 있어 번호만으로는 판별 불가:
     - LSG(fr) 시편처럼 표제가 절 번호를 차지 → 그만큼 밀어야 맞음 (30:5→30:6)
-    - 장 끝 차이/한국어 데이터 결손(시편 16 등) → 밀면 엉뚱한 구절이 됨
-    그래서 후보(verse+0 … verse+차이)를 모두 뽑아 **다국어 임베딩으로 한국어
-    본문과 내용을 대조**해 가장 유사한 절을 고른다. 이 함수는 '오늘의 말씀'
-    현지화(하루·언어당 1회, 캐시됨)에만 쓰여 임베딩 비용은 무시할 수준이다.
+    - 장 끝에서 절을 나눈 번역본(fr 전도서 4:17 = 한국어 5:1) → 밀면 엉뚱한 구절이 됨
+    그래서 후보(verse+0 … verse+차이)를 모두 뽑아 **다국어 임베딩으로 내용을 대조**한다.
+    이 함수는 '오늘의 말씀' 현지화에만 쓰이고(/random 은 하루·언어당 1회 캐시, /daily-verse
+    ·푸시는 부를 때마다) 한 번에 짧은 절 10여 개를 임베딩하므로 비용은 작다.
+
+    대조는 **앞뒤 _ALIGN_CONTEXT 절까지 묶어서** 한다. 오프셋 k 후보의 점수는 「카드 ↔
+    후보」와 「한국어 앞뒤 절 n ↔ 그 언어 n+k 절」 코사인의 평균이다. 카드 한 절만 비교하면
+    e5 의 언어 간 코사인이 0.8 언저리에 몰려 이웃 절과 0.01 안쪽으로 붙는다 — fr 시편
+    42:11 이 42:11(0.843, 원수의 조롱)을 골랐다(정답 42:12, 0.834, #33). 마지막 절 번호가
+    다른 92개 장(언어·장 쌍)의 모든 절 1,614개를 정답과 맞춰 보면 한 절 비교는 114개(7%)를
+    틀리고 앞뒤 2절 창은 2개(고후 13:12 — 그 절에서 오프셋이 바뀌는 데다 두 후보가 모두
+    「문안」)만 틀린다. 접두어는 양쪽 모두 「query: 」(e5 안내: 대칭 과제는 query 끼리) —
+    같은 비교에서 query↔passage 보다 오답이 적다(7 → 2).
 
     last_verse 를 주면 같은 장 verse~last_verse 합본을 **한 덩어리로** 찾는다.
     후보도 같은 오프셋의 창(verse+k ~ last_verse+k)을 이어 붙여 만든다. 절마다
@@ -282,35 +321,54 @@ def find_aligned_verse(
     if store.lang != lang:  # 로드 실패로 ko 폴백된 경우
         return None
     diff = 0
-    ref_count = _ko_counts().get((book_code, int(chapter)))
-    lang_count = store.chapter_verse_count(book_code, int(chapter))
-    if ref_count and lang_count:
-        diff = lang_count - ref_count
+    ref_last = _ko_last_verse_numbers().get((book_code, int(chapter)))
+    lang_last = store.chapter_last_verse(book_code, int(chapter))
+    if ref_last and lang_last:
+        diff = lang_last - ref_last
 
     if diff <= 0 or diff > 3 or not ko_text or _encoder is None:
         return store.find_passage(book_code, chapter, verse, last)
 
-    candidates = []
+    candidates = {}
     for off in range(diff + 1):
         found = store.find_passage(book_code, chapter, verse + off, last + off)
         if found:
-            candidates.append(found)
+            candidates[off] = found
     if not candidates:
         return None
     if len(candidates) == 1:
-        return candidates[0]
+        return next(iter(candidates.values()))
 
     try:
-        q = _encoder([f"query: {ko_text}"])
-        p = _encoder([f"passage: {c['text']}" for c in candidates])
-        sims = (q @ p.T)[0]  # 임베딩이 정규화돼 있어 내적 = 코사인
-        best = int(sims.argmax())
-        score = float(sims[best])
+        ko_verses = _ko_chapter_texts(book_code, chapter)
+        lang_verses = store.chapter_texts(book_code, chapter)
+        around = [
+            *range(int(verse) - _ALIGN_CONTEXT, int(verse)),
+            *range(last + 1, last + 1 + _ALIGN_CONTEXT),
+        ]
+        # 오프셋마다 비교할 (한국어, 그 언어) 쌍 — 첫 쌍이 카드 ↔ 후보.
+        pairs = {
+            off: [(_RE_KO_TITLE.sub("", ko_text), found["text"])]
+            + [(ko_verses[n], lang_verses[n + off])
+               for n in around if n in ko_verses and n + off in lang_verses]
+            for off, found in candidates.items()
+        }
+        texts = list(dict.fromkeys(t for ps in pairs.values() for pair in ps for t in pair))
+        vecs = _encoder([f"query: {t}" for t in texts])
+        row = {t: i for i, t in enumerate(texts)}
+
+        def cos(a: str, b: str) -> float:  # 임베딩이 정규화돼 있어 내적 = 코사인
+            return float(vecs[row[a]] @ vecs[row[b]])
+
+        scores = {off: sum(cos(a, b) for a, b in ps) / len(ps) for off, ps in pairs.items()}
+        ranked = sorted(scores, key=scores.get, reverse=True)
+        best, runner_up = ranked[0], ranked[1]
+        score = cos(*pairs[best][0])
         log.info(
-            "verse align %s %s %s:%s → +%d (cos=%.3f)",
+            "verse align %s %s %s:%s → +%d (창 %.3f, 차점 +%d %.3f, cos=%.3f)",
             lang, book_code, chapter,
             verse if last == int(verse) else f"{verse}-{last}",
-            candidates[best]["verse"] - int(verse), score,
+            best, scores[best], runner_up, scores[runner_up], score,
         )
         if score < _ALIGN_MIN_SCORE:
             return None  # 내용이 안 맞으면 호출측이 ko 본문으로 폴백한다
