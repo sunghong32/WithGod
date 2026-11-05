@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { Linking, Modal, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 import { checkForUpdate, type UpdateStatus } from "@/shared/lib/appUpdate";
+import { ModalBackdrop } from "./ModalBackdrop";
 
 /**
  * 업데이트 안내 팝업.
@@ -49,7 +50,7 @@ export function UpdatePromptModal() {
       // 강제 업데이트면 뒤로가기로도 닫히지 않게 한다.
       onRequestClose={forced ? () => {} : dismiss}
     >
-      <View style={styles.backdrop}>
+      <ModalBackdrop>
         <View style={styles.card}>
           <Text style={styles.title}>
             {forced ? t("update.forcedTitle") : t("update.optionalTitle")}
@@ -81,19 +82,12 @@ export function UpdatePromptModal() {
             </TouchableOpacity>
           )}
         </View>
-      </View>
+      </ModalBackdrop>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    backgroundColor: "rgba(16, 24, 40, 0.45)",
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: 32,
-  },
   card: {
     width: "100%",
     maxWidth: 340,

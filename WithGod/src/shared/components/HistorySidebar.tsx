@@ -176,8 +176,14 @@ export function HistorySidebar({ onSelect }: HistorySidebarProps) {
     ]);
   };
 
+  // 사이드바는 화면 왼쪽 끝에 붙으므로 가로 화면의 왼쪽 안전영역(컷아웃)만 피한다
   return (
-    <View style={[styles.root, { paddingTop: headerPaddingTop }]}>
+    <View
+      style={[
+        styles.root,
+        { paddingTop: headerPaddingTop, paddingLeft: insets.left },
+      ]}
+    >
       <View style={styles.topBar}>
         {searching ? (
           <>

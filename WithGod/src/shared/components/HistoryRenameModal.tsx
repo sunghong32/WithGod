@@ -113,7 +113,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingHorizontal: 32,
   },
+  // 태블릿에서 화면 폭만큼 늘어나지 않게 폭을 묶는다(폰은 이보다 좁아 그대로)
   card: {
+    width: "100%",
+    maxWidth: 420,
+    alignSelf: "center",
     backgroundColor: "#FFFFFF",
     borderRadius: 18,
     paddingTop: 20,
