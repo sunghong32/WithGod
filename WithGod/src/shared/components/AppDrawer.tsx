@@ -18,6 +18,7 @@ import {
   ToastAndroid,
   View,
 } from "react-native";
+// eslint-disable-next-line no-restricted-imports -- 뒤로가기 핸들러(한 번만 등록)에서만 쓴다. 렌더가 아니라 누른 시점의 언어를 읽어야 맞다.
 import { t } from "@/shared/lib/i18n";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { setLeftEdgeGestureExclusion } from "../../../modules/gesture-exclusion";
