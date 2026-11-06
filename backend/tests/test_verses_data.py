@@ -7,21 +7,39 @@
 
 절 안의 누락·오기(잠언 30:19 구 누락, 「여호아」)와 위키문헌 계열의 「침례」는
 공식 개역한글과 대조해 고쳤다(#44, scripts/audit_ko_verse_text.py).
+
+원본에서 통째로 빠졌던 아가 6:14 는 행을 새로 넣었다. 행이 하나 들어가면 그 뒤 인덱스
+행 번호가 모두 밀리므로 parquet 뿐 아니라 npy·faiss 의 행 수도 CSV 와 같아야 한다.
 """
 
 import csv
+import importlib.util
 import re
 import unittest
+from collections import defaultdict
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 BACKEND = Path(__file__).resolve().parent.parent
 CSV = BACKEND / "data" / "verses.csv"
 META = BACKEND / "data" / "verses_meta.parquet"
+NPY = BACKEND / "data" / "verses.npy"
+IDX = BACKEND / "data" / "verses.faiss"
 
 # 밀려난 꼬리 절을 붙여 둔 모양과, 본문 대신 들어간 교차 참조 표지('[사37:26]')
 LEFTOVER = re.compile(r"\[\s*\(|\[[가-힣]{1,3}\d+:\d+\]")
+
+# 장 중간에 행이 없는 절 — 공회 개역한글이 「(없음)」으로 두거나 앞 절에 묶은 절이다
+# (bolls 도 「(없음)」·「(1절에 포함되어 있음)」). 장 끝에서 빠진 절(아가 6:14)은 이 검사로
+# 못 잡아 따로 본다.
+ABSENT_IN_CHAPTER = {
+    "이사야 30:2", "이사야 48:2", "예레미야 21:2", "에스겔 24:5",
+    "마태복음 18:11", "마가복음 9:44", "마가복음 9:46", "마가복음 11:26", "마가복음 15:28",
+    "누가복음 17:36", "누가복음 23:17", "사도행전 8:37", "사도행전 15:26", "사도행전 15:34",
+    "사도행전 28:29", "로마서 9:2", "로마서 16:24",
+}
 
 
 def ws(s: str) -> str:
@@ -73,6 +91,26 @@ class KoVersesDataTest(unittest.TestCase):
         self.assertEqual(bad, [])
         self.assertIn("세례를 받으니", self.text[("사도행전", 8, 12)])
 
+    def test_song_6_14_restored(self) -> None:
+        # 원본(eBible kor)에 없던 절 — 공회·bolls 는 6:14, getbible 은 6:13 에 합쳐 둠
+        self.assertEqual(
+            self.text[("아가", 6, 14)],
+            "너희가 어찌하여 마하나임의 춤추는 것을 보는 것처럼 술람미 여자를 보려느냐",
+        )
+        refs = [(r["book"], r["chapter"], r["verse"]) for r in self.rows]
+        at = refs.index(("아가", "6", "14"))
+        self.assertEqual(refs[at - 1:at + 2], [("아가", "6", "13"), ("아가", "6", "14"), ("아가", "7", "1")])
+
+    def test_no_missing_verse_inside_chapter(self) -> None:
+        verses = defaultdict(list)
+        for r in self.rows:
+            verses[(r["book"], int(r["chapter"]))].append(int(r["verse"]))
+        unsorted = [f"{b} {c}장" for (b, c), vs in verses.items() if vs != sorted(vs)]
+        self.assertEqual(unsorted, [])
+        holes = {f"{b} {c}:{v}" for (b, c), vs in verses.items()
+                 for v in range(1, max(vs) + 1) if v not in vs}
+        self.assertEqual(holes, ABSENT_IN_CHAPTER)
+
     def test_search_index_matches_csv(self) -> None:
         # 앱은 CSV 가 아니라 parquet·faiss 를 읽는다 — 고친 뒤엔 sync_index_with_csv.py 를 돌릴 것
         meta = pd.read_parquet(META, columns=["book", "chapter", "verse", "text"])
@@ -83,6 +121,21 @@ class KoVersesDataTest(unittest.TestCase):
             if (b, str(c), str(v), t) != (r["book"], r["chapter"], r["verse"], r["text"])
         ]
         self.assertEqual(stale[:5], [])
+
+    def test_search_vectors_match_csv_rows(self) -> None:
+        # FAISS 가 돌려주는 번호로 parquet 행을 읽는다 — 행을 넣거나 빼면 셋이 같이 바뀌어야 한다
+        self.assertEqual(np.load(NPY, mmap_mode="r").shape[0], len(self.rows))
+
+    @unittest.skipUnless(importlib.util.find_spec("faiss"), "faiss 없음")
+    def test_faiss_matches_npy(self) -> None:
+        import faiss
+
+        vecs = np.load(NPY, mmap_mode="r")
+        index = faiss.read_index(str(IDX), faiss.IO_FLAG_MMAP | faiss.IO_FLAG_READ_ONLY)
+        self.assertEqual(index.ntotal, len(self.rows))
+        song = [i for i, r in enumerate(self.rows) if (r["book"], r["chapter"]) == ("아가", "6")][-1]
+        for i in (0, song, song + 1, len(self.rows) - 1):
+            np.testing.assert_array_equal(index.reconstruct(i), vecs[i])
 
 
 if __name__ == "__main__":
