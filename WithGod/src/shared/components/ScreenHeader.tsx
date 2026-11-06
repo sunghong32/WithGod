@@ -18,10 +18,16 @@ interface ScreenHeaderProps {
 export function ScreenHeader({ title, right }: ScreenHeaderProps) {
   const { t } = useTranslation();
   const router = useRouter();
-  const { headerPaddingTop } = useSafeAreaPadding();
+  const { headerPaddingTop, getSidePadding } = useSafeAreaPadding();
 
   return (
-    <View style={[styles.header, { paddingTop: headerPaddingTop }]}>
+    <View
+      style={[
+        styles.header,
+        { paddingTop: headerPaddingTop },
+        getSidePadding(16),
+      ]}
+    >
       <TouchableOpacity
         style={styles.backButton}
         onPress={() => router.back()}

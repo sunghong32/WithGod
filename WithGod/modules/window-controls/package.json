@@ -1,0 +1,6 @@
+{
+  "name": "window-controls",
+  "version": "1.0.0",
+  "description": "iPadOS 26 창 조절 버튼(●●●)이 차지하는 영역을 JS 로 넘기는 브리지 (헤더가 창 버튼을 피하게)",
+  "main": "index.ts"
+}
