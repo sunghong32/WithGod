@@ -15,7 +15,7 @@
       "url": "https://u.expo.dev/89ef64a4-7131-472f-89aa-7de04f4256fe"
     },
     "ios": {
-      "supportsTablet": false,
+      "supportsTablet": true,
       "bundleIdentifier": "kr.co.mincha.withgod",
       "appleTeamId": "B434W34DLF",
       "googleServicesFile": "./GoogleService-Info.plist",
