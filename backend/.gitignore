@@ -41,4 +41,6 @@ data/langs/*/verses.faiss
 data/langs/*/verses.npy
 data/langs/*/verses_meta.parquet
 data_raw/*.zip
+# scripts/audit_ko_verse_text.py 가 받아 둔 대조용 원본(bolls·getbible·대한성서공회)
+data_raw/text_audit/
 data/language_config.json
