@@ -22,6 +22,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from languages import is_placeholder_text
+
 BACKEND = Path(__file__).resolve().parent.parent
 CSV = BACKEND / "data" / "verses.csv"
 META = BACKEND / "data" / "verses_meta.parquet"
@@ -39,6 +41,13 @@ ABSENT_IN_CHAPTER = {
     "마태복음 18:11", "마가복음 9:44", "마가복음 9:46", "마가복음 11:26", "마가복음 15:28",
     "누가복음 17:36", "누가복음 23:17", "사도행전 8:37", "사도행전 15:26", "사도행전 15:34",
     "사도행전 28:29", "로마서 9:2", "로마서 16:24",
+}
+
+# 본문 대신 자리표시가 든 행 — 검색·추천 후보에서 뺀다(languages.is_placeholder_text)
+PLACEHOLDER_ROWS = {
+    "신명기 6:19", "신명기 15:5", "여호수아 2:13", "사무엘상 30:31", "역대상 16:13",
+    "욥기 31:34", "시편 92:2", "시편 92:3", "시편 105:6", "이사야 7:9", "예레미야 32:5",
+    "에스겔 25:3", "마태복음 17:21", "마태복음 23:14",
 }
 
 
@@ -110,6 +119,15 @@ class KoVersesDataTest(unittest.TestCase):
         holes = {f"{b} {c}:{v}" for (b, c), vs in verses.items()
                  for v in range(1, max(vs) + 1) if v not in vs}
         self.assertEqual(holes, ABSENT_IN_CHAPTER)
+
+    def test_placeholder_rows(self) -> None:
+        # 「(18절과 같음)」·「(앞절과 동일)」·「(없음)」만 든 행. 늘면 검색 후보에 새는지 볼 것
+        found = {f"{r['book']} {r['chapter']}:{r['verse']}" for r in self.rows
+                 if is_placeholder_text(r["text"])}
+        self.assertEqual(found, PLACEHOLDER_ROWS)
+        # 괄호로 감싼 진짜 본문은 자리표시가 아니다
+        for k in [("신명기", 3, 9), ("사무엘상", 30, 5), ("요한복음", 4, 2), ("시편", 67, 1)]:
+            self.assertFalse(is_placeholder_text(self.text[k]), k)
 
     def test_search_index_matches_csv(self) -> None:
         # 앱은 CSV 가 아니라 parquet·faiss 를 읽는다 — 고친 뒤엔 sync_index_with_csv.py 를 돌릴 것
