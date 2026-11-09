@@ -7,7 +7,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from languages import DAILY_VERSE_TITLES, localize_ko_ref, normalize_lang, resolve_lang
 from notifications.device_store import DeviceStore
 from notifications.models import DailyVerse, DeviceRegistration, MobilePlatform, PushDispatchResult, PushPayload
-from notifications.push_service import PushGateway
+from notifications.push_service import PushGateway, RetryBackoff
 from notifications.verse_provider import DailyVerseProvider, VerseInterpreter
 from settings import AppSettings
 
@@ -20,6 +20,7 @@ class DailyVerseNotificationManager:
         verse_provider: DailyVerseProvider,
         push_gateway: PushGateway,
         verse_interpreter: VerseInterpreter | None = None,
+        retry_backoff: RetryBackoff | None = None,
     ) -> None:
         self.settings = settings
         self.device_store = device_store
@@ -27,6 +28,7 @@ class DailyVerseNotificationManager:
         self.push_gateway = push_gateway
         # None 이면 interpretation 은 빈 문자열로 남는다(푸시 배치 경로 등 풀이가 필요 없는 경우).
         self.verse_interpreter = verse_interpreter
+        self.retry_backoff = retry_backoff or RetryBackoff()
 
     def get_daily_verse(self, now: datetime | None = None, lang: str = "ko") -> dict[str, str]:
         # naive now(또는 None)가 그대로 흘러가면 서버 OS 타임존(UTC 등) 기준 날짜가
@@ -146,12 +148,18 @@ class DailyVerseNotificationManager:
             )
             if local_date is None or device.last_daily_sent_on == local_date:
                 continue
+            # 실패가 이어진 기기는 30초마다가 아니라 간격을 늘려 다시 보낸다(RetryBackoff).
+            if not self.retry_backoff.ready(device.token, local_date, current):
+                continue
             due_devices.append(device)
             sent_dates[device.token] = local_date
 
         outcome = self._send(due_devices, now=current, mark_sent=False)
         result = outcome["result"]
         self.device_store.disable_tokens(result["invalid_tokens"])
+        for device in due_devices:
+            failed = device.token in result["failed_tokens"]
+            self.retry_backoff.record(device.token, sent_dates[device.token], current, failed)
         successful_tokens = [
             device.token for device in due_devices if device.token not in result["failed_tokens"]
         ]

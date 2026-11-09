@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import logging
 from datetime import datetime
 from threading import Event, Thread
 
 from notifications.manager import DailyVerseNotificationManager
+
+log = logging.getLogger("with-god.push")
 
 
 class DailyVerseScheduler:
@@ -12,6 +15,7 @@ class DailyVerseScheduler:
         self.poll_seconds = poll_seconds
         self._stop_event = Event()
         self._thread: Thread | None = None
+        self._last_error = ""
 
     def start(self) -> None:
         if self._thread and self._thread.is_alive():
@@ -32,6 +36,11 @@ class DailyVerseScheduler:
         while not self._stop_event.is_set():
             try:
                 self.manager.send_due_notifications()
-            except Exception:
-                pass
+                self._last_error = ""
+            except Exception as exc:
+                # 같은 오류가 30초마다 되풀이되면 로그가 넘치므로 내용이 바뀔 때만 남긴다.
+                error = f"{type(exc).__name__}: {exc}"
+                if error != self._last_error:
+                    log.exception("push scheduler: send_due_notifications failed")
+                    self._last_error = error
             self._stop_event.wait(self.poll_seconds)
