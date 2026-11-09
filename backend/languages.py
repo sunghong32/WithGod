@@ -249,7 +249,7 @@ def _ko_last_verse_numbers() -> dict[tuple[str, int], int]:
     """한국어(≈KJV 절번호 체계) 기준 (책코드, 장) → 마지막 절 번호. 오프셋 기준점.
 
     절 수가 아니라 마지막 절 번호를 쓴다. 개역한글은 사본에 없는 절을 번호째 비워 둔다
-    (막 9:44·46, 눅 17:36, 데이터 결손인 사 30:2 등 15개 장). 절 수로 재면 이런 장이
+    (막 9:44·46, 눅 17:36 의 「(없음)」, 앞 절에 합친 사 30:2 의 「(1절에 포함)」 등 15개 장). 절 수로 재면 이런 장이
     모든 언어에서 1~2절 밀린 것처럼 보여 임베딩으로 고르게 되지만, 번호는 그대로
     같다 — 같은 번호 절이 정답이다.
     """
@@ -283,6 +283,33 @@ _ALIGN_MIN_SCORE = 0.7
 # 후보를 고를 때 오늘의 말씀 앞뒤로 함께 비교하는 절 수(한쪽).
 _ALIGN_CONTEXT = 2
 
+# 한국어 한 절이 외국어 두 절에 걸치는 곳(#53) — (언어, 책, 장, 한국어 절) → 외국어에서 뒤로 더
+# 붙일 절 수. 언어 None 은 모든 외국어. 정렬로 오프셋을 정한 뒤 그 창의 끝을 늘린다.
+# 한 절만 고르면 뒤 절 내용이 빠진다(fr 막 9:50 은 카드의 요점 「서로 화목하라」가 9:51 에 있다).
+_KO_VERSE_SPANS: dict[tuple[str | None, str, int, int], int] = {
+    # 개역한글이 두 절을 한 절로 합친 곳. 공식 본문도 뒤 절은 「(1절에 포함되어 있음)」이라
+    # verses.csv 에 그 행이 없다(공회 본문 대조, 7개 언어 모두 뒤 절이 이어지는 내용).
+    (None, "PSA", 72, 19): 1,  # 20절 「이새의 아들 다윗의 기도가 필하다」
+    (None, "ISA", 30, 1): 1,
+    (None, "ISA", 48, 1): 1,
+    (None, "JER", 21, 1): 1,
+    (None, "EZK", 24, 4): 1,
+    (None, "ACT", 15, 25): 1,
+    (None, "ROM", 9, 1): 1,
+    # 개역한글 고후 13:11 끝 「거룩하게 입맞춤으로 서로 문안하라」= 영어식 절 체계의 13:12.
+    # es·fr 는 그 말이 「모든 성도가 문안하느니라」(한국어 13:12)와 한 절이라 늘리지 않는다.
+    **{(lang, "2CO", 13, 11): 1 for lang in ("en", "pt", "de", "it", "pl")},
+    # fr(LSG)가 한국어 한 절을 두 절로 나눈 곳
+    ("fr", "MRK", 9, 50): 1,   # 9:51 「Ayez du sel en vous-mêmes, et soyez en paix…」
+    ("fr", "1KI", 22, 43): 1,  # 22:44 「Seulement, les hauts lieux ne disparurent point…」
+}
+
+
+def ko_verse_span(lang: str, book_code: str, chapter: int, verse: int) -> int:
+    """한국어 절 하나가 lang 에서 뒤로 몇 절 더 걸치는지(대개 0)."""
+    key = (book_code, int(chapter), int(verse))
+    return _KO_VERSE_SPANS.get((lang, *key), _KO_VERSE_SPANS.get((None, *key), 0))
+
 
 def find_aligned_verse(
     lang: str,
@@ -294,10 +321,12 @@ def find_aligned_verse(
 ) -> dict | None:
     """한국어 기준 (책, 장, 절)에 해당하는 다른 언어 구절을 찾는다.
 
-    장 마지막 절 번호 차이(1~3)는 두 가지 상반된 원인이 있어 번호만으로는 판별 불가:
+    장 마지막 절 번호 차이(±1~3)는 두 가지 상반된 원인이 있어 번호만으로는 판별 불가:
     - LSG(fr) 시편처럼 표제가 절 번호를 차지 → 그만큼 밀어야 맞음 (30:5→30:6)
     - 장 끝에서 절을 나눈 번역본(fr 전도서 4:17 = 한국어 5:1) → 밀면 엉뚱한 구절이 됨
-    그래서 후보(verse+0 … verse+차이)를 모두 뽑아 **다국어 임베딩으로 내용을 대조**한다.
+    그래서 후보(verse+0 … verse+차이, 차이가 음수면 verse+차이 … verse+0)를 모두 뽑아
+    **다국어 임베딩으로 내용을 대조**한다. 한국어 한 절이 그 언어 두 절에 걸치는 곳은
+    `_KO_VERSE_SPANS` 로 창 끝을 늘린다(#53).
     이 함수는 '오늘의 말씀' 현지화에만 쓰이고(/random 은 하루·언어당 1회 캐시, /daily-verse
     ·푸시는 부를 때마다) 한 번에 짧은 절 10여 개를 임베딩하므로 비용은 작다.
 
@@ -320,18 +349,23 @@ def find_aligned_verse(
     store = get_store(lang)
     if store.lang != lang:  # 로드 실패로 ko 폴백된 경우
         return None
+    # 마지막 한국어 절이 그 언어 두 절에 걸치면 창 끝을 늘린다(#53).
+    extra = ko_verse_span(lang, book_code, chapter, last)
     diff = 0
     ref_last = _ko_last_verse_numbers().get((book_code, int(chapter)))
     lang_last = store.chapter_last_verse(book_code, int(chapter))
     if ref_last and lang_last:
         diff = lang_last - ref_last
 
-    if diff <= 0 or diff > 3 or not ko_text or _encoder is None:
-        return store.find_passage(book_code, chapter, verse, last)
+    # 그 언어의 장이 더 짧아도(diff < 0) 앞 장 끝으로 절이 넘어간 판본이 있다 — fr(LSG) 이사야 8:23 =
+    # 한국어 9:1, 전도서 4:17 = 한국어 5:1 이라 한국어 9:2·5:2 는 그 언어 9:1·5:1 이다. 번호로만
+    # 찾으면 한 절 뒤 내용이 나간다. 그래서 양쪽 모두 후보(0 … diff)를 뽑아 내용으로 고른다.
+    if diff == 0 or abs(diff) > 3 or not ko_text or _encoder is None:
+        return store.find_passage(book_code, chapter, verse, last + extra)
 
     candidates = {}
-    for off in range(diff + 1):
-        found = store.find_passage(book_code, chapter, verse + off, last + off)
+    for off in range(min(0, diff), max(0, diff) + 1):
+        found = store.find_passage(book_code, chapter, verse + off, last + off + extra)
         if found:
             candidates[off] = found
     if not candidates:
@@ -346,11 +380,14 @@ def find_aligned_verse(
             *range(int(verse) - _ALIGN_CONTEXT, int(verse)),
             *range(last + 1, last + 1 + _ALIGN_CONTEXT),
         ]
-        # 오프셋마다 비교할 (한국어, 그 언어) 쌍 — 첫 쌍이 카드 ↔ 후보.
+        # 오프셋마다 비교할 (한국어, 그 언어) 쌍 — 첫 쌍이 카드 ↔ 후보. 뒤 문맥은 늘린 창(extra) 다음부터.
+        def lang_n(n: int, off: int) -> int:
+            return n + off + (extra if n > last else 0)
+
         pairs = {
             off: [(_RE_KO_TITLE.sub("", ko_text), found["text"])]
-            + [(ko_verses[n], lang_verses[n + off])
-               for n in around if n in ko_verses and n + off in lang_verses]
+            + [(ko_verses[n], lang_verses[lang_n(n, off)])
+               for n in around if n in ko_verses and lang_n(n, off) in lang_verses]
             for off, found in candidates.items()
         }
         texts = list(dict.fromkeys(t for ps in pairs.values() for pair in ps for t in pair))
