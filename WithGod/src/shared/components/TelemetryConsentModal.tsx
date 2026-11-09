@@ -7,6 +7,7 @@ import {
   needsConsentPrompt,
   setTelemetryEnabled,
 } from "@/shared/lib/telemetry";
+import { ModalBackdrop } from "./ModalBackdrop";
 
 /**
  * 통계 수집 동의창(첫 실행).
@@ -46,7 +47,7 @@ export function TelemetryConsentModal() {
       // onRequestClose(안드로이드 뒤로가기)에서 닫지 않는다 — 선택을 강제한다.
       onRequestClose={() => {}}
     >
-      <View style={styles.backdrop}>
+      <ModalBackdrop>
         <View style={styles.card}>
           <Text style={styles.title}>{t("consent.title")}</Text>
 
@@ -75,19 +76,12 @@ export function TelemetryConsentModal() {
             </Text>
           </TouchableOpacity>
         </View>
-      </View>
+      </ModalBackdrop>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    backgroundColor: "rgba(16, 24, 40, 0.45)",
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: 32,
-  },
   card: {
     width: "100%",
     maxWidth: 340,

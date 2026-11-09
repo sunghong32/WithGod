@@ -42,6 +42,11 @@ import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 const LOGO_IMAGE = require("../../shared/assets/images/Logo.png");
 const SEND_ICON = require("../../shared/assets/images/send.png");
 
+/** 풀이 위 점선의 한 칸 폭(점 5dp + 간격 4dp) */
+const VERSE_DASH_STEP = 9;
+/** 폭을 재기 전에 그리는 점 개수. 720dp 까지 덮어 폰은 처음부터 끝까지 이 개수로 그린다 */
+const VERSE_DASH_MIN_COUNT = 80;
+
 export default function HomeScreen() {
   const { t } = useTranslation();
   const [message, setMessage] = useState("");
@@ -49,9 +54,16 @@ export default function HomeScreen() {
   const [showAiNotice, setShowAiNotice] = useState(false);
   const [showWidgetPromo, setShowWidgetPromo] = useState(false);
   const [showWidgetGuide, setShowWidgetGuide] = useState(false);
+  // 점선 영역의 실제 폭. 넓은 화면에서 점이 중간에 끊기지 않게 개수를 맞춘다.
+  const [verseDividerWidth, setVerseDividerWidth] = useState(0);
   const { open: openHistoryDrawer } = useAppDrawer();
   const isKeyboardVisible = useKeyboardVisible();
-  const { headerPaddingTop, getInputBarPaddingBottom } = useSafeAreaPadding();
+  const {
+    headerPaddingTop,
+    getInputBarPaddingBottom,
+    getSidePadding,
+    getContentPadding,
+  } = useSafeAreaPadding();
   const router = useRouter();
 
   // 위젯 기능 1회성 안내 배너: 아직 안 봤으면 오늘의 말씀 카드 아래에 노출
@@ -199,7 +211,13 @@ export default function HomeScreen() {
 
   const content = (
     <View style={styles.container}>
-        <View style={[styles.header, { paddingTop: headerPaddingTop }]}>
+        <View
+          style={[
+            styles.header,
+            { paddingTop: headerPaddingTop },
+            getSidePadding(24),
+          ]}
+        >
           <TouchableOpacity
             style={styles.menuButton}
             onPress={openHistoryDrawer}
@@ -240,7 +258,7 @@ export default function HomeScreen() {
         </View>
 
         <ScrollView
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={[styles.scrollContent, getContentPadding(24)]}
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.todayCard}>
@@ -268,8 +286,18 @@ export default function HomeScreen() {
                   </Text>
                   {!!dailyVerse?.interpretation && (
                     <>
-                      <View style={styles.verseDivider}>
-                        {Array.from({ length: 80 }).map((_, i) => (
+                      <View
+                        style={styles.verseDivider}
+                        onLayout={(e) =>
+                          setVerseDividerWidth(e.nativeEvent.layout.width)
+                        }
+                      >
+                        {Array.from({
+                          length: Math.max(
+                            VERSE_DASH_MIN_COUNT,
+                            Math.ceil(verseDividerWidth / VERSE_DASH_STEP),
+                          ),
+                        }).map((_, i) => (
                           <View key={i} style={styles.verseDash} />
                         ))}
                       </View>
@@ -343,7 +371,13 @@ export default function HomeScreen() {
           </View>
         </ScrollView>
 
-        <View style={[styles.inputBar, { paddingTop: inputBarPaddingTop, paddingBottom: inputBarPaddingBottom }]}>
+        <View
+          style={[
+            styles.inputBar,
+            { paddingTop: inputBarPaddingTop, paddingBottom: inputBarPaddingBottom },
+            getContentPadding(24),
+          ]}
+        >
           <TextInput
             style={styles.textInput}
             placeholder={t("home.moodPlaceholder")}

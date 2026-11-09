@@ -10,12 +10,12 @@ import {
 import {
   Animated,
   BackHandler,
-  Dimensions,
   Easing,
   PanResponder,
   Platform,
   StyleSheet,
   ToastAndroid,
+  useWindowDimensions,
   View,
 } from "react-native";
 // eslint-disable-next-line no-restricted-imports -- 뒤로가기 핸들러(한 번만 등록)에서만 쓴다. 렌더가 아니라 누른 시점의 언어를 읽어야 맞다.
@@ -40,8 +40,15 @@ import { setLeftEdgeGestureExclusion } from "../../../modules/gesture-exclusion"
  *   이미 차 있어야 하기 때문이다(열린 뒤에 조회하면 빈 화면이 스친다).
  */
 
-const SCREEN_WIDTH = Dimensions.get("window").width;
-export const DRAWER_WIDTH = Math.min(320, Math.round(SCREEN_WIDTH * 0.82));
+/**
+ * 사이드바 폭: 창 폭의 82%, 최대 320dp.
+ *
+ * 창 폭은 실행 중에도 바뀐다(폴더블 접기·펴기, 태블릿 분할 화면). 시작할 때 한 번만 재면
+ * 펼친 화면에서 잰 320dp 가 접힌 화면에 그대로 남아 덮인 화면이 거의 안 보이게 되므로
+ * 렌더할 때마다 창 폭으로 다시 계산한다.
+ */
+const DRAWER_MAX_WIDTH = 320;
+const DRAWER_WIDTH_RATIO = 0.82;
 
 const IS_ANDROID = Platform.OS === "android";
 const OPEN_MS = 280;
@@ -135,7 +142,12 @@ export function AppDrawer({
   renderSidebar,
   swipeEnabled = true,
 }: AppDrawerProps) {
-  // 0(닫힘) ~ DRAWER_WIDTH(열림). 제스처 계산을 픽셀로 하려고 이 단위를 쓴다.
+  const { width: windowWidth } = useWindowDimensions();
+  const drawerWidth = Math.min(
+    DRAWER_MAX_WIDTH,
+    Math.round(windowWidth * DRAWER_WIDTH_RATIO),
+  );
+  // 0(닫힘) ~ drawerWidth(열림). 제스처 계산을 픽셀로 하려고 이 단위를 쓴다.
   const translateX = useRef(new Animated.Value(0)).current;
   const insets = useSafeAreaInsets();
   // 홈버튼 기기(상단 안전영역이 작음)는 화면 모서리가 각지므로 깎지 않는다.
@@ -186,8 +198,16 @@ export function AppDrawer({
     [markVisible, translateX],
   );
 
-  const open = useCallback(() => animateTo(DRAWER_WIDTH, true), [animateTo]);
+  const open = useCallback(
+    () => animateTo(drawerWidth, true),
+    [animateTo, drawerWidth],
+  );
   const close = useCallback(() => animateTo(0, false), [animateTo]);
+
+  // 열린 채로 창 폭이 바뀌면 새 폭의 열린 위치로 옮긴다
+  useEffect(() => {
+    if (isOpenRef.current) translateX.setValue(drawerWidth);
+  }, [drawerWidth, translateX]);
 
   // 안드로이드: 좌측 엣지를 시스템 뒤로가기 제스처에서 넘겨받는다.
   // 드로어가 닫혀 있고 스와이프가 켜져 있을 때만 가져오고, 그 외에는 반납해
@@ -250,7 +270,7 @@ export function AppDrawer({
         // 가져가는 경우가 있어 신뢰할 수 없다.
         onStartShouldSetPanResponderCapture: (evt) => {
           // 열려 있을 때: 덮인/밀린 화면을 건드리면 가로챈다(탭으로 닫기).
-          if (isOpenRef.current) return evt.nativeEvent.pageX > DRAWER_WIDTH;
+          if (isOpenRef.current) return evt.nativeEvent.pageX > drawerWidth;
           // 닫혀 있을 때: 좌측 엣지에서 시작한 터치는 **손이 닿는 즉시** 선점한다.
           //
           // 움직임을 보고 판단하면 늦다. 실제 손가락은 처음 몇 샘플이 dx 1~2px
@@ -295,13 +315,13 @@ export function AppDrawer({
         },
         onPanResponderMove: (_evt, gesture) => {
           const { dx, dy } = offsetFromGrant(gesture);
-          const base = isOpenRef.current ? DRAWER_WIDTH : 0;
+          const base = isOpenRef.current ? drawerWidth : 0;
           // 엣지에서 손을 댔지만 세로로 끄는 중이면 드로어를 움직이지 않는다.
           // (터치 다운에 선점하므로 세로 제스처도 우리에게 들어온다)
           if (base === 0 && Math.abs(dy) > Math.abs(dx) * 1.2) {
             return;
           }
-          const next = Math.min(DRAWER_WIDTH, Math.max(0, base + dx));
+          const next = Math.min(drawerWidth, Math.max(0, base + dx));
           translateX.setValue(next);
           // 손가락으로 살짝 끌어낸 순간부터 사이드바를 '보이는' 상태로 친다.
           // 모서리도 이때 곧바로 완전히 둥글어진다(서서히 둥글어지지 않는다).
@@ -315,17 +335,25 @@ export function AppDrawer({
             close();
             return;
           }
-          const base = isOpenRef.current ? DRAWER_WIDTH : 0;
-          const current = Math.min(DRAWER_WIDTH, Math.max(0, base + dx));
+          const base = isOpenRef.current ? drawerWidth : 0;
+          const current = Math.min(drawerWidth, Math.max(0, base + dx));
           // 빠르게 튕기면 위치와 무관하게 그 방향으로
           if (gesture.vx > 0.5) return open();
           if (gesture.vx < -0.5) return close();
-          if (current > DRAWER_WIDTH * SNAP_RATIO) open();
+          if (current > drawerWidth * SNAP_RATIO) open();
           else close();
         },
         onPanResponderTerminationRequest: () => false,
       }),
-    [close, markVisible, offsetFromGrant, open, swipeEnabled, translateX],
+    [
+      close,
+      drawerWidth,
+      markVisible,
+      offsetFromGrant,
+      open,
+      swipeEnabled,
+      translateX,
+    ],
   );
 
   const value = useMemo(
@@ -340,13 +368,14 @@ export function AppDrawer({
     <Animated.View
       style={[
         styles.sidebar,
+        { width: drawerWidth },
         IS_ANDROID
           ? {
               transform: [
                 {
                   translateX: translateX.interpolate({
-                    inputRange: [0, DRAWER_WIDTH],
-                    outputRange: [-DRAWER_WIDTH, 0],
+                    inputRange: [0, drawerWidth],
+                    outputRange: [-drawerWidth, 0],
                   }),
                 },
               ],
@@ -390,7 +419,7 @@ export function AppDrawer({
                 styles.scrim,
                 {
                   opacity: translateX.interpolate({
-                    inputRange: [0, DRAWER_WIDTH],
+                    inputRange: [0, drawerWidth],
                     outputRange: [0, SCRIM_MAX_OPACITY],
                   }),
                 },
@@ -420,7 +449,6 @@ const styles = StyleSheet.create({
     left: 0,
     top: 0,
     bottom: 0,
-    width: DRAWER_WIDTH,
     backgroundColor: "#F7F8FA",
     ...(IS_ANDROID
       ? {

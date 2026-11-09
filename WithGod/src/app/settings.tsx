@@ -66,7 +66,7 @@ const appVersion =
 
 export default function SettingsScreen() {
   const { t } = useTranslation();
-  const { insets } = useSafeAreaPadding();
+  const { insets, getContentPadding } = useSafeAreaPadding();
 
   const [settings, setSettings] = useState<NotificationSettings>(
     DEFAULT_NOTIFICATION_SETTINGS,
@@ -272,6 +272,7 @@ export default function SettingsScreen() {
         contentContainerStyle={[
           styles.scrollContent,
           { paddingBottom: insets.bottom + 32 },
+          getContentPadding(16),
         ]}
         showsVerticalScrollIndicator={false}
       >
