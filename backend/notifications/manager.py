@@ -68,7 +68,7 @@ class DailyVerseNotificationManager:
         app_version: str = "",
         os_version: str = "",
         language: str | None = None,
-        enabled: bool = True,
+        enabled: bool | None = None,
         schedule_hour: int | None = None,
         schedule_minute: int | None = None,
         now: datetime | None = None,
@@ -104,7 +104,9 @@ class DailyVerseNotificationManager:
             device_id=device_id.strip(),
             app_version=app_version.strip(),
             os_version=os_version.strip(),
-            language=normalize_lang(language),
+            # 안 보낸 language 는 None 그대로 넘겨 기존 값을 지킨다(이슈 #23) —
+            # normalize_lang(None) 은 'ko' 라 여기서 정규화하면 외국어 사용자가 ko 로 돌아간다.
+            language=normalize_lang(language) if language else None,
             enabled=enabled,
             schedule_hour=schedule_hour,
             schedule_minute=schedule_minute,
