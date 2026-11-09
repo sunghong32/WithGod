@@ -284,6 +284,75 @@ class LocalizeTidyTest(LanguageStoreTestBase):
         )
 
 
+class VerseSpanAndShorterChapterTest(LanguageStoreTestBase):
+    """한국어 한 절이 그 언어 두 절에 걸치는 곳, 그 언어의 장이 더 짧은 곳(#53)."""
+
+    def test_span_extends_window(self) -> None:
+        # fr 마가 9:50 — LSG 는 한국어 9:50 을 9:50·9:51 로 나눴다. 한 절만 고르면 9:51 이 빠진다.
+        self.install(
+            ko_rows(("마가복음", 9, 49, "불"), ("마가복음", 9, 50, "소금 화목")),
+            {"fr": lang_rows(
+                ("MRK", "Marc", 9, 49, "feu"),
+                ("MRK", "Marc", 9, 50, "sel"),
+                ("MRK", "Marc", 9, 51, "paix"),
+            )},
+        )
+        self.assertEqual(
+            localize_ko_ref("fr", "마가복음 9:50", "소금 화목"),
+            {"ref": "Marc 9:50-51", "text": "Sel paix"},
+        )
+        # 다른 언어·다른 절은 그대로
+        self.assertEqual(localize_ko_ref("fr", "마가복음 9:49", "불")["ref"], "Marc 9:49")
+        self.assertEqual(languages.ko_verse_span("en", "MRK", 9, 50), 0)
+
+    def test_span_applies_to_every_language_for_krv_merged_verse(self) -> None:
+        # 개역한글이 30:1-2 를 한 절로 합쳤다(공식 본문 30:2 = 「(1절에 포함되어 있음)」)
+        self.assertEqual(languages.ko_verse_span("en", "ISA", 30, 1), 1)
+        self.assertEqual(languages.ko_verse_span("pl", "ISA", 30, 1), 1)
+        self.assertEqual(languages.ko_verse_span("es", "2CO", 13, 11), 0)  # es 는 한국어와 같다
+        self.assertEqual(languages.ko_verse_span("de", "2CO", 13, 11), 1)
+
+    def test_shorter_chapter_pulls_back_by_content(self) -> None:
+        # fr(LSG) 이사야 8:23 = 한국어 9:1 이라 그 언어 9장이 한 절 짧다. 한국어 9:2 는 fr 9:1 이다.
+        self.install(
+            ko_rows(("이사야", 9, 1, "기도"), ("이사야", 9, 2, "소망"), ("이사야", 9, 3, "노래")),
+            {"fr": lang_rows(("ISA", "Ésaïe", 9, 1, "HOPE"), ("ISA", "Ésaïe", 9, 2, "SONG"))},
+        )
+        languages.set_encoder(fake_encode)
+        self.assertEqual(localize_ko_ref("fr", "이사야 9:2", "소망")["ref"], "Ésaïe 9:1")
+        # 임베더가 없으면 예전처럼 번호로 찾는다
+        languages.set_encoder(None)
+        self.assertEqual(localize_ko_ref("fr", "이사야 9:2", "소망")["ref"], "Ésaïe 9:2")
+
+
+@unittest.skipUnless(
+    all((languages.LANG_DIR / lang / "verses.csv").exists() for lang in FOREIGN_LANGS),
+    "외국어 verses.csv 없음",
+)
+class KoVerseSpansDataTest(LanguageStoreTestBase):
+    """`_KO_VERSE_SPANS` 의 모든 항목이 실제 데이터에서 그 언어 두 절로 나오는지."""
+
+    def test_every_span_localizes_to_two_verses(self) -> None:
+        keys = {(b, c) for (_, b, c, _) in languages._KO_VERSE_SPANS}
+        ko = _read_chapters(
+            BACKEND / "data" / "verses.csv", "book",
+            {(languages._CODE_TO_KO_NAME[b], c) for b, c in keys},
+        )
+        self.install(ko, {
+            lang: _read_chapters(languages.LANG_DIR / lang / "verses.csv", "book_code", keys)
+            for lang in FOREIGN_LANGS
+        })
+        wrong = []
+        for (only, code, ch, v), n in languages._KO_VERSE_SPANS.items():
+            name = languages._CODE_TO_KO_NAME[code]
+            text = ko[(ko.book == name) & (ko.chapter == ch) & (ko.verse == v)].text.item()
+            for lang in [only] if only else FOREIGN_LANGS:
+                got = localize_ko_ref(lang, f"{name} {ch}:{v}", text)
+                if not got or not got["ref"].endswith(f" {ch}:{v}-{v + n}"):
+                    wrong.append((name, ch, v, lang, got and got["ref"]))
+        self.assertEqual(wrong, [])
+
+
 class TidyVerseTextTest(unittest.TestCase):
     """외국어 절을 떼어 보여 줄 때의 표시 정리 — 짝 없는 따옴표(#51)·소문자 첫 글자(#52)."""
 
@@ -393,6 +462,10 @@ INTL_DIR = BACKEND / "docs" / "verse_picks" / "interpretations_intl"
 # 장 마지막 절 번호가 한국어와 1~3 달라 임베딩으로 절을 고르는 결정 — 한국어와 그 언어
 # 본문을 나란히 놓고 사람이 확인한 정답(2026-11-05, #33). 목록이 바뀌어 이런 결정이 새로
 # 생기면 test_offset_decisions_are_reviewed 가 실패한다 → 본문을 보고 여기에 더한다.
+_THIRD_JOHN = {
+    "en": "3 John", "es": "3 Juan", "pt": "3 João", "de": "3. Johannes", "it": "3 Giovanni", "pl": "III Jana",
+}
+
 REVIEWED_OFFSETS = {
     # fr(LSG) 시편은 표제가 1절(51편은 1~2절)을 차지한다.
     ("시편 4:8", "fr"): "Psaumes 4:9",
@@ -416,9 +489,18 @@ REVIEWED_OFFSETS = {
     ("전도서 4:10", "fr"): "Ecclésiaste 4:10",
     ("전도서 4:12", "fr"): "Ecclésiaste 4:12",
     ("로마서 14:10", "en"): "Romans 14:10",
-    # LSG 는 한국어 9:50 을 50·51 두 절로 나눴다. 한 절만 고르는 지금 정렬로는 9:51
-    # (「서로 화목하라」)이 빠진다 — 절 분할 대응은 따로 다룬다.
-    ("마가복음 9:50", "fr"): "Marc 9:50",
+    # 그 언어의 장이 더 짧은 곳(#53) — fr(LSG)는 앞 장 끝으로 절이 넘어가 한 절 당긴다
+    # (이사야 8:23 = 한국어 9:1, 전도서 4:17 = 한국어 5:1). 번호로만 찾던 때는 한 절 뒤 내용이 나갔다.
+    ("이사야 9:2", "fr"): "Ésaïe 9:1",
+    ("전도서 5:2", "fr"): "Ecclésiaste 5:1",
+    ("전도서 5:10", "fr"): "Ecclésiaste 5:9",
+    ("전도서 5:12", "fr"): "Ecclésiaste 5:11",
+    # 장 끝에서만 갈리는 곳 — 당기지 않는다(fr 전도서 11:9-10 = 12:1-2, 요한삼서 14-15 = 14).
+    ("전도서 11:4", "fr"): "Ecclésiaste 11:4",
+    ("전도서 11:6", "fr"): "Ecclésiaste 11:6",
+    ("전도서 11:7", "fr"): "Ecclésiaste 11:7",
+    **{("요한삼서 1:2", lang): f"{name} 1:2" for lang, name in _THIRD_JOHN.items()},
+    **{("요한삼서 1:11", lang): f"{name} 1:11" for lang, name in _THIRD_JOHN.items()},
 }
 
 
@@ -472,10 +554,15 @@ class DailyVersesLocalizationDataTest(LanguageStoreTestBase):
                 if found is None:
                     failed.append((item["reference"], lang))
                     continue
-                # 하반절 b 는 떼고, 합본은 같은 길이의 범위로 나와야 한다.
+                # 하반절 b 는 떼고, 합본은 같은 길이의 범위로 나와야 한다. 한국어 한 절이 그 언어
+                # 두 절에 걸치는 곳(#53)은 그만큼 길다.
+                last_ko = int(m.group(4) or m.group(3))
+                want_span = span + languages.ko_verse_span(
+                    lang, languages.KO_NAME_TO_CODE[m.group(1)], int(m.group(2)), last_ko
+                )
                 got = re.search(r"(\d+):(\d+)(?:-(\d+))?$", found["ref"])
                 got_span = int(got.group(3)) - int(got.group(2)) if got and got.group(3) else 0
-                if got is None or got_span != span:
+                if got is None or got_span != want_span:
                     failed.append((item["reference"], lang, found["ref"]))
         self.assertEqual(failed, [], f"현지화 실패 {len(failed)}건")
 
