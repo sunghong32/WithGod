@@ -64,6 +64,7 @@
           }
         }
       ],
+      "./plugins/with-phone-only-portrait",
       "./plugins/with-rnfirebase-static-framework",
       "./plugins/with-remove-ad-id-permission",
       "./plugins/with-large-screen-config-changes",
