@@ -17,7 +17,7 @@ import pandas as pd
 
 import embedding
 import languages
-from languages import VerseStore, localize_ko_ref
+from languages import VerseStore, collect_candidates, localize_ko_ref
 
 BACKEND = Path(__file__).resolve().parent.parent
 DAILY_VERSES = BACKEND / "notifications" / "daily_verses.json"
@@ -161,6 +161,33 @@ class LocalizeKoRefTest(LanguageStoreTestBase):
 
 
 _RE_DAILY_REF = re.compile(r"^(.+?)\s+(\d+):(\d+)(?:-(\d+))?b?$")
+
+
+class CollectCandidatesTest(unittest.TestCase):
+    """검색 결과(FAISS 점수·행 번호)에서 추천 후보를 만드는 collect_candidates."""
+
+    def store(self, *rows) -> VerseStore:
+        return VerseStore("ko", ko_rows(*rows), None)
+
+    def test_drops_placeholder_rows(self) -> None:
+        # 본문 대신 「(앞절과 동일)」·「(없 음)」이 든 행이 검색에 걸려도 후보로 나가면 안 된다
+        store = self.store(
+            ("시편", 92, 2, "(앞절과 동일)"),
+            ("시편", 92, 1, "지존자여 십현금과 비파와 수금의 정숙한 소리로 여호와께 감사하며"),
+            ("마태복음", 17, 21, "(없 음)"),
+            ("시편", 23, 1, "여호와는 나의 목자시니 내가 부족함이 없으리로다"),
+        )
+        got = collect_candidates(store, [0.9, 0.8, 0.7, 0.6], [0, 1, 2, 3], top_k=3)
+        self.assertEqual([c["ref"] for c in got], ["시편 92:1", "시편 23:1"])
+
+    def test_fallback_still_drops_placeholder_rows(self) -> None:
+        # 부적합 절만 걸려 필터 없이 폴백할 때도 자리표시는 뺀다(잠언 7:14 는 큐레이션 부적합)
+        store = self.store(
+            ("신명기", 6, 19, "(18절과 같음)"),
+            ("잠언", 7, 14, "내가 화목제를 드려서 서원한 것을 오늘날 갚았노라"),
+        )
+        got = collect_candidates(store, [0.9, 0.8], [0, 1], top_k=3)
+        self.assertEqual([c["ref"] for c in got], ["잠언 7:14"])
 
 
 def _read_chapters(path: Path, book_col: str, chapters: set) -> pd.DataFrame:

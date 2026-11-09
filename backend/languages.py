@@ -407,6 +407,58 @@ def is_recommendable(book_code: str | None, chapter, verse) -> bool:
     return f"{book_code} {int(chapter)}:{int(verse)}" not in _load_unsuitable()
 
 
+# 본문 대신 자리표시만 든 절. 공회가 앞 절에 묶은 절(신명기 6:18-19 → 6:19 「(18절과 같음)」,
+# 시편 92:1-3 → 92:2·3 「(앞절과 동일)」)과 사본에 없는 절(마태복음 17:21 「(없 음)」)이다.
+# 행에 벡터가 있어 질문에 따라 검색 후보로 걸린다. 괄호로 감싼 진짜 본문(요한복음 4:2)은 아니다.
+_PLACEHOLDER = re.compile(r"\(\s*(?:\d+\s*절과\s*같음|앞\s*절과\s*동일|없\s*음)\s*\)")
+
+
+def is_placeholder_text(text) -> bool:
+    """「(18절과 같음)」·「(앞절과 동일)」·「(없음)」처럼 본문이 없는 절인지."""
+    return bool(_PLACEHOLDER.fullmatch(str(text).strip()))
+
+
+def collect_candidates(store: VerseStore, scores, ids, top_k: int) -> list[dict]:
+    """FAISS 결과에서 위로 부적합 절(심판 신탁·족보·악인의 대사 등)을 걸러
+    상위 top_k 후보를 만든다. 전부 걸러지는 극단엔 부적합 필터 없이 폴백한다.
+    본문이 없는 자리표시 절은 폴백에서도 뺀다."""
+    def card(s, r) -> dict:
+        return {
+            "ref": f"{r['book']} {int(r['chapter'])}:{int(r['verse'])}",
+            "text": str(r["text"]),
+            "score": float(s),
+        }
+
+    cands: list[dict] = []
+    dropped = 0
+    for s, i in zip(scores, ids):
+        r = store.df.iloc[int(i)]
+        if is_placeholder_text(r["text"]):
+            dropped += 1
+            continue
+        code = (
+            str(r["book_code"]) if "book_code" in r.index
+            else KO_NAME_TO_CODE.get(str(r["book"]))
+        )
+        if not is_recommendable(code, r["chapter"], r["verse"]):
+            dropped += 1
+            continue
+        cands.append(card(s, r))
+        if len(cands) >= top_k:
+            break
+    if dropped:
+        log.info("추천 후보에서 부적합 절 %d개 제외", dropped)
+    if not cands:
+        for s, i in zip(scores, ids):
+            r = store.df.iloc[int(i)]
+            if is_placeholder_text(r["text"]):
+                continue
+            cands.append(card(s, r))
+            if len(cands) >= top_k:
+                break
+    return cands
+
+
 # ---------- 라우터 ----------
 
 @router.get("/languages", tags=["app"])
