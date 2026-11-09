@@ -71,6 +71,7 @@ class DailyVerseNotificationManager:
         enabled: bool = True,
         schedule_hour: int | None = None,
         schedule_minute: int | None = None,
+        now: datetime | None = None,
     ) -> dict[str, object]:
         clean_token = token.strip()
         if not clean_token:
@@ -87,6 +88,15 @@ class DailyVerseNotificationManager:
 
         tz_name = (timezone or self.settings.push_default_timezone).strip()
         self._resolve_timezone(tz_name)
+        # 그날 알림 시각이 지난 뒤 처음 등록된 기기는 캐치업 판정에 걸려 다음 폴링에 곧바로
+        # 푸시가 나간다(#25). 새 행이면 오늘 몫은 보낸 것으로 쳐 두고 다음 날부터 받게 한다.
+        # 기존 행은 upsert 가 last_daily_sent_on 을 보존하므로 시각을 바꿔도 그날 그대로 받는다.
+        sent_on_if_created = (
+            self._passed_target_on(
+                self._normalize_now(now), tz_name, schedule_hour, schedule_minute
+            )
+            or ""
+        )
         device, created = self.device_store.upsert(
             token=clean_token,
             platform=mobile_platform,
@@ -98,6 +108,7 @@ class DailyVerseNotificationManager:
             enabled=enabled,
             schedule_hour=schedule_hour,
             schedule_minute=schedule_minute,
+            last_daily_sent_on_if_created=sent_on_if_created,
         )
         return {
             "device": asdict(device),
@@ -125,25 +136,13 @@ class DailyVerseNotificationManager:
         due_devices: list[DeviceRegistration] = []
         sent_dates: dict[str, str] = {}
         for device in self.device_store.list_enabled_devices():
-            local_now = current.astimezone(self._resolve_timezone(device.timezone))
-            local_date = local_now.date().isoformat()
-            if device.last_daily_sent_on == local_date:
-                continue
-            # 기기별 개인 알림 시각이 있으면 사용, 없으면 전역 기본값으로 폴백.
-            target_hour = (
-                device.schedule_hour
-                if device.schedule_hour is not None
-                else self.settings.push_schedule_hour
-            )
-            target_minute = (
-                device.schedule_minute
-                if device.schedule_minute is not None
-                else self.settings.push_schedule_minute
-            )
-            # 캐치업 발송: '현재 분 == 목표 분' 정확 일치 대신, 오늘 아직 안 보냈고
-            # (위 last_daily_sent_on 검사) 목표 시각을 지났으면 발송한다.
+            # 캐치업 발송: '현재 분 == 목표 분' 정확 일치 대신, 목표 시각을 지났고
+            # 오늘 아직 안 보냈으면 발송한다.
             # 프로세스 재시작/스톨로 해당 분을 넘겨도 그날 발송이 누락되지 않는다.
-            if (local_now.hour, local_now.minute) < (target_hour, target_minute):
+            local_date = self._passed_target_on(
+                current, device.timezone, device.schedule_hour, device.schedule_minute
+            )
+            if local_date is None or device.last_daily_sent_on == local_date:
                 continue
             due_devices.append(device)
             sent_dates[device.token] = local_date
@@ -212,6 +211,26 @@ class DailyVerseNotificationManager:
             "verse": asdict(verse),
             "result": asdict(dispatch),
         }
+
+    def _passed_target_on(
+        self,
+        now: datetime,
+        timezone: str,
+        schedule_hour: int | None,
+        schedule_minute: int | None,
+    ) -> str | None:
+        """기기 현지 시각으로 그날 알림 시각을 지났으면 현지 날짜(ISO), 아직이면 None."""
+        local_now = now.astimezone(self._resolve_timezone(timezone))
+        # 기기별 개인 알림 시각이 있으면 사용, 없으면 전역 기본값으로 폴백.
+        target_hour = (
+            schedule_hour if schedule_hour is not None else self.settings.push_schedule_hour
+        )
+        target_minute = (
+            schedule_minute if schedule_minute is not None else self.settings.push_schedule_minute
+        )
+        if (local_now.hour, local_now.minute) < (target_hour, target_minute):
+            return None
+        return local_now.date().isoformat()
 
     def _resolve_timezone(self, name: str) -> ZoneInfo:
         try:
