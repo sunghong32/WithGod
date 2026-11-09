@@ -17,6 +17,7 @@ from __future__ import annotations
 import argparse
 import csv
 import re
+import unicodedata
 import zipfile
 from pathlib import Path
 
@@ -95,6 +96,149 @@ def _fix_pt(text: str) -> str:
 TEXT_OVERRIDES = {
     "de": lambda t: _RE_DE_ALTVERSE.sub("", t),
     "pt": _fix_pt,
+}
+
+
+# ── es(RV1909): 인쇄본 조판 흔적 (이슈 #35) ──
+# spaRV1909 원본은 인쇄본 지면을 그대로 옮겼다.
+# 1) 시편 표제가 `\d` 가 아니라 `\v 1` 안에 있다 — 「Salmo de David: Masquil. BIENAVENTURADO aquel…」.
+#    절 체계는 KJV 식(표제에 번호 없음)이라 표제를 떼야 다른 언어 1절과 맞는다.
+# 2) 장 첫머리 드롭캡이 대문자 낱말로 남았다 — 「NO juzguéis」. 한 글자 드롭캡은 다음 낱말까지
+#    대문자다 — 「Y FUERON acabados」「A TI, oh Jehová」「Y Á SUS discípulos」.
+# 3) 시편 119편 히브리 자모 머리말(「ALEPH.」「BETH」)이 각 연 첫 절 본문에 붙었다. 자모는 절의
+#    낱말이 아니라 머리말이다(ko·en·de·fr·it·pl 모두 본문에 없다).
+_PSALM119_LETTERS = {
+    "ALEPH", "BETH", "GIMEL", "DALETH", "HE", "VAU", "ZAIN", "CHETH", "TETH", "JOD", "CAPH",
+    "LAMED", "MEM", "NUN", "SAMECH", "AIN", "PE", "TZADDI", "COPH", "RESH", "SIN", "TAU",
+}
+# 장 1절이 아닌데 드롭캡이 있는 곳 — 누가복음 서언(1:1-4) 뒤 본문 첫머리.
+_ES_EXTRA_DROPCAPS = {("LUK", 1, 5)}
+# 드롭캡 둘째 낱말이 첫 글자만 대문자로 옮겨진 곳 — 대문자로 되돌려 같은 규칙을 탄다.
+_ES_SOURCE_FIXES = {("JDG", 2, 1): ("Y El ángel", "Y EL ángel")}
+# 시편 1절 머리의 「Aleluya.」는 표제가 아니라 1절 본문이다(히브리어 본문·개역한글·RV1960 모두
+# 1절에 있다). 원본이 드롭캡을 그 뒤에 찍어 표제처럼 보일 뿐이다(시편 111·112·113 …).
+_ES_KEEP_PREFIX = {"Aleluya."}
+_RE_LETTERS = re.compile(r"[^\W\d_]+")
+_RE_SENTENCE_END = re.compile(r"[.!?:;¡¿«“\"(]$")
+
+
+def _letters(tok: str) -> str:
+    return "".join(_RE_LETTERS.findall(tok))
+
+
+def _is_caps(tok: str) -> bool:
+    w = _letters(tok)
+    return bool(w) and w.isupper()
+
+
+def _dropcap_start(toks: list[str]) -> int | None:
+    """드롭캡이 시작하는 낱말 위치 — 두 글자 이상 대문자 낱말, 또는 대문자 낱말이 뒤따르는 한 글자
+    대문자(「A TI」의 A). 시편 표제 안의 낱말은 대문자로 시작할 뿐 전부 대문자는 아니다."""
+    for i, tok in enumerate(toks):
+        if not _is_caps(tok):
+            continue
+        if len(_letters(tok)) >= 2 or (i + 1 < len(toks) and _is_caps(toks[i + 1])):
+            return i
+    return None
+
+
+def _dropcap_end(toks: list[str], start: int) -> int:
+    """드롭캡이 끝나는 위치(포함 안 함) — 대문자 낱말이 이어지는 데까지."""
+    end = start
+    while end < len(toks) and _is_caps(toks[end]):
+        end += 1
+    return end
+
+
+def _has_dropcap(r: dict) -> bool:
+    return r["verse"] == 1 or (r["book_code"], r["chapter"], r["verse"]) in _ES_EXTRA_DROPCAPS
+
+
+def _lex_key(tok: str) -> str:
+    """사전 열쇠 — 소문자에 발음 부호를 뗀다. 드롭캡 「ACHAB」을 본문의 「Achâb」과 맞추려고."""
+    w = unicodedata.normalize("NFD", _letters(tok).lower())
+    return "".join(ch for ch in w if not unicodedata.combining(ch))
+
+
+def _casing_lexicon(rows: list[dict]) -> dict[str, str]:
+    """낱말별 평소 표기 — 'lower'·'title'·'upper'. 드롭캡 둘째 낱말이 고유명사(「Y JEHOVÁ」→
+    Jehová)인지 보통 낱말(「Y FUERON」→ fueron)인지, 원래 대문자(JAH)인지를 본문 다른 곳의
+    표기로 정한다. 절 첫 낱말과 문장부호 뒤 낱말은 대문자가 문법 때문이라 세지 않고,
+    드롭캡 자체도 세지 않는다. 본문 다른 곳에 없는 낱말은 소문자로 본다."""
+    counts: dict[str, dict[str, int]] = {}
+    for r in rows:
+        toks = r["text"].split()
+        skip = range(0)
+        if _has_dropcap(r):
+            start = _dropcap_start(toks)
+            if start is not None:
+                skip = range(start, _dropcap_end(toks, start))
+        for i in range(1, len(toks)):
+            prev, tok = toks[i - 1], toks[i]
+            w = _letters(tok)
+            if not w or i in skip or _RE_SENTENCE_END.search(prev):
+                continue
+            kind = "upper" if len(w) >= 2 and w.isupper() else "title" if w[0].isupper() else "lower"
+            c = counts.setdefault(_lex_key(w), {"lower": 0, "title": 0, "upper": 0})
+            c[kind] += 1
+    lex = {}
+    for w, c in counts.items():
+        if c["upper"] > c["title"] + c["lower"]:
+            lex[w] = "upper"
+        elif c["title"] > c["lower"]:
+            lex[w] = "title"
+        else:
+            lex[w] = "lower"
+    return lex
+
+
+def _recase(tok: str, kind: str) -> str:
+    if kind == "upper":
+        return tok
+    out, first = [], True
+    for ch in tok:
+        if ch.isalpha():
+            out.append(ch.upper() if first and kind == "title" else ch.lower())
+            first = False
+        else:
+            out.append(ch)
+    return "".join(out)
+
+
+def _undo_dropcap(toks: list[str], start: int, lex: dict[str, str]) -> list[str]:
+    """toks[start] 부터 이어지는 대문자 낱말을 평소 표기로. 첫 낱말은 첫 글자만 대문자다."""
+    toks = list(toks)
+    for i in range(start, _dropcap_end(toks, start)):
+        kind = lex.get(_lex_key(toks[i]), "lower")
+        if i == start and kind != "upper":
+            kind = "title"
+        toks[i] = _recase(toks[i], kind)
+    return toks
+
+
+def _fix_es_rows(rows: list[dict]) -> None:
+    """시편 119편 머리말·시편 표제를 떼고 드롭캡을 평소 표기로 되돌린다(행을 고쳐 쓴다)."""
+    for r in rows:
+        fix = _ES_SOURCE_FIXES.get((r["book_code"], r["chapter"], r["verse"]))
+        if fix:
+            r["text"] = r["text"].replace(*fix)
+    lex = _casing_lexicon(rows)
+    for r in rows:
+        toks = r["text"].split()
+        if (r["book_code"], r["chapter"]) == ("PSA", 119) and r["verse"] % 8 == 1:
+            if _letters(toks[0]) in _PSALM119_LETTERS:
+                toks = toks[1:]
+        start = _dropcap_start(toks) if _has_dropcap(r) else None
+        if start is not None:
+            if r["book_code"] == "PSA" and start and " ".join(toks[:start]) not in _ES_KEEP_PREFIX:
+                toks, start = toks[start:], 0  # 시편 표제
+            toks = _undo_dropcap(toks, start, lex)
+        r["text"] = " ".join(toks)
+
+
+# 판본 전체를 봐야 하는 정리 — TEXT_OVERRIDES 와 달리 절 위치와 본문 다른 곳의 표기를 쓴다.
+ROW_OVERRIDES = {
+    "es": _fix_es_rows,
 }
 
 
@@ -199,6 +343,8 @@ def build_language(lang: str, ebible_id: str) -> list[dict]:
                 {"book_code": code, "book": book_name, "chapter": chapter,
                  "verse": verse, "text": text}
             )
+    if lang in ROW_OVERRIDES:
+        ROW_OVERRIDES[lang](rows)
     return rows
 
 
