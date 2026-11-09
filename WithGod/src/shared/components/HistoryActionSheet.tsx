@@ -1,9 +1,9 @@
 import type { HistoryEntry } from "@/features/history";
 import { useSafeAreaPadding } from "@/shared/hooks";
-import { t } from "@/shared/lib/i18n";
 import { baseFontFamily, colors, scaleFont } from "@/shared/styles";
 import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Animated,
   Easing,
@@ -38,6 +38,8 @@ export function HistoryActionSheet({
   onRename,
   onDelete,
 }: HistoryActionSheetProps) {
+  // 사이드바 안에 늘 마운트돼 있다 — 전역 t 를 쓰면 문구가 첫 언어로 굳는다(이슈 #30).
+  const { t } = useTranslation();
   const { insets } = useSafeAreaPadding();
   const progress = useRef(new Animated.Value(0)).current;
 

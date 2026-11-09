@@ -1,6 +1,6 @@
-import { t } from "@/shared/lib/i18n";
 import { baseFontFamily, colors, scaleFont } from "@/shared/styles";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   KeyboardAvoidingView,
   Modal,
@@ -34,6 +34,8 @@ export function HistoryRenameModal({
   onCancel,
   onSubmit,
 }: HistoryRenameModalProps) {
+  // 사이드바 안에 늘 마운트돼 있다 — 전역 t 를 쓰면 문구가 첫 언어로 굳는다(이슈 #30).
+  const { t } = useTranslation();
   const [value, setValue] = useState(initialTitle);
 
   // 열릴 때마다 현재 제목으로 초기화한다(직전에 고치던 값이 남지 않도록).

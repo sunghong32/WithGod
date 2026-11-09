@@ -25,7 +25,6 @@ import {
   LANGUAGE_NATIVE_NAMES,
   getAppLanguageChoice,
   setAppLanguageChoice,
-  t,
 } from "@/shared/lib/i18n";
 import { refreshHomeWidgetAsync } from "@/widgets/refreshHomeWidget";
 import { clearDailyVerseCache } from "@/widgets/widgetTaskHandler";
@@ -33,6 +32,7 @@ import { syncWidgetLanguage } from "../../modules/widget-bridge";
 import { baseFontFamily, colors, scaleFont } from "@/shared/styles";
 import { Ionicons } from "@expo/vector-icons";
 import Constants from "expo-constants";
+import type { TFunction } from "i18next";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -48,7 +48,9 @@ import {
   View,
 } from "react-native";
 
-const formatTime = (hour: number, minute: number): string => {
+// t 를 인자로 받는다 — 전역 t 를 쓰면 React Compiler 가 결과를 시각만 보고 캐시해
+// 이 화면에서 언어를 바꿔도 오전/오후 표기가 옛 언어로 남는다(이슈 #30).
+const formatTime = (hour: number, minute: number, t: TFunction): string => {
   const period = hour < 12 ? t("settings.am") : t("settings.pm");
   const displayHour = hour % 12 === 0 ? 12 : hour % 12;
   const mm = String(minute).padStart(2, "0");
@@ -335,7 +337,7 @@ export default function SettingsScreen() {
                 <View style={styles.timeHeaderRow}>
                   <Text style={styles.cardTitle}>{t("settings.notifTime")}</Text>
                   <Text style={styles.timeValue}>
-                    {formatTime(settings.scheduleHour, settings.scheduleMinute)}
+                    {formatTime(settings.scheduleHour, settings.scheduleMinute, t)}
                   </Text>
                 </View>
 
