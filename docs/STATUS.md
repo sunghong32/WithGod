@@ -52,7 +52,7 @@ OpenAI 시절 이탈리아어만 gpt-4o 로 올리던 장치는 `LLM_MODEL_IT`(�
 ⚠️ **작업 문서는 [backend/docs/오늘의말씀_재선정.md](../backend/docs/오늘의말씀_재선정.md).**
 확정된 선정 기준·파이프라인·다음 할 일이 전부 거기 있다. 이어서 작업하려면 그걸 먼저 읽을 것.
 
-iOS 는 1.5.0 이 App Store 공개 상태(2026-08-11 릴리스). OTA production 최신은 update group `3d47a75e`(11/2, runtime 1.5.0).
+iOS 는 1.5.0 이 App Store 공개 상태(2026-08-11 릴리스). OTA production 최신은 update group `7a43d408`(11/9, runtime 1.5.0 — #30·#26 JS). **1.6.0(iPad 지원) 스토어 출시 진행 중.**
 
 ## 진행/예정
 
@@ -60,8 +60,8 @@ iOS 는 1.5.0 이 App Store 공개 상태(2026-08-11 릴리스). OTA production 
       백엔드(PR #36~#41·#45·#46·#48): 서버 반영·재시작. ko `verses.csv`·parquet·npy·faiss 는 저장소에 있어 함께 간다.
       **es parquet·faiss 는 저장소에 없어 서버에서 따로 교체**(PR #39 본문 절차, 12/11 전).
       배포 뒤 확인: 첫 폴링에 죽은 토큰 28대가 꺼지는지, iOS 3대 실발송 실패 원인(`with-god.push` 로그, #24).
-      OTA(PR #42·#43 JS)는 한 번에. 스토어 빌드: Android — #43 configChanges·#49 폰만 세로, iOS — #50 `supportsTablet`.
-      ASC API 는 계약 갱신이 필요하다(403). 확인 후 이슈 #23·#24·#25·#26·#30·#31·#33·#35·#44·#47 닫기
+      OTA(PR #42·#43 JS)는 **배포 완료(11/9, `7a43d408`)**. 스토어 빌드 1.6.0: Android — #43 configChanges·#49 폰만 세로, iOS — #50 `supportsTablet`.
+      iOS 는 iPad 13" 스크린샷(2064×2752) 필요(ASC API 403 은 11/9 계약 동의로 해결). 확인 후 이슈 #23·#24·#25·#26·#30·#31·#33·#35·#44·#47 닫기
 - [x] **외국어 풀이 검토본 — 배포 완료(2026-11-03, `f9ca39e`).** 7개 언어 × 376개를 Batch API 로 만들고 검사
       (예고 문구·기도 권유·기도문·원어 풀이·한국어에 없는 하나님 끝 문장) 통과분만 반영. 서버 테스트 121개 통과.
       확인: `/daily-verse?lang=` 7개 언어 모두 검토본 풀이. 남은 것: 원어민 검토는 안 함
@@ -137,6 +137,8 @@ iOS 는 1.5.0 이 App Store 공개 상태(2026-08-11 릴리스). OTA production 
 
 ## 최근 변경 이력
 
+- 2026-11-09 release(app): 1.6.0 — 버전 올림, ASC 1.6.0 생성·iPad 13" 스크린샷 40장(8개 언어) 업로드
+- 2026-11-09 deploy(app): OTA production `7a43d408`(runtime 1.5.0) — #30 사이드바 언어·#26 대형 화면 JS
 - 2026-11-09 merge: 이슈 10개를 고친 PR 13개 app-develop 병합(#36~#43·#45·#46·#48~#50) — 충돌 2곳 해결, 서버 테스트 177개·tsc·eslint · 운영 미배포
 - 2026-11-06 feat(app): iPad 네이티브·iPadOS 26 창 버튼 회피(PR #50), 안드로이드 폰만 세로 고정(PR #49) — #26 2단계
 - 2026-11-06 fix(backend): verses.csv 아가 6:14 추가·자리표시 14행 검색 제외(#47, PR #48)
