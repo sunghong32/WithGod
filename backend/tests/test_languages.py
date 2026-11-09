@@ -239,6 +239,128 @@ class CollectCandidatesTest(unittest.TestCase):
         got = collect_candidates(store, [0.9, 0.8], [0, 1], top_k=3)
         self.assertEqual([c["ref"] for c in got], ["잠언 7:14"])
 
+    def test_foreign_candidate_text_is_tidied(self) -> None:
+        # 검색 결과 카드도 절 하나를 떼어 보여 주므로 정리한다(#51·#52). 한국어는 그대로.
+        en = VerseStore("en", lang_rows(
+            ("GEN", "Genesis", 1, 15, "and let them be for lights to give light on the earth;” and it was so."),
+        ), None)
+        got = collect_candidates(en, [0.9], [0], top_k=1)
+        self.assertEqual(got[0]["text"], "And let them be for lights to give light on the earth; and it was so.")
+        ko = self.store(("시편", 23, 1, "“여호와는 나의 목자시니"))
+        self.assertEqual(collect_candidates(ko, [0.9], [0], top_k=1)[0]["text"], "“여호와는 나의 목자시니")
+
+
+class LocalizeTidyTest(LanguageStoreTestBase):
+    """오늘의 말씀·푸시·위젯 공용 경로(localize_ko_ref)가 정리된 본문을 내보내는지."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.install(
+            ko_rows(
+                ("이사야", 29, 24, "마음이 혼미하던 자도 총명하게 되며"),
+                ("창세기", 1, 14, "하나님이 가라사대 하늘의 궁창에 광명이 있어"),
+                ("창세기", 1, 15, "또 그 광명으로 하늘의 궁창에 있어 땅에 비취라 하시고 그대로 되니라"),
+            ),
+            {"en": lang_rows(
+                ("ISA", "Isaiah", 29, 24, "they also who err in spirit will come to understanding.”"),
+                ("GEN", "Genesis", 1, 14, "God said, “Let there be lights in the expanse of the sky;"),
+                ("GEN", "Genesis", 1, 15, "and let them be for lights to give light on the earth;” and it was so."),
+            )},
+        )
+
+    def test_single_verse_is_tidied(self) -> None:
+        got = localize_ko_ref("en", "이사야 29:24", "마음이 혼미하던 자도 총명하게 되며")
+        self.assertEqual(got["text"], "They also who err in spirit will come to understanding.")
+        got = localize_ko_ref("en", "창세기 1:14", "하나님이 가라사대")
+        self.assertEqual(got["text"], "God said, “Let there be lights in the expanse of the sky;”")
+
+    def test_passage_keeps_quotes_paired_across_verses(self) -> None:
+        # 합본은 이어 붙인 뒤에 정리한다 — 1:14 에서 연 인용이 1:15 에서 제대로 닫힌다
+        got = localize_ko_ref("en", "창세기 1:14-15", "하나님이 가라사대")
+        self.assertEqual(
+            got["text"],
+            "God said, “Let there be lights in the expanse of the sky; "
+            "and let them be for lights to give light on the earth;” and it was so.",
+        )
+
+
+class TidyVerseTextTest(unittest.TestCase):
+    """외국어 절을 떼어 보여 줄 때의 표시 정리 — 짝 없는 따옴표(#51)·소문자 첫 글자(#52)."""
+
+    def check(self, lang: str, raw: str, want: str) -> None:
+        self.assertEqual(languages.tidy_verse_text(raw, lang), want)
+
+    def test_drops_closing_quote_opened_in_previous_verse(self) -> None:
+        # 이사야 29:24 (en, 11/9 오늘의 말씀) — 29:22 에서 연 인용을 닫는 ” 만 남아 있었다
+        self.check(
+            "en",
+            "They also who err in spirit will come to understanding, and those who grumble will receive instruction.”",
+            "They also who err in spirit will come to understanding, and those who grumble will receive instruction.",
+        )
+        self.check(  # 이탈리아어는 닫는 따옴표가 마침표 앞 — 떼고 나서 빈칸이 겹치지 않게
+            "it",
+            "e servano da luminari nella distesa dei cieli per dar luce alla terra”. E così fu.",
+            "E servano da luminari nella distesa dei cieli per dar luce alla terra. E così fu.",
+        )
+
+    def test_closes_quote_continuing_into_next_verse(self) -> None:
+        self.check(  # 이사야 1:18 — 두 번째 인용이 1:19 로 이어진다
+            "en",
+            "“Come now, and let’s reason together,” says Yahweh: “Though your sins be as scarlet, they shall be as white as snow.",
+            "“Come now, and let’s reason together,” says Yahweh: “Though your sins be as scarlet, they shall be as white as snow.”",
+        )
+        self.check(  # 이탈리아어 표기 — 끝 문장부호 앞에서 닫는다
+            "it",
+            "Poi Dio disse: “Sianvi de’ luminari per separare il giorno dalla notte.",
+            "Poi Dio disse: “Sianvi de’ luminari per separare il giorno dalla notte”.",
+        )
+        self.check("pl", "Rzekł: „Nie bój się", "Rzekł: „Nie bój się”")
+        self.check("en", "He answered, “Fallen, fallen is Babylon", "He answered, “Fallen, fallen is Babylon”")
+        self.check("en", "He said, “", "He said,")  # 막 연 인용은 빈 따옴표 대신 뗀다
+
+    def test_both_at_once_and_nested(self) -> None:
+        self.check(
+            "en",
+            "horsemen in pairs.” He answered, “Fallen, fallen is Babylon;",
+            "Horsemen in pairs. He answered, “Fallen, fallen is Babylon;”",
+        )
+        self.check("en", "He said, “Go and say, “Hear", "He said, “Go and say, “Hear””")
+        # 겹인용(‘ ’)을 함께 닫던 ’ 는 같이 뗀다 — 안쪽(왕하 9:10)·바깥쪽(창 45:11)
+        self.check("en", "no one to bury her.’” Then he opened the door and fled.",
+                   "No one to bury her. Then he opened the door and fled.")
+        self.check("en", "and all that you have.”’", "And all that you have.")
+        # 다음 절로 넘어가는 겹인용의 ‘ 가 닫는 따옴표 앞에 매달리지 않게(히 7:21)
+        self.check("en", "“The Lord swore and will not change his mind, ‘",
+                   "“The Lord swore and will not change his mind,”")
+        # 독일어 표기 „ “ 로 닫힌 인용이 끝에 와도 그대로
+        self.check("de", "Er sprach: „Ich will“", "Er sprach: „Ich will“")
+        self.check("en", "Don’t be afraid.’", "Don’t be afraid.’")  # 따옴표 없는 ’ 는 판단하지 않는다
+
+    def test_balanced_and_apostrophes_untouched(self) -> None:
+        for lang, text in [
+            ("en", "Jesus said, “Don’t be afraid.” And they went."),
+            ("it", "Dio disse: “Sia la luce!” E la luce fu."),
+            ("de", "„Ich will dich unterweisen“, spricht er."),  # 독일어 표기 „ “ 도 짝으로 본다
+            ("fr", "Ceux dont l’esprit s’égarait acquerront de l’intelligence."),
+            ("es", "¿Quién nos apartará del amor de Cristo?"),
+        ]:
+            self.check(lang, text, text)
+
+    def test_capitalizes_first_letter(self) -> None:
+        self.check(
+            "it",
+            "i traviati di spirito impareranno la saviezza, e i mormoratori accetteranno l’istruzione.",
+            "I traviati di spirito impareranno la saviezza, e i mormoratori accetteranno l’istruzione.",
+        )
+        self.check("en", "for where your treasure is, there your heart will be also.",
+                   "For where your treasure is, there your heart will be also.")
+        self.check("de", "über alles", "Über alles")
+        self.check("en", "“for I am with you.”", "“For I am with you.”")  # 여는 따옴표 뒤 첫 글자
+        self.check("es", "¿quién?", "¿Quién?")
+
+    def test_korean_untouched(self) -> None:
+        self.check("ko", "“여호와는 나의 목자시니", "“여호와는 나의 목자시니")
+
 
 def _read_chapters(path: Path, book_col: str, chapters: set) -> pd.DataFrame:
     """CSV 를 한 줄씩 읽어 필요한 장만 남긴다. 테스트는 운영 서버(1GB)에서도 도니
@@ -359,6 +481,23 @@ class DailyVersesLocalizationDataTest(LanguageStoreTestBase):
 
     def test_every_daily_verse_localizes(self) -> None:
         self.assert_all_localize()
+
+    def test_daily_verse_texts_are_display_clean(self) -> None:
+        # 오늘의 말씀 카드에 짝 없는 큰따옴표(#51)·소문자 첫 글자(#52)가 나가지 않는다.
+        # 정리 전에는 en 35·it 6·pt 3·de 2(따옴표), it 32·de 22·en 11·fr 8·pt 5(소문자)였다.
+        bad = []
+        for item in self.items:
+            for lang in FOREIGN_LANGS:
+                found = localize_ko_ref(lang, item["reference"], item["text"])
+                if found is None:
+                    continue  # 현지화 실패는 위 테스트가 잡는다
+                text = found["text"]
+                first = next((ch for ch in text if ch not in languages._LEADING_PUNCT), "")
+                opened = sum(text.count(q) for q in "“„«") - (text.count("“") if lang == "de" and "„" in text else 0)
+                closed = text.count("”") + text.count("»") + (text.count("“") if lang == "de" and "„" in text else 0)
+                if first.islower() or opened != closed:
+                    bad.append((item["reference"], lang, text[:40], text[-30:]))
+        self.assertEqual(bad, [])
 
     def test_offset_decisions_are_reviewed(self) -> None:
         # 임베딩을 부르는 결정만 모은다 — 가짜 임베더라 무엇을 고르는지는 상관없다.

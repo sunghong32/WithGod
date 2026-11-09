@@ -378,6 +378,97 @@ def find_aligned_verse(
         return store.find_passage(book_code, chapter, verse, last)
 
 
+# ---------- 외국어 절 표시 정리 (#51·#52) ----------
+#
+# 외국어 판본은 문장·인용이 절을 넘나든다. 「God said, “Let there be lights …」(창 1:14)의
+# 인용은 1:15 에서 닫히고, 이탈리아어 이사야 29:24 는 29:23 의 문장을 이어 소문자로 시작한다.
+# 절 하나(또는 합본)만 떼어 카드·푸시·위젯·검색 결과로 보여 주면 짝 없는 따옴표와 소문자
+# 첫 글자가 그대로 나간다. 원본 CSV·인덱스는 그대로 두고(검색·정렬은 원문으로) 내보내는
+# 곳에서만 정리한다. 한국어(개역한글)는 대소문자가 없고 이 따옴표 체계도 아니라 건드리지 않는다.
+
+# 큰따옴표 여는 것 → 닫는 것. 이 데이터의 en·pt·de·it 는 “ ”, pl 은 „ ” 를 쓴다(지금 de 도 „ “ 가
+# 아니라 “ ” 지만, 독일어 표기 „ “ 가 들어와도 짝이 맞게 de 의 „ 는 “ 로 닫는다). 홑따옴표 ‘ ’ 는
+# 닫는 ’ 가 아포스트로피와 같은 글자라 짝을 셀 수 없어 두고, 따옴표를 쓰지 않는 es·fr 는 그대로 나간다.
+_QUOTE_CLOSE_OF = {"“": "”", "„": "”", "«": "»"}
+_QUOTE_CLOSE_OF_DE = {**_QUOTE_CLOSE_OF, "„": "“"}
+_QUOTE_CLOSERS = frozenset({"”", "»"})
+# 첫 글자를 찾을 때 건너뛰는 앞쪽 문장부호
+_LEADING_PUNCT = frozenset(" \t\"'“„«‘(¿¡[")
+# 이탈리아어 본문은 닫는 따옴표를 끝 문장부호 앞에 둔다(「…quello che t’ho detto”.」).
+_CLOSE_BEFORE_FINAL_PUNCT = frozenset({"it"})
+
+
+def _balance_quotes(text: str, lang: str) -> str:
+    """앞 절에서 열린 인용을 닫는 따옴표는 떼고, 다음 절로 이어지는 인용은 끝에서 닫는다."""
+    close_of = _QUOTE_CLOSE_OF_DE if lang == "de" else _QUOTE_CLOSE_OF
+    kept: list[str] = []
+    # 아직 안 닫힌 인용 — (닫는 따옴표, kept 안의 여는 따옴표 위치), 안쪽이 뒤
+    pending: list[tuple[str, int]] = []
+    removed = False
+    i = 0
+    while i < len(text):
+        ch = text[i]
+        i += 1
+        if pending and ch == pending[-1][0]:
+            pending.pop()
+        elif ch in close_of:
+            pending.append((close_of[ch], len(kept)))
+        elif ch in _QUOTE_CLOSERS:
+            if pending:  # 짝이 다른 닫는 따옴표 — 열린 인용을 닫는 것으로 본다
+                pending.pop()
+            else:  # 앞 절에서 열린 인용을 닫는 따옴표 — 뗀다
+                removed = True
+                # 겹인용을 함께 닫던 ’ 도 뗀다 — 안쪽(「…bury her.’” Then」)이든 바깥쪽
+                # (「…all that you have.”’」)이든. 문장부호 바로 뒤의 ’ 는 아포스트로피일 수 없다.
+                if len(kept) >= 2 and kept[-1] == "’" and kept[-2] in ".,;:!?":
+                    kept.pop()
+                elif text[i:i + 1] == "’" and kept and kept[-1] in ".,;:!?" and text[i + 1:i + 2] in ("", " "):
+                    i += 1
+                continue
+        kept.append(ch)
+
+    def rstrip_kept() -> None:
+        while kept and kept[-1].isspace():
+            kept.pop()
+
+    # 끝에서 막 연 인용 — 빈 따옴표 대신 뗀다. 다음 절로 넘어가는 겹인용의 ‘ 도
+    # (「…will not change his mind, ‘」) 닫는 따옴표 앞에 매달리지 않게 뗀다.
+    rstrip_kept()
+    while kept and (kept[-1] == "‘" or (pending and pending[-1][1] == len(kept) - 1)):
+        if pending and pending[-1][1] == len(kept) - 1:
+            pending.pop()
+        kept.pop()
+        rstrip_kept()
+    out = "".join(kept)
+    if removed:
+        out = re.sub(r" {2,}", " ", out).strip()
+    if pending:
+        closers = "".join(c for c, _ in reversed(pending))
+        if lang in _CLOSE_BEFORE_FINAL_PUNCT and out and out[-1] in ".;:,":
+            out = out[:-1] + closers + out[-1]
+        else:
+            out += closers
+    return out
+
+
+def _capitalize_first(text: str) -> str:
+    for i, ch in enumerate(text):
+        if ch in _LEADING_PUNCT:
+            continue
+        up = ch.upper()
+        if ch.islower() and len(up) == 1:
+            return text[:i] + up + text[i + 1:]
+        return text
+    return text
+
+
+def tidy_verse_text(text: str, lang: str) -> str:
+    """외국어 절을 한 장의 카드로 내보낼 때의 표시 정리 — 짝 없는 따옴표(#51)·소문자 첫 글자(#52)."""
+    if lang == "ko" or not text:
+        return text
+    return _capitalize_first(_balance_quotes(str(text), lang))
+
+
 # 「시편 23:1」 · 합본 「시편 40:1-2」(같은 장) · 하반절 「요한복음 8:11b」.
 # 둘이 겹친 「…:1-2b」도 받는다(scripts/build_verse_cards.py 가 만들 수 있는 꼴).
 _RE_KO_REF = re.compile(r"^(.+?)\s+(\d+):(\d+)(?:-(\d+))?b?$")
@@ -412,7 +503,7 @@ def localize_ko_ref(lang: str, ko_ref: str, ko_text: str) -> dict | None:
     ref = f"{found['book']} {found['chapter']}:{found['verse']}"
     if found["last_verse"] != found["verse"]:
         ref += f"-{found['last_verse']}"
-    return {"ref": ref, "text": found["text"]}
+    return {"ref": ref, "text": tidy_verse_text(found["text"], lang)}
 
 
 # ---------- 추천 적합성 필터 ----------
@@ -479,11 +570,11 @@ def is_placeholder_text(text) -> bool:
 def collect_candidates(store: VerseStore, scores, ids, top_k: int) -> list[dict]:
     """FAISS 결과에서 위로 부적합 절(심판 신탁·족보·악인의 대사 등)을 걸러
     상위 top_k 후보를 만든다. 전부 걸러지는 극단엔 부적합 필터 없이 폴백한다.
-    본문이 없는 자리표시 절은 폴백에서도 뺀다."""
+    본문이 없는 자리표시 절은 폴백에서도 뺀다. 외국어 본문은 표시용으로 정리한다(#51·#52)."""
     def card(s, r) -> dict:
         return {
             "ref": f"{r['book']} {int(r['chapter'])}:{int(r['verse'])}",
-            "text": str(r["text"]),
+            "text": tidy_verse_text(str(r["text"]), store.lang),
             "score": float(s),
         }
 
