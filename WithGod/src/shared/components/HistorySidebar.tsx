@@ -42,6 +42,9 @@ type HistorySidebarProps = {
 
 type Group = { key: string; label: string; items: HistoryEntry[] };
 
+/** 상단 바(검색) 좌우 여백 */
+const TOP_BAR_PADDING = 20;
+
 const startOfDay = (date: Date): number =>
   new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
 
@@ -85,7 +88,7 @@ export function HistorySidebar({ onSelect }: HistorySidebarProps) {
   // 언어가 바뀌어도 사이드바가 처음 그린 언어(앱 시작 시 ko)로 남는다(이슈 #30).
   // 이 훅의 t 는 언어가 바뀔 때마다 새 함수라 캐시가 함께 무효화된다.
   const { t } = useTranslation();
-  const { insets, headerPaddingTop } = useSafeAreaPadding();
+  const { insets, windowControls, headerPaddingTop } = useSafeAreaPadding();
   const { data: entries = [], refetch } = useHistory();
   const removeEntry = useRemoveHistoryEntry();
   const renameEntry = useRenameHistoryEntry();
@@ -188,7 +191,13 @@ export function HistorySidebar({ onSelect }: HistorySidebarProps) {
         { paddingTop: headerPaddingTop, paddingLeft: insets.left },
       ]}
     >
-      <View style={styles.topBar}>
+      {/* 사이드바가 열리면 왼쪽 위가 iPadOS 창 버튼(●●●) 자리다 — 검색창이 그 밑에 깔리지 않게 */}
+      <View
+        style={[
+          styles.topBar,
+          { paddingLeft: TOP_BAR_PADDING + windowControls.left },
+        ]}
+      >
         {searching ? (
           <>
             <View style={styles.searchField}>
@@ -334,7 +343,7 @@ const styles = StyleSheet.create({
     height: 40,
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 20,
+    paddingHorizontal: TOP_BAR_PADDING,
     marginBottom: 16,
     gap: 8,
   },

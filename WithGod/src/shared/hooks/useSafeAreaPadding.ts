@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useWindowControlsInsets } from "../../../modules/window-controls";
 
 /**
  * 본문 단의 최대 폭(dp, 좌우 기본 여백 포함).
@@ -13,6 +14,7 @@ export const CONTENT_MAX_WIDTH = 640;
 
 export function useSafeAreaPadding() {
   const insets = useSafeAreaInsets();
+  const windowControls = useWindowControlsInsets();
   const { width } = useWindowDimensions();
 
   // edge-to-edge 기준: 양 플랫폼 모두 창이 상태바 뒤까지 그려지므로 insets.top 만 쓴다.
@@ -29,14 +31,14 @@ export function useSafeAreaPadding() {
     };
   }, [insets.bottom]);
 
-  // 화면 끝까지 닿는 바(헤더)의 좌우 여백. 가로 화면의 노치·카메라 컷아웃을 피한다.
-  // 세로에서는 좌우 안전영역이 0 이라 기본 여백 그대로다.
+  // 화면 맨 위에 끝까지 닿는 바(헤더)의 좌우 여백. 가로 화면의 노치·카메라 컷아웃과
+  // iPadOS 26 창 모드의 창 조절 버튼(●●●)을 피한다. 폰 세로에서는 둘 다 0 이라 기본 여백 그대로다.
   const getSidePadding = useMemo(() => {
     return (base: number) => ({
-      paddingLeft: base + insets.left,
-      paddingRight: base + insets.right,
+      paddingLeft: base + insets.left + windowControls.left,
+      paddingRight: base + insets.right + windowControls.right,
     });
-  }, [insets.left, insets.right]);
+  }, [insets.left, insets.right, windowControls.left, windowControls.right]);
 
   // 본문(스크롤 내용·입력창)의 좌우 여백. 안전영역을 피하고, 화면이 넓으면
   // CONTENT_MAX_WIDTH 폭의 단으로 가운데에 모은다.
@@ -50,6 +52,7 @@ export function useSafeAreaPadding() {
 
   return {
     insets,
+    windowControls,
     headerPaddingTop,
     getInputBarPaddingBottom,
     getSidePadding,
