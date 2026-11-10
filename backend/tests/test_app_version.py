@@ -119,6 +119,34 @@ class AppVersionAutoTrackTest(unittest.TestCase):
         ):
             self.assertIsNone(app_version._fetch_store_version())
 
+    def test_fetch_store_version_busts_cdn_cache_each_call(self) -> None:
+        """조회마다 주소가 달라야 한다 — 같은 주소면 애플 CDN 이 낡은 버전을 돌려준다."""
+
+        class FakeResp:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return False
+
+            def read(self):
+                return json.dumps({"results": [{"version": "1.6.0"}]}).encode()
+
+        urls = []
+
+        def fake_urlopen(request, timeout):
+            urls.append(request.full_url)
+            return FakeResp()
+
+        with patch.object(app_version.urllib.request, "urlopen", side_effect=fake_urlopen):
+            self.assertEqual(app_version._fetch_store_version(), "1.6.0")
+            self.assertEqual(app_version._fetch_store_version(), "1.6.0")
+
+        self.assertEqual(len(urls), 2)
+        self.assertNotEqual(urls[0], urls[1])
+        for url in urls:
+            self.assertTrue(url.startswith(app_version.STORE_LOOKUP_URL + "&_="), url)
+
     # --- 쓰기 안전성 ---
 
     def test_auto_bump_does_not_clobber_concurrent_admin_save(self) -> None:
