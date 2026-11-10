@@ -6,6 +6,13 @@ WithGod 사용자 지표 어드민 대시보드 (Next.js).
 - **데이터 출처**: 백엔드 `GET /admin/analytics/*` — 설계와 지표 정의는
   [`backend/docs/analytics.md`](../backend/docs/analytics.md)
 - `/` 는 아직 비어 있다. 소개 페이지를 만들면 여기에 넣으면 된다.
+- **`/get` — 앱 받기 링크** (인스타 프로필 등 링크를 하나만 걸 수 있는 곳용,
+  예: `https://withgod-web.vercel.app/get?src=instagram`). iPhone·Android 는
+  User-Agent 로 해당 스토어에 바로 보내고(307), PC·링크 미리보기 봇은 두 스토어
+  버튼이 있는 영어 안내 페이지를 받는다. iPadOS 사파리는 Mac 으로 보여 안내
+  페이지를 받지만 클라이언트에서 터치 지점으로 다시 App Store 로 보낸다.
+  `src` 는 Play 의 UTM referrer 로 실리고, App Store 캠페인(`pt`·`ct`)은
+  [`lib/storeLinks.ts`](lib/storeLinks.ts) 의 provider token 을 채우면 켜진다.
 
 ## 로컬 실행
 
