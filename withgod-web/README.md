@@ -11,8 +11,9 @@ WithGod 사용자 지표 어드민 대시보드 (Next.js).
   User-Agent 로 해당 스토어에 바로 보내고(307), PC·링크 미리보기 봇은 두 스토어
   버튼이 있는 영어 안내 페이지를 받는다. iPadOS 사파리는 Mac 으로 보여 안내
   페이지를 받지만 클라이언트에서 터치 지점으로 다시 App Store 로 보낸다.
-  `src` 는 Play 의 UTM referrer 로 실리고, App Store 캠페인(`pt`·`ct`)은
-  [`lib/storeLinks.ts`](lib/storeLinks.ts) 의 provider token 을 채우면 켜진다.
+  `src` 는 Play 의 UTM referrer 와 App Store 캠페인(`ct`)에 함께 실린다 —
+  App Store Connect 앱 분석 → 유입 경로 → 캠페인에서 `src` 별로 본다
+  (provider token `pt` 는 [`lib/storeLinks.ts`](lib/storeLinks.ts)).
 
 ## 로컬 실행
 

@@ -10,11 +10,11 @@ export const ANDROID_PACKAGE = "kr.co.mincha.withgod";
 
 /**
  * App Store Connect 캠페인 링크의 provider token(pt).
- * 앱 분석 → 획득 → 캠페인 링크 만들기 화면의 `pt=` 값이다. 공개 링크에 그대로
- * 실리는 값이라 비밀이 아니다. 비어 있으면 캠페인 파라미터 없이 보낸다
+ * 앱 분석 → 유입 경로 → 캠페인 → + 로 만든 링크의 `pt=` 값이다. 공개 링크에
+ * 그대로 실리는 값이라 비밀이 아니다. 비우면 캠페인 파라미터 없이 보낸다
  * (앱 분석에서 유입 경로별 집계만 빠지고 링크는 정상 동작한다).
  */
-const APP_STORE_PROVIDER_TOKEN = "";
+const APP_STORE_PROVIDER_TOKEN = "128437792";
 
 export type Platform = "ios" | "android" | "other";
 
@@ -39,7 +39,8 @@ export function normalizeSource(raw: string | string[] | undefined): string {
 }
 
 export function appStoreUrl(source: string): string {
-  const url = new URL(`https://apps.apple.com/app/id${APP_STORE_ID}`);
+  // App Store Connect 가 만들어 주는 캠페인 링크와 같은 꼴(`/app/apple-store/id…`).
+  const url = new URL(`https://apps.apple.com/app/apple-store/id${APP_STORE_ID}`);
   if (APP_STORE_PROVIDER_TOKEN) {
     url.searchParams.set("pt", APP_STORE_PROVIDER_TOKEN);
     url.searchParams.set("ct", source);
