@@ -3,6 +3,8 @@
 latest(최신 버전)는 **App Store 라이브 버전을 자동 추적**한다: iTunes Lookup 을
 TTL 캐시로 조회해 스토어 버전이 저장값보다 높으면 자동으로 올린다(수동 갱신 누락
 방지 — 1.3.0/1.4.0 릴리즈 때 latest 가 1.2.4 로 방치됐던 사고의 재발 방지).
+조회 주소에는 매번 다른 값을 붙여 애플 CDN(Akamai) 캐시를 피한다 — 붙이지 않으면
+출시 뒤 몇 시간이 지나도 옛 버전을 돌려준다(1.6.0 때 7시간 넘게 1.5.0).
 자동 반영은 '올리기'만 한다 — 스토어 심사 중(미공개) 버전으로 안내하는 일이 없고,
 어드민이 수동으로 더 높게 올리는 것도 그대로 존중된다.
 
@@ -44,8 +46,9 @@ APPSTORE_ID = "6757704775"
 STORE_LOOKUP_URL = (
     f"https://itunes.apple.com/lookup?id={APPSTORE_ID}&country=kr"
 )
-# 캐시 TTL(기본 6시간) — 0 이면 자동 추적 비활성(수동 전용으로 롤백).
-STORE_TTL_SECONDS = int(os.getenv("APP_VERSION_STORE_TTL", "21600"))
+# 조회 주기(기본 1시간) — 0 이면 자동 추적 비활성(수동 전용으로 롤백).
+# 워커마다 주기당 한 번만 부르므로 하루 수십 번 수준이다.
+STORE_TTL_SECONDS = int(os.getenv("APP_VERSION_STORE_TTL", "3600"))
 STORE_TIMEOUT_SECONDS = 5
 
 # 파일이 없을 때의 안전한 기본값. min_supported=1.0.0 이라 강제 업데이트는 걸리지
@@ -127,11 +130,24 @@ def _is_newer(candidate: str, baseline: str) -> bool:
         return False
 
 
+def _store_lookup_url() -> str:
+    """CDN 캐시를 피하도록 호출마다 다른 값을 붙인 조회 주소.
+
+    iTunes Lookup 앞단의 Akamai 는 같은 주소면 낡은 응답을 몇 시간씩 그대로 돌려준다
+    (`x-cache: TCP_HIT`, 1.6.0 출시 7시간 뒤에도 1.5.0). 쿼리만 달라지면 원본까지 간다.
+    """
+    return f"{STORE_LOOKUP_URL}&_={time.time_ns()}"
+
+
 def _fetch_store_version() -> str | None:
     """iTunes Lookup 으로 App Store 라이브 버전을 조회한다. 실패 시 None(fail-open)."""
     try:
         request = urllib.request.Request(
-            STORE_LOOKUP_URL, headers={"User-Agent": "withgod-backend/app-version"}
+            _store_lookup_url(),
+            headers={
+                "User-Agent": "withgod-backend/app-version",
+                "Cache-Control": "no-cache",
+            },
         )
         with urllib.request.urlopen(request, timeout=STORE_TIMEOUT_SECONDS) as resp:
             data = json.loads(resp.read().decode("utf-8"))
