@@ -14,6 +14,9 @@ WithGod 사용자 지표 어드민 대시보드 (Next.js).
   `src` 는 Play 의 UTM referrer 와 App Store 캠페인(`ct`)에 함께 실린다 —
   App Store Connect 앱 분석 → 유입 경로 → 캠페인에서 `src` 별로 본다
   (provider token `pt` 는 [`lib/storeLinks.ts`](lib/storeLinks.ts)).
+- **`/ig`** — 인스타 프로필에 거는 짧은 주소. `next.config.ts` 의 rewrite 로
+  주소는 그대로 두고 `/get?src=instagram` 을 연다(인스타는 링크가 하나면 제목
+  대신 URL 을 보여 줘서 긴 주소가 잘린다).
 
 ## 로컬 실행
 
