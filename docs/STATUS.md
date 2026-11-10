@@ -4,7 +4,7 @@
 > **작업을 완료하면 「지금 상태」와 「최근 변경 이력」을 갱신할 것.** 낡으면 신뢰가 무너진다.
 > ⚠️ 이 파일은 세션 시작 시 통째로 주입된다. **20KB 아래로 유지할 것** —
 > 완료 이력은 `CHANGELOG.md` 나 git history 로 넘긴다.
-> 최종 갱신: 2026-11-09 · 브랜치: `app-develop`
+> 최종 갱신: 2026-11-10 · 브랜치: `app-develop`
 
 ## 한 줄
 
@@ -51,7 +51,12 @@ OpenAI 시절 이탈리아어만 gpt-4o 로 올리던 장치는 `LLM_MODEL_IT`(�
 ⚠️ **작업 문서는 [backend/docs/오늘의말씀_재선정.md](../backend/docs/오늘의말씀_재선정.md).**
 확정된 선정 기준·파이프라인·다음 할 일이 전부 거기 있다. 이어서 작업하려면 그걸 먼저 읽을 것.
 
-iOS 는 1.5.0 이 App Store 공개 상태(2026-08-11 릴리스). OTA production 최신은 update group `7a43d408`(11/9, runtime 1.5.0 — #30·#26 JS). **1.6.0(iPad 지원) 제출(11/9)** — iOS 빌드 61 심사 대기, Android vc28 production·alpha·internal 게시(구글 검토).
+**1.6.0(iPad 지원)이 양 스토어 공개(11/10 확인)** — App Store 2026-11-09 17:35 UTC 릴리스(iTunes Lookup us·jp·kr),
+Play vc28 production·alpha·internal `completed`. 1.6.0 빌드(`932143a`) 뒤 앱 코드 변경 없음.
+⚠️ runtimeVersion 이 `appVersion` 정책이라 **이제 `eas update` 는 1.6.0 빌드에만 닿는다** — 1.5.0 에 남은 사용자에게도
+보내려면 runtime 1.5.0 으로 따로 내야 한다. 1.5.0 의 마지막 OTA 는 `7a43d408`(11/9, #30·#26 JS).
+`/app-version` latest 는 iTunes 조회로 자동으로 따라간다(1시간마다, 애플 CDN 캐시 우회 — #56). 1.6.0 은 11/10 09:12 반영.
+min_supported 는 1.0.0 유지(강제 업데이트 사유 없음).
 
 ## 진행/예정
 
@@ -60,8 +65,8 @@ iOS 는 1.5.0 이 App Store 공개 상태(2026-08-11 릴리스). OTA production 
       확인: 첫 폴링에 무효 토큰 32개 꺼짐(NotRegistered 28 + iOS 1.5.0 APNs「device token is disabled」4) —
       enabled 147 → 115, 켜져 있는데 오래 못 받은 기기 34 → 2. #36·#37 은 가짜 토큰 등록으로 확인 후 삭제.
       8개 언어 `/daily-verse`, ko·es `/recommend` 정상(공식 본문). 재시작 뒤 오류 로그 없음.
-      OTA(PR #42·#43 JS) `7a43d408`. 스토어 1.6.0 **심사 중** — iOS 빌드 61 WAITING_FOR_REVIEW, Android vc28 3트랙.
-      승인 뒤 `/app-version` latest 는 iTunes 조회로 자동으로 따라간다
+      OTA(PR #42·#43 JS) `7a43d408`. 스토어 1.6.0 은 11/10 양쪽 공개 확인 — `/app-version` latest 는 애플 CDN 캐시 때문에
+      7시간 가까이 1.5.0 에 묶여 있다가 #56 배포로 1.6.0 반영
 - [x] **외국어 풀이 검토본 — 배포 완료(2026-11-03, `f9ca39e`).** 7개 언어 × 376개를 Batch API 로 만들고 검사
       (예고 문구·기도 권유·기도문·원어 풀이·한국어에 없는 하나님 끝 문장) 통과분만 반영. 서버 테스트 121개 통과.
       확인: `/daily-verse?lang=` 7개 언어 모두 검토본 풀이. 남은 것: 원어민 검토는 안 함
@@ -138,6 +143,8 @@ iOS 는 1.5.0 이 App Store 공개 상태(2026-08-11 릴리스). OTA production 
 
 ## 최근 변경 이력
 
+- 2026-11-10 fix(backend): #56 app-version 스토어 조회가 애플 CDN(Akamai) 캐시에 막혀 1.6.0 출시 7시간 뒤에도 latest 1.5.0 — 조회마다 캐시 우회 값, 주기 6시간 → 1시간(PR #57) · 운영 배포 `b81eded`(서버 테스트 192개, 재시작 7초), 곧바로 latest 1.6.0
+- 2026-11-10 check(app): 1.6.0 양 스토어 공개 확인 — min_supported 1.0.0 유지, 앞으로 OTA 는 runtime 1.6.0 에만 닿음
 - 2026-11-09 fix(backend): #53 한국어 한 절 = 외국어 두 절(`_KO_VERSE_SPANS` 11곳) + 외국어 장이 짧을 때도 내용으로 정렬 — fr 오늘의 말씀 5개 정정(PR #55) · 운영 배포 `72ca607`(서버 테스트 191개), 이슈 닫음(열린 이슈 0)
 - 2026-11-09 fix(backend): #51·#52 외국어 절 표시 정리(PR #54, `languages.tidy_verse_text`) — 짝 없는 따옴표 떼기·닫기, 첫 글자 대문자. 오늘의 말씀 376 × 7 따옴표 46·소문자 78 → 0 · 운영 배포 `0895561`(서버 테스트 187개), 이슈 닫음
 - 2026-11-09 issue: 외국어 표시 결함 3개 등록(#51 따옴표·#52 소문자·#53 합절) — 이사야 30:2 누락은 공식 본문의 합절이라 결함 아님
