@@ -143,7 +143,7 @@ min_supported 는 1.0.0 유지(강제 업데이트 사유 없음).
 
 ## 최근 변경 이력
 
-- 2026-11-10 feat(web): #58 `/get` 앱 받기 링크 — 인스타 프로필용 단일 링크. iPhone·Android(인스타 인앱 포함)는 스토어로 바로, PC·미리보기 봇은 영어 안내 페이지, iPad 사파리는 클라이언트에서 App Store 로(시뮬레이터 확인). Play UTM 은 실림, App Store 캠페인은 `pt` 미입력이라 꺼짐 · PR #59 → Vercel 운영 배포 `727cfaa`(운영 주소에서 기기별 확인), 이슈 닫음
+- 2026-11-10 feat(web): #58 `/get` 앱 받기 링크 — 인스타 프로필용 단일 링크. iPhone·Android(인스타 인앱 포함)는 스토어로 바로, PC·미리보기 봇은 영어 안내 페이지, iPad 사파리는 클라이언트에서 App Store 로(시뮬레이터 확인). Play UTM · App Store 캠페인(`pt=128437792`, `ct=src`) 둘 다 실림 · PR #59 → Vercel 운영 배포 `727cfaa`(운영 주소에서 기기별 확인), 이슈 닫음 · App Store 캠페인은 후속 PR 로 켬
 - 2026-11-10 fix(backend): #56 app-version 스토어 조회가 애플 CDN(Akamai) 캐시에 막혀 1.6.0 출시 7시간 뒤에도 latest 1.5.0 — 조회마다 캐시 우회 값, 주기 6시간 → 1시간(PR #57) · 운영 배포 `b81eded`(서버 테스트 192개, 재시작 7초), 곧바로 latest 1.6.0
 - 2026-11-10 check(app): 1.6.0 양 스토어 공개 확인 — min_supported 1.0.0 유지, 앞으로 OTA 는 runtime 1.6.0 에만 닿음
 - 2026-11-09 fix(backend): #53 한국어 한 절 = 외국어 두 절(`_KO_VERSE_SPANS` 11곳) + 외국어 장이 짧을 때도 내용으로 정렬 — fr 오늘의 말씀 5개 정정(PR #55) · 운영 배포 `72ca607`(서버 테스트 191개), 이슈 닫음(열린 이슈 0)
