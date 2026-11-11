@@ -60,9 +60,10 @@ min_supported 는 1.0.0 유지(강제 업데이트 사유 없음).
 
 ## 진행/예정
 
-- [ ] **인스타 런칭 게시물 9개 — 제작 완료, 게시 대기(11/10).** 결과 `docs/instagram/launch/`(36장 + `captions.md` 올리는 순서·캡션·대체 텍스트),
-      다시 만들기 `python3 docs/instagram/tools/make_launch_posts.py`(디자인은 사용자가 고른 시안 A+C). 사용자가 사흘에 3개씩 직접 올리고 03→02→01 고정.
-      다음: 프로페셔널 계정 전환 확인 → Daily Verse 자동 게시(공식 API). 기획·결정은 메모리 `instagram-account`
+- [ ] **인스타 런칭 게시물 9개 — 1일째 3개(09·08·07) 게시(11/11), 나머지 6개 예약(11/12·13 22:00 KST).** 결과 `docs/instagram/launch/`(36장 + `captions.md` 올리는 순서·캡션·대체 텍스트),
+      다시 만들기 `python3 docs/instagram/tools/make_launch_posts.py`(디자인은 사용자가 고른 시안 A+C). 사흘에 3개씩, 마지막에 03→02→01 고정(고정은 앱에서만).
+      공식 API 로 올림 `python3 docs/instagram/tools/post_launch.py prepare|publish <slug>…`(raw URL·PNG·대체 텍스트 OK, 기록 `launch/posted.json`). 예약은 이 Mac 의 launchd `~/Library/LaunchAgents/com.minsunghong.withgod-ig-launch.plist` → `post_launch.py due`(묶음 `launch/schedule.json`, 로그 `~/Library/Logs/withgod-ig-launch.log`), 올리면 텔레그램으로 링크 알림.
+      **11/13 22:00 전에는 메인 체크아웃 브랜치를 바꾸지 말 것**(스크립트·예약 파일이 여기 있음). 끝나면 사용자가 03→02→01 고정(앱), plist 지워도 됨. 기획·결정은 메모리 `instagram-account`
 - [x] **11/9 병합분 배포 — 완료(11/9).** 백엔드 PR 9개 운영 서버 `da6df40`(서버 테스트 177개, 재시작 6초).
       ko 데이터 4개는 저장소로 함께 갔고(md5 일치), **es parquet·faiss 는 서버에서 교체**(PR #39 절차, 백업 `.bak-20261109`).
       확인: 첫 폴링에 무효 토큰 32개 꺼짐(NotRegistered 28 + iOS 1.5.0 APNs「device token is disabled」4) —
@@ -146,6 +147,7 @@ min_supported 는 1.0.0 유지(강제 업데이트 사유 없음).
 
 ## 최근 변경 이력
 
+- 2026-11-11 ops(instagram): 런칭 1일째 3개(시편 118:24 카드 · 기다림 캐러셀 · 시편 34:18 카드) 공식 API 로 게시 · 2·3일째 6개는 launchd 로 11/12·13 22:00 예약(게시 후 텔레그램 알림). 게시물→스토리 공유·고정은 API 에 없어 앱에서
 - 2026-11-10 feat(instagram): 런칭 게시물 9개(고정 3 + 말씀 카드 4 + 캐러셀 2, 36장) — HTML→Chrome 헤드리스 1080×1350, 본문 WEB·카드 캡션은 앱 영어 풀이(AI 표기), 사용법은 iPhone 시뮬레이터 실제 화면. "AI로 만든 티" 지적에 감정별 하늘빛 + 필름 질감 + 형광펜(Fraunces, OFL)으로 다시 그림
 - 2026-11-10 feat(web): #58 `/get` 앱 받기 링크 — 인스타 프로필용 단일 링크. iPhone·Android(인스타 인앱 포함)는 스토어로 바로, PC·미리보기 봇은 영어 안내 페이지, iPad 사파리는 클라이언트에서 App Store 로(시뮬레이터 확인). Play UTM · App Store 캠페인(`pt=128437792`, `ct=src`) 둘 다 실림 · PR #59 → Vercel 운영 배포 `727cfaa`(운영 주소에서 기기별 확인), 이슈 닫음 · 후속: App Store 캠페인 켬(#60), 인스타용 짧은 주소 `/ig`(#61)
 - 2026-11-10 fix(backend): #56 app-version 스토어 조회가 애플 CDN(Akamai) 캐시에 막혀 1.6.0 출시 7시간 뒤에도 latest 1.5.0 — 조회마다 캐시 우회 값, 주기 6시간 → 1시간(PR #57) · 운영 배포 `b81eded`(서버 테스트 192개, 재시작 7초), 곧바로 latest 1.6.0
