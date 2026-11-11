@@ -14,10 +14,10 @@ from unittest.mock import patch
 from instagram import daily_post
 from instagram.caption import (
     APP_LINE, CAPTION_MAX, build_caption, display_ref, find_caption_problems, find_copy_problems,
-    find_post_problems,
+    find_post_problems, find_slide_problems,
 )
 from instagram.graph import INSTAGRAM_HOST, GraphError, InstagramClient, TokenStore
-from instagram.posts import MANIFEST, card_text, load_daily_verses
+from instagram.posts import COPY_JSON, MANIFEST, card_text, load_copy, load_daily_verses
 from instagram.selection import REPEAT_WINDOW_DAYS, app_verse_for, pick_verse_id
 from notifications.verse_provider import _HOLIDAY_ONLY, text_fingerprint
 
@@ -60,6 +60,19 @@ class CopyRulesTest(unittest.TestCase):
         self.assertTrue(find_caption_problems(caption + "x" * CAPTION_MAX))
         with self.assertRaises(ValueError):
             build_caption(hook="h", verse_text="t", ref="r", note="n", cta="c", topic="#nope")
+
+    def test_slide_copy_rules(self):
+        good = {"scene": {"label": "the scene", "body": "A hillside in Galilee.", "art": "x.jpg",
+                          "credit": "Carl Bloch, 1877", "alt": "Painting."},
+                "today": {"body": "Care is already at work.", "emph": "already at work.", "extra": "Save this."}}
+        self.assertEqual(find_slide_problems(good), [])
+        bad = json.loads(json.dumps(good))
+        bad["scene"]["label"] = "the story"
+        bad["today"]["emph"] = "not there"
+        bad["today"]["body"] = "My heart — always."
+        found = " ".join(find_slide_problems(bad))
+        for word in ("scene.label", "today.emph", "줄표", "사람이 쓴 척"):
+            self.assertIn(word, found)
 
     def test_display_ref_and_card_text(self):
         self.assertEqual(display_ref("Psalms 34:18"), "Psalm 34:18")
@@ -376,6 +389,30 @@ class RunTest(unittest.TestCase):
         self.assertEqual(daily_post.app_line_for(date(2026, 11, 15)), APP_LINE)  # 일
         self.assertEqual(daily_post.app_line_for(date(2026, 11, 12)), "")
 
+    def test_app_slide_is_added_on_wednesday(self):
+        manifest = json.loads(self.cfg.manifest.read_text())
+        manifest["app_slide"] = {"image": "cards/app-0123456789.jpg", "alt_text": "App."}
+        for e in manifest["posts"].values():
+            e["images"], e["alt_texts"] = [e["image"], e["image"].replace(".jpg", "-2.jpg")], ["a", "b"]
+        self.cfg.manifest.write_text(json.dumps(manifest))
+        state = daily_post.State(self.cfg.state_dir)
+        wed = daily_post.plan(self.cfg, date(2026, 11, 18), state)
+        thu = daily_post.plan(self.cfg, date(2026, 11, 19), state)
+        self.assertEqual((wed["images"][-1], wed["alt_texts"][-1]), ("cards/app-0123456789.jpg", "App."))
+        self.assertEqual(len(wed["images"]), 3)
+        self.assertEqual(len(thu["images"]), 2)
+        self.assertIn(APP_LINE, wed["caption"])
+
+    def test_runway_counts_ready_days(self):
+        manifest = json.loads(self.cfg.manifest.read_text())
+        day = date(2026, 11, 12)
+        third = app_verse_for(day + timedelta(days=2)).verse_id
+        posts = {k: v for k, v in manifest["posts"].items() if k != third}
+        self.assertEqual(daily_post.runway(posts, day), 2)
+        self.assertEqual(daily_post.runway(manifest["posts"], day, limit=5), 5)
+        daily_post.run(self.cfg, self.deps)
+        self.assertIn("준비된 날", self.sent[0][0])
+
     def test_manual_posts_are_avoided(self):
         day = date(2026, 11, 12)
         app = app_verse_for(day).verse_id
@@ -402,23 +439,26 @@ class ManifestDataTest(unittest.TestCase):
         cls.manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
         cls.items = load_daily_verses()
 
-    def test_covers_every_daily_verse_with_current_text(self):
+    def test_entries_are_current_daily_verses(self):
+        # 카피·그림은 2주치씩 앞서 만들어서 목록 전부를 덮지 않는다. 있는 항목은 지금 목록·본문과 맞아야 한다.
         posts = self.manifest["posts"]
-        self.assertEqual(set(posts), {i["verse_id"] for i in self.items})
-        stale = [i["verse_id"] for i in self.items if posts[i["verse_id"]]["ko_fp"] != text_fingerprint(i["text"])]
+        current = {i["verse_id"]: text_fingerprint(i["text"]) for i in self.items}
+        self.assertEqual(sorted(set(posts) - set(current)), [])
+        stale = [vid for vid, e in posts.items() if e["ko_fp"] != current[vid]]
         self.assertEqual(stale, [])
 
     def test_notes_match_reviewed_interpretations(self):
         from instagram.posts import en_note
 
         drift = [i["verse_id"] for i in self.items
-                 if self.manifest["posts"][i["verse_id"]]["note"] != en_note(i["verse_id"], i["text"])]
+                 if i["verse_id"] in self.manifest["posts"]
+                 and self.manifest["posts"][i["verse_id"]]["note"] != en_note(i["verse_id"], i["text"])]
         self.assertEqual(drift, [])
 
     def test_texts_match_app_localization(self):
         from instagram.posts import localize_all
 
-        en = localize_all(self.items)
+        en = localize_all([i for i in self.items if i["verse_id"] in self.manifest["posts"]])
         wrong = [(vid, e["text"][:30]) for vid, e in self.manifest["posts"].items()
                  if e["text"] != card_text(en[vid]["text"]) or e["ref"] != en[vid]["ref"]]
         self.assertEqual(wrong, [])
@@ -427,6 +467,37 @@ class ManifestDataTest(unittest.TestCase):
         bad = {vid: p for vid, e in self.manifest["posts"].items() if (p := find_post_problems(e))}
         self.assertEqual(bad, {})
 
-    def test_unique_images(self):
-        keys = [e["image"] for e in self.manifest["posts"].values()]
+    def test_slides_and_alt_texts(self):
+        keys = [k for e in self.manifest["posts"].values() for k in e["images"]]
         self.assertEqual(len(keys), len(set(keys)))
+        for vid, e in self.manifest["posts"].items():
+            self.assertTrue(1 <= len(e["images"]) <= 9, vid)  # 앱 안내 장 자리 하나를 남긴다
+            self.assertEqual(len(e["images"]), len(e["alt_texts"]), vid)
+        self.assertIn("image", self.manifest["app_slide"])
+
+
+@unittest.skipUnless(COPY_JSON.exists(), "카피 없음")
+class CopyDataTest(unittest.TestCase):
+    """instagram/copy_en.json — 손으로 쓴 카피가 규칙을 지키는지."""
+
+    def test_copy_rules(self):
+        copies = load_copy()
+        ids = {i["verse_id"] for i in load_daily_verses()}
+        self.assertEqual(sorted(set(copies) - ids), [])
+        bad = {}
+        for vid, c in copies.items():
+            p = (find_copy_problems(c["label"], limit=40, field="label")
+                 + find_copy_problems(c["hook"], limit=125, field="hook")
+                 + find_copy_problems(c["cta"], limit=100, field="cta") + find_slide_problems(c))
+            if p:
+                bad[vid] = p
+        self.assertEqual(bad, {})
+
+    def test_highlight_is_in_the_card_text(self):
+        from instagram.posts import localize_all
+
+        copies = load_copy()
+        items = [i for i in load_daily_verses() if i["verse_id"] in copies]
+        en = localize_all(items)
+        missing = [vid for vid, c in copies.items() if c["emph"] not in card_text(en[vid]["text"])]
+        self.assertEqual(missing, [])

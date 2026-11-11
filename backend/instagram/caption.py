@@ -13,8 +13,8 @@
 
     #bibleverse #dailybibleverse #{주제}
 
-풀이는 AI 로 쓴 앱 풀이라 그렇다고 밝힌다(사람·목회자가 쓴 척 금지 규칙). 훅·카드 라벨·요청 줄은
-`scripts/generate_ig_hooks.py` 가 만들고 여기 `find_copy_problems` 로 검사한다.
+풀이는 AI 로 쓴 앱 풀이라 그렇다고 밝힌다(사람·목회자가 쓴 척 금지 규칙). 훅·카드 라벨·요청 줄과
+캐러셀 안쪽 장 글은 `instagram/copy_en.json` 에 손으로 쓰고(API 로 만들지 않는다) 여기 규칙으로 검사한다.
 """
 from __future__ import annotations
 
@@ -23,9 +23,15 @@ import re
 # 인스타 캡션 상한(공식 문서: 2,200자, 해시태그 30, @ 20). 피드는 첫 줄 약 125자 뒤를 접는다.
 CAPTION_MAX = 2200
 HOOK_MAX = 125
-KICKER_MAX = 30
+KICKER_MAX = 40  # 런칭 라벨 최장 38자(「When it’s taking longer than you hoped」)
 CTA_MAX = 100
 ALT_TEXT_MAX = 1000
+# 캐러셀 안쪽 장 글(card.py 의 scene·today 장)
+SCENE_MAX = 240
+TODAY_MAX = 200
+EXTRA_MAX = 90
+CREDIT_MAX = 80
+SCENE_LABELS = ("the scene", "the picture")
 
 NOTE_INTRO = "From the WithGod app’s note on this verse (written with AI):"
 BASE_HASHTAGS = ("#bibleverse", "#dailybibleverse")
@@ -158,6 +164,30 @@ def build_alt_text(*, kicker: str, verse_text: str, ref: str) -> str:
     if len(alt) > ALT_TEXT_MAX:
         alt = alt[: ALT_TEXT_MAX - 1].rstrip() + "…"
     return alt
+
+
+def find_slide_problems(copy: dict) -> list[str]:
+    """copy_en.json 한 말씀의 캐러셀 안쪽 장 글 검사(장면·오늘의 한마디). 강조 구절은 본문에 그대로 있어야 한다."""
+    problems = []
+    scene = copy.get("scene")
+    if scene:
+        if scene.get("label") not in SCENE_LABELS:
+            problems.append(f"scene.label: {scene.get('label')!r} (허용: {', '.join(SCENE_LABELS)})")
+        problems += find_copy_problems(scene.get("body", ""), limit=SCENE_MAX, field="scene.body")
+        if not (scene.get("credit") or "").strip() or len(scene["credit"]) > CREDIT_MAX:
+            problems.append("scene.credit: 비었거나 김")
+        if not (scene.get("alt") or "").strip() or len(scene["alt"]) > ALT_TEXT_MAX:
+            problems.append("scene.alt: 비었거나 김")
+        if not scene.get("art"):
+            problems.append("scene.art: 그림 파일 없음")
+    today = copy.get("today")
+    if today:
+        problems += find_copy_problems(today.get("body", ""), limit=TODAY_MAX, field="today.body")
+        if today.get("emph") and today["emph"] not in today.get("body", ""):
+            problems.append("today.emph: 본문에 없는 구절")
+        if today.get("extra"):
+            problems += find_copy_problems(today["extra"], limit=EXTRA_MAX, field="today.extra")
+    return problems
 
 
 def find_post_problems(entry: dict) -> list[str]:

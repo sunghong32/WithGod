@@ -38,7 +38,7 @@ from instagram.graph import (
     DEFAULT_VERSION, FACEBOOK_HOST, INSTAGRAM_HOST, GraphError, InstagramClient, TokenStore,
 )
 from instagram.posts import MANIFEST, load_daily_verses, load_manifest
-from instagram.selection import pick_verse_id
+from instagram.selection import app_verse_for, pick_verse_id
 from notifications.verse_provider import text_fingerprint
 
 log = logging.getLogger("with-god.ig")
@@ -241,9 +241,21 @@ def available_posts(manifest: dict) -> dict[str, dict]:
     return {vid: e for vid, e in manifest.get("posts", {}).items() if current.get(vid) == e.get("ko_fp")}
 
 
+def runway(posts: dict[str, dict], day: date, limit: int = 60) -> int:
+    """오늘부터 앱 말씀이 매니페스트에 준비된 날이 며칠 이어지는지(카피·그림을 미리 만드는 일정 알림용)."""
+    for k in range(limit):
+        if app_verse_for(day + timedelta(days=k)).verse_id not in posts:
+            return k
+    return limit
+
+
 def plan(cfg: Config, day: date, state: State) -> dict:
-    """그날 올릴 것 — {day, verse_id, reason, entry, caption}."""
-    posts = available_posts(load_manifest(cfg.manifest))
+    """그날 올릴 것 — {day, verse_id, reason, entry, caption, images, alt_texts, runway}.
+
+    수·일요일에는 캡션에 앱 안내 줄을 붙이고, 매니페스트에 앱 안내 장이 있으면 캐러셀 끝에 붙인다.
+    """
+    manifest = load_manifest(cfg.manifest)
+    posts = available_posts(manifest)
     verse_id, reason = pick_verse_id(day, state.last_posted_by_verse(), set(posts))
     e = posts[verse_id]
     caption = build_caption(hook=e["hook"], verse_text=e["text"], ref=e["display_ref"], note=e["note"],
@@ -251,7 +263,13 @@ def plan(cfg: Config, day: date, state: State) -> dict:
     problems = find_caption_problems(caption)
     if problems:
         raise RuntimeError(f"캡션 검사 실패({verse_id}): {'; '.join(problems)}")
-    return {"day": day, "verse_id": verse_id, "reason": reason, "entry": e, "caption": caption}
+    images = post_images(e)
+    alts = list(e.get("alt_texts") or [e.get("alt_text", "")] * len(images))
+    app = manifest.get("app_slide")
+    if app_line_for(day) and app and len(images) < 10:
+        images, alts = images + [app["image"]], alts + [app.get("alt_text", "")]
+    return {"day": day, "verse_id": verse_id, "reason": reason, "entry": e, "caption": caption,
+            "images": images, "alt_texts": alts, "runway": runway(posts, day)}
 
 
 def run(cfg: Config, deps: Deps, *, day: date | None = None, force: bool = False,
@@ -274,7 +292,7 @@ def run(cfg: Config, deps: Deps, *, day: date | None = None, force: bool = False
 
     p = plan(cfg, day, state)
     e = p["entry"]
-    keys = post_images(e)
+    keys = p["images"]
     urls = [deps.presign(cfg.bucket, cfg.region, key, PRESIGN_SECONDS) for key in keys]
     for key, url in zip(keys, urls):
         status, ctype, size = deps.probe(url)
@@ -287,12 +305,13 @@ def run(cfg: Config, deps: Deps, *, day: date | None = None, force: bool = False
     when = f"{day:%m/%d}({'월화수목금토일'[day.weekday()]}) 07:00 ET"
     why = "" if p["reason"] == "app" else f" · 앱 말씀 {p['reason'].split(':', 1)[1]} 대신({p['reason'].split(':')[0]})"
     head = f"{e['display_ref']} · {e['kicker']}{why}"
+    ready = f"준비된 날 {p['runway']}일" + (" — 카피·그림을 더 만들 때" if p["runway"] < 7 else "")
 
     if cfg.mode == "dry-run":
         result = {"status": "dry-run", "verse_id": p["verse_id"], "caption": p["caption"], "image_urls": urls}
         if notify:
             slides = f" · {len(urls)}장 캐러셀" if len(urls) > 1 else ""
-            deps.telegram(cfg, f"🧪 [인스타 dry-run] {when} 게시 예정분{slides}\n{head}\n토큰: {token_note}", urls)
+            deps.telegram(cfg, f"🧪 [인스타 dry-run] {when} 게시 예정분{slides}\n{head}\n토큰: {token_note}\n{ready}", urls)
             deps.telegram(cfg, p["caption"], [])
         return result
 
@@ -315,10 +334,9 @@ def run(cfg: Config, deps: Deps, *, day: date | None = None, force: bool = False
                 log.info("지난 실행의 컨테이너가 이미 게시됨 — 기록만 남긴다")
     if not media_id:
         if len(urls) > 1:
-            alts = e.get("alt_texts") or [e.get("alt_text", "")]
-            container = client.create_carousel(urls, p["caption"], alts)
+            container = client.create_carousel(urls, p["caption"], p["alt_texts"])
         else:
-            container = client.create_image_container(urls[0], p["caption"], e.get("alt_text", ""))
+            container = client.create_image_container(urls[0], p["caption"], p["alt_texts"][0])
         state.set_pending({"date": day.isoformat(), "verse_id": p["verse_id"], "container": container})
         client.wait_until_finished(container)
         media_id = client.publish(container)
@@ -335,7 +353,7 @@ def run(cfg: Config, deps: Deps, *, day: date | None = None, force: bool = False
                   "source": "auto"})
     state.set_pending(None)
     if notify:
-        deps.telegram(cfg, f"✅ 인스타 게시 완료 — {head}\n{permalink or media_id}\n토큰: {token_note}", [])
+        deps.telegram(cfg, f"✅ 인스타 게시 완료 — {head}\n{permalink or media_id}\n토큰: {token_note}\n{ready}", [])
     return {"status": "posted", "verse_id": p["verse_id"], "media_id": media_id, "permalink": permalink}
 
 

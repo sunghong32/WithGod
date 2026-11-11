@@ -1,0 +1,12 @@
+{
+ "_readme": "장면 그림 출처. 그림 파일은 instagram/build/art/(git 제외)에 두고, 여기에는 다시 만들거나 내려받을 수 있게 출처만 적는다. kind: public-domain(퍼블릭 도메인 성화) | generated(로컬 오픈소스 모델, 이 맥에서 생성).",
+ "mat-6-28": {
+  "kind": "public-domain",
+  "title": "The Sermon on the Mount",
+  "artist": "Carl Bloch",
+  "year": 1877,
+  "source": "https://commons.wikimedia.org/wiki/File:Carl_Bloch_-_The_Sermon_on_the_Mount.jpg",
+  "license": "Public domain",
+  "prep": "3840px 축소본을 받아 2160px 로 줄임"
+ }
+}

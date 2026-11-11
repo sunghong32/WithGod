@@ -1,8 +1,10 @@
-"""Daily Verse 게시물 재료 — 영어 본문(앱과 같은 변환)·훅 파일·매니페스트 (이슈 #62).
+"""Daily Verse 게시물 재료 — 영어 본문(앱과 같은 변환)·카피 파일·매니페스트 (이슈 #62).
 
 - 영어 본문은 앱 `/daily-verse?lang=en` 과 같은 `languages.localize_ko_ref` 로 만든다(합본·하반절·절 경계
   차이·따옴표·첫 글자 정리가 거기 있다). 스토어는 git 의 CSV 로 만든다(서버의 parquet 와 같은 행).
-- 훅·카드 라벨·요청 줄·주제 해시태그는 `hooks_en.tsv`(scripts/generate_ig_hooks.py 가 만들고 사람이 본다).
+- 카피는 `copy_en.json` — 말씀별 카드 라벨·강조 구절·훅·요청 줄·주제 해시태그·팔레트와 캐러셀 안쪽 장
+  (장면 설명·그림, 오늘의 한마디). 세션에서 손으로 쓴다(API 로 만들지 않는다). 아직 없는 말씀은 게시하지 않고
+  실행기가 준비된 다른 말씀을 고른다(dry-run 알림에 남은 준비 일수가 나온다).
 - 매니페스트 `daily_posts_en.json` 은 말씀별 완성 재료(본문·캡션 조각·대체 텍스트·S3 키)다. 운영 서버는
   이 파일과 S3 이미지만 보고 게시한다 — 렌더도 임베딩도 하지 않는다.
 """
@@ -18,13 +20,13 @@ from notifications.verse_provider import CURATED_INTL_PATH, intl_curated_key, te
 
 HERE = Path(__file__).resolve().parent
 BACKEND = HERE.parent
-HOOKS_TSV = HERE / "hooks_en.tsv"
+COPY_JSON = HERE / "copy_en.json"
 MANIFEST = HERE / "daily_posts_en.json"
 DAILY_VERSES = BACKEND / "notifications" / "daily_verses.json"
 KO_CSV = BACKEND / "data" / "verses.csv"
 EN_CSV = BACKEND / "data" / "langs" / "en" / "verses.csv"
 EN_INTL_TSV = BACKEND / "docs" / "verse_picks" / "interpretations_intl" / "en.tsv"
-HOOK_FIELDS = ("verse_id", "kicker", "hook", "cta", "topic")
+COPY_FIELDS = ("label", "emph", "hook", "cta", "topic", "pal")
 
 _RE_REF = re.compile(r"^(.+?)\s+(\d+):(\d+)(?:-(\d+))?b?$")
 
@@ -105,31 +107,18 @@ def localize_all(items: list[dict]) -> dict[str, dict]:
     return out
 
 
-# ── 훅 파일 ───────────────────────────────────────────────────────
+# ── 카피 파일 ─────────────────────────────────────────────────────
 
-def load_hooks(path: Path = HOOKS_TSV) -> dict[str, dict]:
+def load_copy(path: Path = COPY_JSON) -> dict[str, dict]:
+    """copy_en.json — {verse_id: {label, emph, hook, cta, topic, pal, scene?, today?}}."""
     if not path.exists():
         return {}
-    out = {}
-    for line in path.read_text(encoding="utf-8").splitlines():
-        if not line.strip() or line.startswith("#"):
-            continue
-        parts = line.split("\t")
-        if len(parts) != len(HOOK_FIELDS):
-            raise ValueError(f"{path.name}: 칸 수가 다르다 — {line[:60]}")
-        row = dict(zip(HOOK_FIELDS, parts))
-        out[row["verse_id"]] = row
-    return out
-
-
-def save_hooks(rows: dict[str, dict], order: list[str], path: Path = HOOKS_TSV) -> None:
-    head = [
-        "# Daily Verse 인스타 카피(en) — verse_id<TAB>카드 라벨<TAB>훅(캡션 첫 줄)<TAB>요청 한 줄<TAB>주제 해시태그",
-        "# 생성: scripts/generate_ig_hooks.py — 규칙 검사는 instagram/caption.py find_copy_problems.",
-        "# 손으로 고쳐도 된다. 고친 뒤 scripts/build_ig_daily_posts.py 로 카드·매니페스트를 다시 만든다.",
-    ]
-    body = ["\t".join(rows[v][f] for f in HOOK_FIELDS) for v in order if v in rows]
-    path.write_text("\n".join(head + body) + "\n", encoding="utf-8")
+    data = json.loads(path.read_text(encoding="utf-8"))
+    for vid, row in data.items():
+        missing = [f for f in COPY_FIELDS if not str(row.get(f, "")).strip()]
+        if missing:
+            raise ValueError(f"{path.name} {vid}: 빈 칸 {missing}")
+    return data
 
 
 def tidy_copy(text: str) -> str:
@@ -143,9 +132,10 @@ def tidy_copy(text: str) -> str:
 
 # ── 매니페스트 ────────────────────────────────────────────────────
 
-def image_key(verse_id: str, digest: str) -> str:
-    """S3 키. 내용 지문을 붙여 다시 렌더하면 새 키가 된다(받는 쪽 캐시에 옛 카드가 남지 않게)."""
-    return f"cards/{verse_id}-{digest[:10]}.jpg"
+def image_key(name: str, digest: str) -> str:
+    """S3 키. 내용 지문을 붙여 다시 렌더하면 새 키가 된다(받는 쪽 캐시에 옛 카드가 남지 않게).
+    name 은 「{verse_id}-{장 번호}」 또는 「app」."""
+    return f"cards/{name}-{digest[:10]}.jpg"
 
 
 def card_text(text: str) -> str:
@@ -156,7 +146,7 @@ def card_text(text: str) -> str:
     return re.sub(r"\s*[,;:]\s*$", "…", text.strip())
 
 
-def manifest_entry(item: dict, en: dict, hook: dict, note: str) -> dict:
+def manifest_entry(item: dict, en: dict, copy: dict, note: str) -> dict:
     ref = display_ref(en["ref"])
     text = card_text(en["text"])
     return {
@@ -165,12 +155,12 @@ def manifest_entry(item: dict, en: dict, hook: dict, note: str) -> dict:
         "ref": en["ref"],
         "display_ref": ref,
         "text": text,
-        "kicker": hook["kicker"],
-        "hook": hook["hook"],
-        "cta": hook["cta"],
-        "topic": hook["topic"],
+        "kicker": copy["label"],
+        "hook": copy["hook"],
+        "cta": copy["cta"],
+        "topic": copy["topic"],
         "note": note,
-        "alt_text": build_alt_text(kicker=hook["kicker"], verse_text=text, ref=ref),
+        "alt_text": build_alt_text(kicker=copy["label"], verse_text=text, ref=ref),
     }
 
 

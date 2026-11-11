@@ -1,0 +1,44 @@
+{
+ "mat-6-28": {
+  "label": "When you’re worried about having enough",
+  "emph": "Consider the lilies of the field, how they grow.",
+  "hook": "Wildflowers don’t earn their colors.",
+  "cta": "Save this for a morning when nothing feels like enough.",
+  "topic": "#trust",
+  "pal": "sagelight",
+  "scene": {
+   "label": "the scene",
+   "body": "A hillside in Galilee. Jesus sits down and talks to a crowd about what they worry about most: what to eat, what to wear. Then he points to the wildflowers in the fields.",
+   "art": "mat-6-28.jpg",
+   "focus": "50% 22%",
+   "credit": "Carl Bloch, The Sermon on the Mount, 1877",
+   "alt": "Painting: Jesus seated on a rock on a hillside, teaching a crowd of men and women gathered around him."
+  },
+  "today": {
+   "body": "The flowers don’t weave or sew a thing, and still they’re clothed. Noticing that doesn’t mean ignoring your worries. It means seeing that care is already at work.",
+   "emph": "care is already at work.",
+   "extra": "Save this for a morning when nothing feels like enough."
+  }
+ },
+ "pro-10-25": {
+  "label": "When everything feels shaky",
+  "emph": "but the righteous stand firm forever.",
+  "hook": "Storms don’t decide what’s solid. They just show it.",
+  "cta": "Save this for a shaky week.",
+  "topic": "#strength",
+  "pal": "mist",
+  "scene": {
+   "label": "the picture",
+   "body": "Proverbs is a book of short sayings about everyday life. In ancient Israel, storm winds could hit without warning. Afterward, you could see what had been built to last.",
+   "art": "pro-10-25.jpg",
+   "focus": "50% 50%",
+   "credit": "Illustration by WithGod, made with AI",
+   "alt": "Illustration: a small stone house on a rocky hill after a storm, dark clouds moving away and sunlight breaking through."
+  },
+  "today": {
+   "body": "A storm doesn’t decide what is solid. It only shows it. When a small choice comes up today, ask whether it could stand up to any wind.",
+   "emph": "It only shows it.",
+   "extra": "Save this for a shaky week."
+  }
+ }
+}
