@@ -1,0 +1,25 @@
+[Unit]
+Description=WithGod 인스타그램 Daily Verse 게시 (이슈 #62)
+After=network-online.target
+Wants=network-online.target
+# 처리하지 못한 실패(알림까지 실패)만 기존 크래시 알림 경로를 탄다. 게시 실패는 스크립트가 직접 알린다.
+OnFailure=tg-alert@%n.service
+
+[Service]
+Type=oneshot
+User=ubuntu
+WorkingDirectory=/home/ubuntu/withgod/backend
+# 게시 기록·장기 토큰(갱신본)·잠금 파일. systemd 가 User= 소유, 700 으로 만든다.
+StateDirectory=with-god-ig
+StateDirectoryMode=0700
+# 토큰·모드(IG_MODE=dry-run|live)·버킷 — root 600 파일. 레포에 두지 않는다.
+EnvironmentFile=/etc/with-god-ig.env
+# 텔레그램은 서버 장애 알림과 같은 봇(TG_TOKEN·TG_CHAT_IDS).
+EnvironmentFile=-/etc/tg-alert.env
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/home/ubuntu/with-god-rag/.venv/bin/python -m instagram.daily_post
+# 3 = 실패했지만 텔레그램으로 이미 알림(OnFailure 로 또 알리지 않는다)
+SuccessExitStatus=3
+TimeoutStartSec=15min
+# 앱 서버(1GB)와 같은 머신이라 낮은 우선순위로 돈다.
+Nice=10
