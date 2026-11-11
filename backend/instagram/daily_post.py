@@ -10,7 +10,9 @@ dry-run 은 API 호출 직전까지 가고(토큰이 있으면 /me 확인·갱�
 카드와 캡션을 텔레그램으로 보내 그날 무엇이 올라갈지 보여 준다.
 
 설정(env, 운영은 systemd EnvironmentFile):
-  IG_MODE=dry-run|live      IG_ACCESS_TOKEN  IG_USER_ID(비우면 /me 로)  IG_GRAPH_VERSION(기본 v27.0)
+  IG_MODE=dry-run|live      IG_ACCESS_TOKEN  IG_USER_ID  IG_GRAPH_VERSION(기본 v27.0)
+  IG_API_HOST(기본 https://graph.facebook.com — 시스템 사용자 토큰, 갱신 없음. graph.instagram.com 이면
+  60일 토큰을 상태 디렉터리에서 갱신하고 IG_USER_ID 를 비워도 /me 로 안다)
   IG_S3_BUCKET  IG_S3_REGION(기본 ap-northeast-2)  IG_STATE_DIR(기본 systemd STATE_DIRECTORY)
   IG_LATE_LIMIT_HOURS(기본 6 — 07:00 에서 이만큼 지나면 그날은 건너뛴다)
   TG_TOKEN  TG_CHAT_IDS(쉼표 구분) — 서버의 장애 알림과 같은 봇
@@ -32,7 +34,9 @@ from typing import Callable
 from zoneinfo import ZoneInfo
 
 from instagram.caption import APP_LINE, build_caption, find_caption_problems
-from instagram.graph import DEFAULT_VERSION, GraphError, InstagramClient, TokenStore
+from instagram.graph import (
+    DEFAULT_VERSION, FACEBOOK_HOST, INSTAGRAM_HOST, GraphError, InstagramClient, TokenStore,
+)
 from instagram.posts import MANIFEST, load_daily_verses, load_manifest
 from instagram.selection import pick_verse_id
 from notifications.verse_provider import text_fingerprint
@@ -55,6 +59,7 @@ class Config:
     token: str = ""
     user_id: str = ""
     graph_version: str = DEFAULT_VERSION
+    api_host: str = FACEBOOK_HOST
     bucket: str = "with-god-ig-cards"
     region: str = "ap-northeast-2"
     state_dir: Path = Path("/var/lib/with-god-ig")
@@ -75,6 +80,7 @@ class Config:
             token=(env.get("IG_ACCESS_TOKEN") or "").strip(),
             user_id=(env.get("IG_USER_ID") or "").strip(),
             graph_version=env.get("IG_GRAPH_VERSION") or DEFAULT_VERSION,
+            api_host=(env.get("IG_API_HOST") or FACEBOOK_HOST).rstrip("/"),
             bucket=env.get("IG_S3_BUCKET") or "with-god-ig-cards",
             region=env.get("IG_S3_REGION") or "ap-northeast-2",
             state_dir=Path(state.split(":")[0]),
@@ -142,7 +148,7 @@ class State:
 class Deps:
     presign: Callable[[str, str, str, int], str]
     probe: Callable[[str], tuple[int, str, int]]
-    telegram: Callable[[Config, str, str], bool]
+    telegram: Callable[[Config, str, list[str]], bool]
     client_factory: Callable[[Config, str], InstagramClient]
     now: Callable[[], datetime] = lambda: datetime.now(timezone.utc)
 
@@ -166,17 +172,21 @@ def http_probe(url: str) -> tuple[int, str, int]:
         return resp.status, resp.headers.get("Content-Type", ""), int(size) if size.isdigit() else 0
 
 
-def send_telegram(cfg: Config, text: str, photo_url: str = "") -> bool:
-    """텔레그램 알림(best-effort). 사진이 있으면 sendPhoto(설명 1,024자 제한)로 먼저 보낸다."""
+def send_telegram(cfg: Config, text: str, photos: list[str] | None = None) -> bool:
+    """텔레그램 알림(best-effort). 사진 1장은 sendPhoto(설명 1,024자), 여러 장은 sendMediaGroup(첫 장에 설명)."""
     if not cfg.tg_token or not cfg.tg_chats:
         log.warning("텔레그램 설정 없음 — 알림 생략")
         return False
+    photos = list(photos or [])
     ok = True
     for chat in cfg.tg_chats:
         try:
-            if photo_url:
-                _tg(cfg.tg_token, "sendPhoto", {"chat_id": chat, "photo": photo_url,
-                                                "caption": text[:1000]})
+            if len(photos) == 1:
+                _tg(cfg.tg_token, "sendPhoto", {"chat_id": chat, "photo": photos[0], "caption": text[:1000]})
+            elif photos:
+                media = [{"type": "photo", "media": u, **({"caption": text[:1000]} if i == 0 else {})}
+                         for i, u in enumerate(photos[:10])]
+                _tg(cfg.tg_token, "sendMediaGroup", {"chat_id": chat, "media": json.dumps(media)})
             else:
                 _tg(cfg.tg_token, "sendMessage", {"chat_id": chat, "text": text[:4000],
                                                   "disable_web_page_preview": "true"})
@@ -198,7 +208,8 @@ def default_deps() -> Deps:
         presign=lambda bucket, region, key, seconds: s3_presign(bucket, region, key, seconds),
         probe=http_probe,
         telegram=send_telegram,
-        client_factory=lambda cfg, token: InstagramClient(token, cfg.user_id, version=cfg.graph_version),
+        client_factory=lambda cfg, token: InstagramClient(token, cfg.user_id, version=cfg.graph_version,
+                                                          host=cfg.api_host),
     )
 
 
@@ -210,6 +221,14 @@ class Skip(Exception):
     def __init__(self, message: str, notify: bool = False) -> None:
         super().__init__(message)
         self.notify = notify
+
+
+def post_images(entry: dict) -> list[str]:
+    """매니페스트 항목의 S3 키 목록 — 캐러셀은 "images"(2~10장), 한 장은 "image"."""
+    keys = list(entry.get("images") or ([entry["image"]] if entry.get("image") else []))
+    if not 1 <= len(keys) <= 10:
+        raise RuntimeError(f"이미지 수가 맞지 않다: {len(keys)}")
+    return keys
 
 
 def app_line_for(day: date) -> str:
@@ -255,12 +274,14 @@ def run(cfg: Config, deps: Deps, *, day: date | None = None, force: bool = False
 
     p = plan(cfg, day, state)
     e = p["entry"]
-    url = deps.presign(cfg.bucket, cfg.region, e["image"], PRESIGN_SECONDS)
-    status, ctype, size = deps.probe(url)
-    if status not in (200, 206) or not ctype.startswith("image/jpeg"):
-        raise RuntimeError(f"카드 이미지를 받을 수 없다: HTTP {status} {ctype} ({e['image']})")
-    if size > 8 * 1024 * 1024:
-        raise RuntimeError(f"카드 이미지가 8MB 를 넘는다: {size}")
+    keys = post_images(e)
+    urls = [deps.presign(cfg.bucket, cfg.region, key, PRESIGN_SECONDS) for key in keys]
+    for key, url in zip(keys, urls):
+        status, ctype, size = deps.probe(url)
+        if status not in (200, 206) or not ctype.startswith("image/jpeg"):
+            raise RuntimeError(f"카드 이미지를 받을 수 없다: HTTP {status} {ctype} ({key})")
+        if size > 8 * 1024 * 1024:
+            raise RuntimeError(f"카드 이미지가 8MB 를 넘는다: {size} ({key})")
 
     token_note, client = _token(cfg, deps, now)
     when = f"{day:%m/%d}({'월화수목금토일'[day.weekday()]}) 07:00 ET"
@@ -268,10 +289,11 @@ def run(cfg: Config, deps: Deps, *, day: date | None = None, force: bool = False
     head = f"{e['display_ref']} · {e['kicker']}{why}"
 
     if cfg.mode == "dry-run":
-        result = {"status": "dry-run", "verse_id": p["verse_id"], "caption": p["caption"], "image_url": url}
+        result = {"status": "dry-run", "verse_id": p["verse_id"], "caption": p["caption"], "image_urls": urls}
         if notify:
-            deps.telegram(cfg, f"🧪 [인스타 dry-run] {when} 게시 예정분\n{head}\n토큰: {token_note}", url)
-            deps.telegram(cfg, p["caption"], "")
+            slides = f" · {len(urls)}장 캐러셀" if len(urls) > 1 else ""
+            deps.telegram(cfg, f"🧪 [인스타 dry-run] {when} 게시 예정분{slides}\n{head}\n토큰: {token_note}", urls)
+            deps.telegram(cfg, p["caption"], [])
         return result
 
     if client is None:
@@ -292,7 +314,11 @@ def run(cfg: Config, deps: Deps, *, day: date | None = None, force: bool = False
                 media_id = "unknown"
                 log.info("지난 실행의 컨테이너가 이미 게시됨 — 기록만 남긴다")
     if not media_id:
-        container = client.create_image_container(url, p["caption"], e["alt_text"])
+        if len(urls) > 1:
+            alts = e.get("alt_texts") or [e.get("alt_text", "")]
+            container = client.create_carousel(urls, p["caption"], alts)
+        else:
+            container = client.create_image_container(urls[0], p["caption"], e.get("alt_text", ""))
         state.set_pending({"date": day.isoformat(), "verse_id": p["verse_id"], "container": container})
         client.wait_until_finished(container)
         media_id = client.publish(container)
@@ -309,19 +335,28 @@ def run(cfg: Config, deps: Deps, *, day: date | None = None, force: bool = False
                   "source": "auto"})
     state.set_pending(None)
     if notify:
-        deps.telegram(cfg, f"✅ 인스타 게시 완료 — {head}\n{permalink or media_id}\n토큰: {token_note}", "")
+        deps.telegram(cfg, f"✅ 인스타 게시 완료 — {head}\n{permalink or media_id}\n토큰: {token_note}", [])
     return {"status": "posted", "verse_id": p["verse_id"], "media_id": media_id, "permalink": permalink}
 
 
 def _token(cfg: Config, deps: Deps, now: datetime) -> tuple[str, InstagramClient | None]:
-    """(사람이 읽을 토큰 상태, 클라이언트). 토큰이 없으면 (설명, None). 갱신은 dry-run 에서도 한다."""
-    store = TokenStore(cfg.state_dir / "token.json", cfg.token, now=deps.now)
-    state = store.load()
-    if state is None:
+    """(사람이 읽을 토큰 상태, 클라이언트). 토큰이 없으면 (설명, None).
+
+    Facebook 경로(운영)는 시스템 사용자 토큰이라 만료·갱신이 없다 — env 값을 그대로 쓴다.
+    Instagram 경로는 60일 토큰을 상태 디렉터리에서 갱신한다(dry-run 에서도 — 안 쓰면 그대로 죽는다).
+    """
+    state = None
+    if cfg.api_host == INSTAGRAM_HOST:
+        store = TokenStore(cfg.state_dir / "token.json", cfg.token, now=deps.now)
+        state = store.load()
+        token = state.access_token if state else ""
+    else:
+        token = cfg.token
+    if not token:
         return "없음(IG_ACCESS_TOKEN 을 넣으면 확인한다)", None
-    client = deps.client_factory(cfg, state.access_token)
+    client = deps.client_factory(cfg, token)
     notes = []
-    if store.needs_refresh(state):
+    if state is not None and store.needs_refresh(state):
         try:
             state = store.refresh(state, client)
             notes.append("갱신함")
@@ -333,7 +368,7 @@ def _token(cfg: Config, deps: Deps, now: datetime) -> tuple[str, InstagramClient
         notes.insert(0, f"정상 @{me.get('username', '?')}")
     except GraphError as exc:
         return f"확인 실패({exc})", None
-    if state.expires_at:
+    if state is not None and state.expires_at:
         left = datetime.fromisoformat(state.expires_at) - now
         notes.append(f"만료까지 {left.days}일")
         if left < timedelta(days=10):
@@ -384,13 +419,13 @@ def main(argv: list[str] | None = None) -> int:
     except Skip as exc:
         log.info("건너뜀: %s", exc)
         if exc.notify and not args.no_telegram:
-            deps.telegram(cfg, f"⏭ 인스타 게시 건너뜀 — {exc}", "")
+            deps.telegram(cfg, f"⏭ 인스타 게시 건너뜀 — {exc}", [])
         return 0
     except Exception as exc:  # noqa: BLE001 — 무엇이든 알리고 끝낸다
         log.exception("인스타 게시 실패")
         if args.no_telegram:
             return 1
-        reported = deps.telegram(cfg, f"🚨 인스타 게시 실패({cfg.mode}): {type(exc).__name__}: {exc}", "")
+        reported = deps.telegram(cfg, f"🚨 인스타 게시 실패({cfg.mode}): {type(exc).__name__}: {exc}", [])
         return EXIT_REPORTED_FAILURE if reported else 1
     log.info("%s %s", result["status"], result["verse_id"])
     if args.print and "caption" in result:

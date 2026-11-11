@@ -1,11 +1,18 @@
-"""Instagram API(인스타그램 로그인) 게시 클라이언트와 장기 토큰 보관 (이슈 #62).
+"""Instagram 게시 API 클라이언트와 장기 토큰 보관 (이슈 #62).
+
+두 가지 경로를 받는다(호스트만 다르고 게시 호출은 같다):
+- **Facebook 로그인 경로(운영)** — `graph.facebook.com`, 페이지에 연결한 인스타 계정 + 시스템 사용자 토큰
+  (만료 없음·갱신 불필요). 권한 instagram_basic·instagram_content_publish. IG user id 는 설정으로 준다.
+- Instagram 로그인 경로 — `graph.instagram.com`, 60일 장기 토큰(아래 TokenStore 가 갱신). `/me` 로 id 를 안다.
 
 공식 문서(2026-11 확인, API v27.0):
 - 컨테이너 생성 `POST /{ig-user-id}/media` (image_url·caption·alt_text) → 상태 `GET /{container}?fields=status_code`
   (EXPIRED·ERROR·FINISHED·IN_PROGRESS·PUBLISHED, 1분에 한 번·5분까지 권장) → `POST /{ig-user-id}/media_publish`
   (creation_id) → `GET /{media}?fields=permalink`.
 - 이미지는 JPEG 만, 8MB·가로 320~1440·비율 4:5~1.91:1. image_url 은 게시 시점에 공개로 받을 수 있어야 한다.
-- 24시간에 게시 50건(`content_publishing_limit`), 컨테이너는 24시간 뒤 만료.
+- 캐러셀: 장마다 `POST /{ig-user-id}/media`(image_url, is_carousel_item=true) → `media_type=CAROUSEL`·
+  `children=id1,id2…`·caption 으로 부모 컨테이너 → media_publish. 최대 10장, 게시 1건으로 센다.
+- 24시간 게시 한도는 `content_publishing_limit` 로 본다(11/11 운영 계정 100건), 컨테이너는 24시간 뒤 만료.
 - 장기 토큰은 60일. `GET /refresh_access_token?grant_type=ig_refresh_token` 으로 갱신하며, 받은 지
   24시간이 지나고 만료 전이어야 한다.
 
@@ -26,7 +33,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Callable
 
-GRAPH_HOST = "https://graph.instagram.com"
+FACEBOOK_HOST = "https://graph.facebook.com"
+INSTAGRAM_HOST = "https://graph.instagram.com"
 DEFAULT_VERSION = "v27.0"
 HTTP_TIMEOUT = 30
 
@@ -60,11 +68,12 @@ def _scrub(text: str, secret: str) -> str:
 
 class InstagramClient:
     def __init__(self, token: str, user_id: str = "", *, version: str = DEFAULT_VERSION,
-                 opener: Opener = urllib.request.urlopen,
+                 host: str = FACEBOOK_HOST, opener: Opener = urllib.request.urlopen,
                  sleep: Callable[[float], None] = time.sleep) -> None:
         self.token = token
         self.user_id = user_id
         self.version = version
+        self.host = host.rstrip("/")
         self._open = opener
         self._sleep = sleep
 
@@ -73,7 +82,7 @@ class InstagramClient:
                  *, versioned: bool = True) -> dict:
         params = {k: v for k, v in (params or {}).items() if v not in (None, "")}
         params["access_token"] = self.token
-        base = f"{GRAPH_HOST}/{self.version}" if versioned else GRAPH_HOST
+        base = f"{self.host}/{self.version}" if versioned else self.host
         url = f"{base}/{path.lstrip('/')}"
         body = None
         if method == "GET":
@@ -98,8 +107,22 @@ class InstagramClient:
             raise GraphError(_scrub(f"{method} {path}: {exc.reason}", self.token)) from None
 
     # ── 계정 ──
+    @property
+    def instagram_login(self) -> bool:
+        return self.host == INSTAGRAM_HOST
+
     def me(self) -> dict:
-        """{"user_id": 게시용 IG id, "username": …}. 응답이 data 배열로 올 때도 있다(문서 예시)."""
+        """{"user_id": 게시용 IG id, "username": …}.
+
+        Facebook 경로의 `/me` 는 시스템 사용자라 IG 계정을 id 로 직접 읽는다(user_id 필수).
+        Instagram 경로는 `/me?fields=user_id,username`(응답이 data 배열로 올 때도 있다 — 문서 예시).
+        """
+        if not self.instagram_login:
+            if not self.user_id:
+                raise GraphError("IG_USER_ID 가 없다(Facebook 경로는 계정 id 를 설정으로 준다)")
+            out = self._request("GET", self.user_id, {"fields": "id,username,media_count"})
+            return {"user_id": str(out.get("id") or self.user_id), "username": out.get("username", ""),
+                    "media_count": out.get("media_count")}
         out = self._request("GET", "me", {"fields": "user_id,username"})
         if isinstance(out.get("data"), list) and out["data"]:
             out = out["data"][0]
@@ -142,6 +165,26 @@ class InstagramClient:
             if code in ("ERROR", "EXPIRED"):
                 raise GraphError(f"컨테이너 {code}: {status.get('status', '')}")
         raise GraphError(f"컨테이너가 {sum(POLL_SCHEDULE)}초 안에 준비되지 않음: {status}")
+
+    def create_carousel(self, image_urls: list[str], caption: str, alt_texts: list[str] | None = None) -> str:
+        """장마다 자식 컨테이너를 만들어 FINISHED 를 확인한 뒤 부모(CAROUSEL) 컨테이너 id 를 돌려준다."""
+        if not 2 <= len(image_urls) <= 10:
+            raise GraphError(f"캐러셀은 2~10장: {len(image_urls)}")
+        alts = list(alt_texts or []) + [""] * len(image_urls)
+        children = []
+        for url, alt in zip(image_urls, alts):
+            out = self._request("POST", f"{self.ensure_user_id()}/media",
+                                {"image_url": url, "is_carousel_item": "true", "alt_text": alt})
+            if not out.get("id"):
+                raise GraphError(f"캐러셀 장 컨테이너 id 없음: {out}")
+            children.append(str(out["id"]))
+        for child in children:
+            self.wait_until_finished(child)
+        out = self._request("POST", f"{self.ensure_user_id()}/media",
+                            {"media_type": "CAROUSEL", "children": ",".join(children), "caption": caption})
+        if not out.get("id"):
+            raise GraphError(f"캐러셀 컨테이너 id 없음: {out}")
+        return str(out["id"])
 
     def publish(self, container_id: str) -> str:
         out = self._request("POST", f"{self.ensure_user_id()}/media_publish", {"creation_id": container_id})

@@ -16,7 +16,7 @@ from instagram.caption import (
     APP_LINE, CAPTION_MAX, build_caption, display_ref, find_caption_problems, find_copy_problems,
     find_post_problems,
 )
-from instagram.graph import GraphError, InstagramClient, TokenStore
+from instagram.graph import INSTAGRAM_HOST, GraphError, InstagramClient, TokenStore
 from instagram.posts import MANIFEST, card_text, load_daily_verses
 from instagram.selection import REPEAT_WINDOW_DAYS, app_verse_for, pick_verse_id
 from notifications.verse_provider import _HOLIDAY_ONLY, text_fingerprint
@@ -168,7 +168,7 @@ class GraphClientTest(unittest.TestCase):
             ("GET", "M1"): {"permalink": "https://www.instagram.com/p/x/"},
         })
         sleeps = []
-        c = InstagramClient("SECRET", opener=fake, sleep=sleeps.append)
+        c = InstagramClient("SECRET", host=INSTAGRAM_HOST, opener=fake, sleep=sleeps.append)
         cid = c.create_image_container("https://img/x.jpg", "cap", "alt")
         self.assertEqual(c.wait_until_finished(cid), "FINISHED")
         self.assertEqual(c.publish(cid), "M1")
@@ -191,7 +191,32 @@ class GraphClientTest(unittest.TestCase):
 
     def test_me_accepts_data_array(self):
         fake = FakeGraph({("GET", "me"): {"data": [{"user_id": "9", "username": "w"}]}})
-        self.assertEqual(InstagramClient("t", opener=fake).me(), {"user_id": "9", "username": "w"})
+        self.assertEqual(InstagramClient("t", host=INSTAGRAM_HOST, opener=fake).me(),
+                         {"user_id": "9", "username": "w"})
+
+    def test_facebook_host_reads_account_by_id(self):
+        fake = FakeGraph({("GET", "17841"): {"id": "17841", "username": "withgod.app", "media_count": 0}})
+        c = InstagramClient("t", "17841", opener=fake)
+        self.assertEqual(c.me()["username"], "withgod.app")
+        with self.assertRaises(GraphError):
+            InstagramClient("t", opener=fake).me()  # Facebook 경로는 id 가 필요하다
+
+    def test_carousel(self):
+        n = iter(range(10))
+        fake = FakeGraph({
+            ("POST", "17841/media"): lambda: {"id": f"K{next(n)}"},
+            **{("GET", f"K{i}"): {"status_code": "FINISHED"} for i in range(10)},
+        })
+        c = InstagramClient("t", "17841", opener=fake, sleep=lambda s: None)
+        parent = c.create_carousel(["https://a", "https://b", "https://c"], "cap", ["alt a"])
+        posts = [call for call in fake.calls if call[1] == "17841/media"]
+        self.assertEqual([p[2].get("is_carousel_item") for p in posts[:3]], ["true"] * 3)
+        self.assertEqual(posts[0][2]["alt_text"], "alt a")
+        self.assertEqual(posts[3][2]["media_type"], "CAROUSEL")
+        self.assertEqual(posts[3][2]["children"], "K0,K1,K2")
+        self.assertEqual(parent, "K3")
+        with self.assertRaises(GraphError):
+            c.create_carousel(["https://a"], "cap")
 
 
 class TokenStoreTest(unittest.TestCase):
@@ -214,7 +239,7 @@ class TokenStoreTest(unittest.TestCase):
         self.clock[0] += timedelta(hours=25)
         self.assertTrue(self.store().needs_refresh(st))
         fake = FakeGraph({("GET", "refresh_access_token"): {"access_token": "NEW", "expires_in": 5184000}})
-        client = InstagramClient("ENV1", opener=fake)
+        client = InstagramClient("ENV1", host=INSTAGRAM_HOST, opener=fake)
         new = self.store().refresh(st, client)
         self.assertEqual((new.access_token, client.token), ("NEW", "NEW"))
         again = self.store().load()  # 같은 env 토큰이면 갱신본을 그대로 쓴다
@@ -249,10 +274,10 @@ class RunTest(unittest.TestCase):
         root = Path(self.dir.name)
         fake_manifest(root / "m.json")
         self.cfg = daily_post.Config(mode="dry-run", state_dir=root / "state", manifest=root / "m.json",
-                                     token="", tg_token="t", tg_chats=["1"])
+                                     token="", user_id="17841", tg_token="t", tg_chats=["1"])
         self.sent = []
         self.graph_routes = {
-            ("GET", "me"): {"user_id": "17841", "username": "withgod.app"},
+            ("GET", "17841"): {"id": "17841", "username": "withgod.app"},
             ("POST", "17841/media"): {"id": "C1"},
             ("GET", "C1"): {"status_code": "FINISHED"},
             ("POST", "17841/media_publish"): {"id": "M1"},
@@ -264,9 +289,9 @@ class RunTest(unittest.TestCase):
         self.deps = daily_post.Deps(
             presign=lambda b, r, k, s: f"https://s3.example/{k}?sig=1",
             probe=lambda url: (206, "image/jpeg", 120_000),
-            telegram=lambda cfg, text, photo: self.sent.append((text, photo)) or True,
-            client_factory=lambda cfg, token: InstagramClient(token, cfg.user_id, opener=self.fake,
-                                                              sleep=lambda s: None),
+            telegram=lambda cfg, text, photos: self.sent.append((text, photos)) or True,
+            client_factory=lambda cfg, token: InstagramClient(token, cfg.user_id, host=cfg.api_host,
+                                                              opener=self.fake, sleep=lambda s: None),
             now=lambda: self.now,
         )
 
@@ -277,7 +302,7 @@ class RunTest(unittest.TestCase):
         out = daily_post.run(self.cfg, self.deps)
         self.assertEqual(out["status"], "dry-run")
         self.assertEqual(out["verse_id"], app_verse_for(date(2026, 11, 12)).verse_id)
-        self.assertTrue(self.sent[0][1].startswith("https://s3.example/cards/"))
+        self.assertTrue(self.sent[0][1][0].startswith("https://s3.example/cards/"))
         self.assertIn("dry-run", self.sent[0][0])
         self.assertIn("토큰: 없음", self.sent[0][0])
         self.assertEqual(self.fake.calls, [])
@@ -286,7 +311,8 @@ class RunTest(unittest.TestCase):
     def test_dry_run_checks_token_but_does_not_post(self):
         self.cfg.token = "T"
         daily_post.run(self.cfg, self.deps)
-        self.assertEqual([c[1] for c in self.fake.calls], ["me"])
+        self.assertEqual([c[1] for c in self.fake.calls], ["17841"])
+        self.assertFalse((self.cfg.state_dir / "token.json").exists())  # 시스템 사용자 토큰은 따로 저장하지 않는다
         self.assertIn("정상 @withgod.app", self.sent[0][0])
 
     def test_live_posts_once(self):
@@ -302,6 +328,22 @@ class RunTest(unittest.TestCase):
             daily_post.run(self.cfg, self.deps)  # 같은 날 두 번째 실행
         create = next(c for c in self.fake.calls if c[1] == "17841/media")
         self.assertIn("#bibleverse", create[2]["caption"])
+
+    def test_live_carousel(self):
+        self.cfg.mode, self.cfg.token = "live", "T"
+        manifest = json.loads(self.cfg.manifest.read_text())
+        for e in manifest["posts"].values():
+            e["images"] = [e["image"], e["image"].replace(".jpg", "-2.jpg"), e["image"].replace(".jpg", "-3.jpg")]
+        self.cfg.manifest.write_text(json.dumps(manifest))
+        n = iter(range(10))
+        self.graph_routes[("POST", "17841/media")] = lambda: {"id": f"K{next(n)}"}
+        for i in range(10):
+            self.graph_routes[("GET", f"K{i}")] = {"status_code": "FINISHED"}
+        self.graph_routes[("POST", "17841/media_publish")] = {"id": "M1"}
+        out = daily_post.run(self.cfg, self.deps)
+        self.assertEqual(out["status"], "posted")
+        publish = next(c for c in self.fake.calls if c[1] == "17841/media_publish")
+        self.assertEqual(publish[2]["creation_id"], "K3")
 
     def test_live_recovers_published_pending_container(self):
         self.cfg.mode, self.cfg.token = "live", "T"
@@ -345,6 +387,7 @@ class RunTest(unittest.TestCase):
         cfg = daily_post.Config.from_env({"IG_MODE": "live", "STATE_DIRECTORY": "/var/lib/with-god-ig",
                                           "TG_CHAT_IDS": "1, 2", "IG_LATE_LIMIT_HOURS": "3"})
         self.assertEqual((cfg.mode, cfg.tg_chats, cfg.late_limit), ("live", ["1", "2"], timedelta(hours=3)))
+        self.assertEqual(cfg.api_host, "https://graph.facebook.com")
         with self.assertRaises(ValueError):
             daily_post.Config.from_env({"IG_MODE": "yes"})
 
