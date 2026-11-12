@@ -10,7 +10,8 @@
 
 예외는 그 말씀의 캐러셀이 아직 준비되지 않았을 때뿐이다 — 그날만 **회전의 반대편**(반 바퀴 떨어진)
 준비된 말씀을 올린다. 바로 다음 말씀으로 넘기면 이튿날 앱 말씀이 「어제 올린 말씀」이 되어 그 뒤로
-매일 한 칸씩 밀린다. 대신 올릴 말씀은 최근 `REPEAT_WINDOW_DAYS` 안에 올린 것을 피한다.
+매일 한 칸씩 밀린다. 대신 올릴 말씀은 최근 `REPEAT_WINDOW_DAYS` 안에 올린 것과, 앞으로 그만큼 안에 앱 차례가
+돌아올 것(곧 그날 말씀으로 다시 올라간다)을 피한다. 그런 말씀이 없으면 그날은 올리지 않는다(실패 알림).
 """
 from __future__ import annotations
 
@@ -47,10 +48,12 @@ def pick_verse_id(day: date, posted: dict[str, str], available: set[str],
     n = len(rotation)
     start = rotation.index(verse.verse_id) if verse.verse_id in rotation else day.toordinal() % n
     for step in range(n):
-        candidate = rotation[(start + n // 2 + step) % n]
-        if candidate in available and _fresh(candidate, day, posted):
+        pos = (start + n // 2 + step) % n
+        candidate = rotation[pos]
+        upcoming = (pos - start) % n <= REPEAT_WINDOW_DAYS  # 곧 앱 차례로 다시 올라갈 말씀
+        if candidate in available and not upcoming and _fresh(candidate, day, posted):
             return candidate, f"missing:{verse.verse_id}"
-    raise RuntimeError("올릴 수 있는 말씀이 없다(매니페스트가 비었거나 전부 최근에 올림)")
+    raise RuntimeError(f"{verse.verse_id} 캐러셀이 준비되지 않았고 대신 올릴 말씀도 없다 — 카피·그림을 만들 때")
 
 
 def _fresh(verse_id: str, day: date, posted: dict[str, str]) -> bool:

@@ -130,6 +130,13 @@ class SelectionTest(unittest.TestCase):
         # 최근에 올린 말씀은 대신 올릴 후보에서 빠진다
         self.assertNotEqual(pick_verse_id(d, {vid: d.isoformat()}, self.all_ids - {app})[0], vid)
 
+    def test_missing_never_borrows_an_upcoming_verse(self):
+        # 2주치만 준비됐을 때 오늘 말씀이 빠지면, 곧 차례가 올 말씀을 당겨 쓰지 않고 실패한다
+        d = date(2026, 11, 12)
+        soon = {app_verse_for(d + timedelta(days=k)).verse_id for k in range(1, 15)}
+        with self.assertRaises(RuntimeError):
+            pick_verse_id(d, {}, soon)
+
 
 # ── Graph API 가짜 ──────────────────────────────────────────────
 
@@ -418,6 +425,15 @@ class RunTest(unittest.TestCase):
         app = app_verse_for(day).verse_id
         daily_post.mark_posted(self.cfg, [app], day - timedelta(days=2))
         self.assertEqual(daily_post.run(self.cfg, self.deps)["verse_id"], app)
+
+    def test_start_date_skips_earlier_days(self):
+        self.cfg.mode, self.cfg.token = "live", "T"
+        self.cfg.start_date = date(2026, 11, 13)
+        with self.assertRaises(daily_post.Skip):
+            daily_post.run(self.cfg, self.deps)  # 11/12
+        self.assertEqual(self.fake.calls, [])
+        cfg = daily_post.Config.from_env({"IG_START_DATE": "2026-11-13"})
+        self.assertEqual(cfg.start_date, date(2026, 11, 13))
 
     def test_env_config(self):
         cfg = daily_post.Config.from_env({"IG_MODE": "live", "STATE_DIRECTORY": "/var/lib/with-god-ig",

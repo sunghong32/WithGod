@@ -64,6 +64,7 @@ class Config:
     region: str = "ap-northeast-2"
     state_dir: Path = Path("/var/lib/with-god-ig")
     late_limit: timedelta = timedelta(hours=6)
+    start_date: date | None = None  # 이 날짜(미국 동부) 전에는 live 여도 올리지 않는다
     tg_token: str = ""
     tg_chats: list[str] = field(default_factory=list)
     manifest: Path = MANIFEST
@@ -85,6 +86,7 @@ class Config:
             region=env.get("IG_S3_REGION") or "ap-northeast-2",
             state_dir=Path(state.split(":")[0]),
             late_limit=timedelta(hours=float(env.get("IG_LATE_LIMIT_HOURS") or 6)),
+            start_date=date.fromisoformat(env["IG_START_DATE"].strip()) if (env.get("IG_START_DATE") or "").strip() else None,
             tg_token=(env.get("TG_TOKEN") or "").strip(),
             tg_chats=[c.strip() for c in (env.get("TG_CHAT_IDS") or "").split(",") if c.strip()],
             manifest=Path(env.get("IG_MANIFEST") or MANIFEST),
@@ -282,6 +284,8 @@ def run(cfg: Config, deps: Deps, *, day: date | None = None, force: bool = False
     day = day or local_now.date()
     state = State(cfg.state_dir)
 
+    if cfg.start_date and day < cfg.start_date and not force:
+        raise Skip(f"{day} — 시작일({cfg.start_date}) 전이라 건너뜀")
     if cfg.mode == "live" and not force:
         done = state.posted_on(day)
         if done:
