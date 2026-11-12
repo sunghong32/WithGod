@@ -4,7 +4,7 @@
 > **작업을 완료하면 「지금 상태」와 「최근 변경 이력」을 갱신할 것.** 낡으면 신뢰가 무너진다.
 > ⚠️ 이 파일은 세션 시작 시 통째로 주입된다. **20KB 아래로 유지할 것** —
 > 완료 이력은 `CHANGELOG.md` 나 git history 로 넘긴다.
-> 최종 갱신: 2026-11-10 · 브랜치: `app-develop`
+> 최종 갱신: 2026-11-12 · 브랜치: `app-develop`
 
 ## 한 줄
 
@@ -60,6 +60,12 @@ min_supported 는 1.0.0 유지(강제 업데이트 사유 없음).
 
 ## 진행/예정
 
+- [ ] **인스타 Daily Verse 자동 게시(#62) — 11/13 07:00 ET 첫 게시(live), 하루 하나.** 앱 오늘의 말씀과 같은 말씀(겹쳐도 그대로)을
+      캐러셀로: 표지(런칭 디자인) · 장면 그림 + 배경 설명 · 앱 영어 풀이 전문 카드(AI 표기), 수·일요일엔 앱 안내 장. 운영 서버
+      `with-god-ig-post.timer`(07:00 America/New_York) → `python -m instagram.daily_post`, 설정 `/etc/with-god-ig.env`, 기록 `/var/lib/with-god-ig/`,
+      결과는 텔레그램. 카피·그림은 **이 맥에서 2주치씩** 앞서 만든다 — 지금 11/13~27 준비, 알림의 「준비된 날」이 7일 아래면 다음 묶음.
+      카피는 `backend/instagram/copy_en.json` 에 세션에서 직접 쓴다(API 금지), 그림은 `scripts/gen_ig_art.py`(로컬 Z-Image-Turbo,
+      서양 2D 애니메이션풍; 예수님 장면은 퍼블릭 도메인 성화), 렌더·업로드 `scripts/build_ig_daily_posts.py --upload`. 요령은 메모리 `instagram-account`
 - [ ] **인스타 런칭 게시물 9개 — 1일째 3개(09·08·07) 게시(11/11), 나머지 6개 예약(11/12·13 22:00 KST).** 결과 `docs/instagram/launch/`(36장 + `captions.md` 올리는 순서·캡션·대체 텍스트),
       다시 만들기 `python3 docs/instagram/tools/make_launch_posts.py`(디자인은 사용자가 고른 시안 A+C). 사흘에 3개씩, 마지막에 03→02→01 고정(고정은 앱에서만).
       공식 API 로 올림 `python3 docs/instagram/tools/post_launch.py prepare|publish <slug>…`(raw URL·PNG·대체 텍스트 OK, 기록 `launch/posted.json`). 예약은 이 Mac 의 launchd `~/Library/LaunchAgents/com.minsunghong.withgod-ig-launch.plist` → `post_launch.py due`(묶음 `launch/schedule.json`, 로그 `~/Library/Logs/withgod-ig-launch.log`), 올리면 텔레그램으로 링크 알림.
@@ -147,6 +153,7 @@ min_supported 는 1.0.0 유지(강제 업데이트 사유 없음).
 
 ## 최근 변경 이력
 
+- 2026-11-12 feat(backend): #62 인스타 Daily Verse 자동 게시 — 캐러셀(표지·장면·앱 풀이), 2주치 15개(46장), 로컬 오픈소스 모델로 장면 그림(장당 70초, 8비트 저장 모델), S3 비공개 버킷 + 임시 서명 주소, systemd 타이머 07:00 ET, 11/13 첫 게시
 - 2026-11-11 ops(instagram): 런칭 1일째 3개(시편 118:24 카드 · 기다림 캐러셀 · 시편 34:18 카드) 공식 API 로 게시 · 2·3일째 6개는 launchd 로 11/12·13 22:00 예약(게시 후 텔레그램 알림). 게시물→스토리 공유·고정은 API 에 없어 앱에서
 - 2026-11-10 feat(instagram): 런칭 게시물 9개(고정 3 + 말씀 카드 4 + 캐러셀 2, 36장) — HTML→Chrome 헤드리스 1080×1350, 본문 WEB·카드 캡션은 앱 영어 풀이(AI 표기), 사용법은 iPhone 시뮬레이터 실제 화면. "AI로 만든 티" 지적에 감정별 하늘빛 + 필름 질감 + 형광펜(Fraunces, OFL)으로 다시 그림
 - 2026-11-10 feat(web): #58 `/get` 앱 받기 링크 — 인스타 프로필용 단일 링크. iPhone·Android(인스타 인앱 포함)는 스토어로 바로, PC·미리보기 봇은 영어 안내 페이지, iPad 사파리는 클라이언트에서 App Store 로(시뮬레이터 확인). Play UTM · App Store 캠페인(`pt=128437792`, `ct=src`) 둘 다 실림 · PR #59 → Vercel 운영 배포 `727cfaa`(운영 주소에서 기기별 확인), 이슈 닫음 · 후속: App Store 캠페인 켬(#60), 인스타용 짧은 주소 `/ig`(#61)
@@ -162,11 +169,4 @@ min_supported 는 1.0.0 유지(강제 업데이트 사유 없음).
 - 2026-11-06 feat(app): iPad 네이티브·iPadOS 26 창 버튼 회피(PR #50), 안드로이드 폰만 세로 고정(PR #49) — #26 2단계
 - 2026-11-06 fix(backend): verses.csv 아가 6:14 추가·자리표시 14행 검색 제외(#47, PR #48)
 - 2026-11-06 fix(backend): 오늘의 말씀 카드 6절을 공식 개역한글로 — 풀이·외국어 검토본 다시 맞춤(LLM 7회, 서버 테스트 121개) · PR #46
-- 2026-11-05 fix(backend): verses.csv 개역한글 1,002절 공식 본문으로(#44, PR #45) · #31 남은 6개 장 복구(PR #40)
-- 2026-11-05 fix(backend): 푸시 #23·#24·#25(PR #37·#38·#36) · es 시편 표제 #35(PR #39) · fr 정렬 #33(PR #41)
-- 2026-11-05 fix(app): 사이드바 언어 #30(PR #42) · 대형 화면 1단계 #26(PR #43)
-- 2026-11-05 chore: 해결됐는데 열려 있던 이슈 7개 닫음 — #17·#18·#19(#20·#22·#21 중복), #16·#8·#9·#27(완료). 열린 이슈 8개
-- 2026-11-03 check: BibliaTodo NTBT 스페인어 성경 제안 검토 — 라이선스 원문·NTBT 데이터(31,104절)·저작권 판본 9종 표본 대조, 회신 초안
-- 2026-11-03 feat(backend): 외국어 오늘의 말씀 풀이도 검토본으로(7개 언어 × 376, 한국어 검토본 바탕·Batch API·자동 검사) · 운영 배포(서버 테스트 121개)
-- 2026-11-03 feat(backend): 오늘의 말씀 풀이를 비신자 기준으로 재검토 — 224개 수정, 기도 끝 0, 프롬프트 ko·외국어 갱신 · 운영 배포(서버 테스트 114개)
-- 그 이전 이력은 git history 로 넘김(`git log --until=2026-11-03`)
+- 그 이전 이력은 git history 로 넘김(`git log --until=2026-11-06`)
