@@ -1,0 +1,12 @@
+[Unit]
+Description=WithGod 인스타그램 Daily Verse 매일 미국 동부 07:00
+
+[Timer]
+# 미국 동부 아침 7시(서머타임 따라 한국 20시 또는 21시). systemd 가 시간대를 직접 계산한다.
+OnCalendar=*-*-* 07:00:00 America/New_York
+# 서버가 꺼져 놓친 실행은 부팅 후 따라잡는다. 07:00 에서 IG_LATE_LIMIT_HOURS(기본 6시간) 넘게 늦으면
+# 스크립트가 그날을 건너뛴다. 게시 기록이 있어 같은 날 두 번 올리지 않는다.
+Persistent=true
+
+[Install]
+WantedBy=timers.target
