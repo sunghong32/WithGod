@@ -121,5 +121,13 @@
   "steps": 9,
   "size": "1344x992",
   "style": "이전 화풍(Hand-painted animated film background art …)으로 생성 — 사람이 없는 풍경이라 그대로 둔다"
+ },
+ "psa-34-18": {
+  "kind": "generated",
+  "model": "z-image-turbo (Tongyi-MAI, Apache-2.0) via mflux 0.24.0, -q 8",
+  "prompt": "A young woman sits alone on the stone steps of an ancient village house at dawn, her face in her hands, while warm first light falls across the steps and an old woman neighbor quietly sits down beside her and puts an arm around her shoulders. Soft, tender, hopeful mood. The people are Middle Eastern, in plain first-century linen and wool clothing.",
+  "seed": 1,
+  "steps": 9,
+  "size": "1344x992"
  }
 }
