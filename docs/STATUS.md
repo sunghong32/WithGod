@@ -67,7 +67,7 @@ min_supported 는 1.0.0 유지(강제 업데이트 사유 없음).
       카피는 `backend/instagram/copy_en.json` 에 세션에서 직접 쓴다(API 금지), 그림은 `scripts/gen_ig_art.py`(로컬 Z-Image-Turbo,
       서양 2D 애니메이션풍; 예수님 장면은 퍼블릭 도메인 성화), 렌더·업로드 `scripts/build_ig_daily_posts.py --upload`. 요령은 메모리 `instagram-account`
 - [x] **인스타 런칭 게시물 — 끝(11/12, 7개).** 오늘의 말씀과 겹치는 말씀 카드 2개(06·04)는 사용자 결정으로 뺐고, 남은 4개는 11/12 오전에 바로 게시.
-      결과물·생성기 `docs/instagram/launch/`·`tools/make_launch_posts.py`, 게시 기록 `launch/posted.json`. 고정(03→02→01)은 앱에서 사용자가. launchd plist 는 지워도 된다
+      결과물·생성기 `docs/instagram/launch/`·`tools/make_launch_posts.py`, 게시 기록 `launch/posted.json`. 상단 고정(소개·사용법·잠 못 드는 밤) 완료(11/12, 앱에서 사용자가). launchd plist 는 지워도 된다
 - [x] **11/9 병합분 배포 — 완료(11/9).** 백엔드 PR 9개 운영 서버 `da6df40`(서버 테스트 177개, 재시작 6초).
       ko 데이터 4개는 저장소로 함께 갔고(md5 일치), **es parquet·faiss 는 서버에서 교체**(PR #39 절차, 백업 `.bak-20261109`).
       확인: 첫 폴링에 무효 토큰 32개 꺼짐(NotRegistered 28 + iOS 1.5.0 APNs「device token is disabled」4) —
