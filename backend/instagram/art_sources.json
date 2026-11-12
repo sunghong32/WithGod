@@ -13,29 +13,33 @@
   "kind": "generated",
   "model": "z-image-turbo (Tongyi-MAI, Apache-2.0) via mflux 0.24.0, -q 8",
   "prompt": "In a sunlit courtyard of a simple stone house in the first-century Middle East, a woman hands a round loaf of bread and a small clay jar to an elderly neighbor at the gate while two children watch. Warm afternoon light, clay pots, a fig tree. Gentle, everyday mood. The people are Middle Eastern, in plain first-century linen and wool clothing.",
-  "seed": null,
-  "steps": 9
+  "seed": 1,
+  "steps": 9,
+  "size": "1344x992"
  },
  "rom-12-17": {
   "kind": "generated",
   "model": "z-image-turbo (Tongyi-MAI, Apache-2.0) via mflux 0.24.0, -q 8",
-  "prompt": "A small group of ordinary men and women gathered in a lamplit room of a crowded ancient Roman apartment building at evening, one man reading aloud from a scroll letter while the others listen. Warm oil lamp light, plaster walls, a window showing tall city buildings at dusk. The people are Middle Eastern, in plain first-century linen and wool clothing.",
-  "seed": null,
-  "steps": 9
+  "prompt": "A small group of ordinary men and women gathered in a lamplit room of a crowded ancient Roman apartment building at evening, one man reading aloud from a scroll letter while the others listen. Warm oil lamp light, plaster walls, a small window showing tiled Roman rooftops at dusk. The letter is a rolled papyrus scroll. The people are Middle Eastern, in plain first-century linen and wool clothing.",
+  "seed": 3,
+  "steps": 9,
+  "size": "1344x992"
  },
  "pro-10-12": {
   "kind": "generated",
   "model": "z-image-turbo (Tongyi-MAI, Apache-2.0) via mflux 0.24.0, -q 8",
-  "prompt": "By the warm light of a small clay oil lamp, an elderly woman gently draws a woolen blanket over a sleeping young man in a simple ancient stone house at night. Soft shadows, tender and peaceful mood. The people are Middle Eastern, in plain first-century linen and wool clothing.",
-  "seed": null,
-  "steps": 9
+  "prompt": "By the warm light of a small open clay oil lamp set on the floor, an elderly woman gently pulls a woolen blanket up over the shoulders of a sleeping young man, holding the edge of the blanket with both hands in a simple ancient stone house at night. Soft shadows, tender and peaceful mood. The people are Middle Eastern, in plain first-century linen and wool clothing.",
+  "seed": 6,
+  "steps": 9,
+  "size": "1344x992"
  },
  "pro-10-19": {
   "kind": "generated",
   "model": "z-image-turbo (Tongyi-MAI, Apache-2.0) via mflux 0.24.0, -q 8",
   "prompt": "Morning at a stone village well in ancient Israel. Several women with clay water jars talk animatedly, while one young woman listens quietly with a calm smile. Golden morning light, olive trees, stone houses on a hillside. The people are Middle Eastern, in plain first-century linen and wool clothing.",
-  "seed": null,
-  "steps": 9
+  "seed": 1,
+  "steps": 9,
+  "size": "1344x992"
  },
  "mat-5-16": {
   "kind": "generated",
@@ -48,58 +52,66 @@
  "psa-34-19": {
   "kind": "generated",
   "model": "z-image-turbo (Tongyi-MAI, Apache-2.0) via mflux 0.24.0, -q 8",
-  "prompt": "A young shepherd man in a simple tunic sits at the mouth of a rocky cave in the wilderness at dawn, tired but safe, looking out at the first light over the hills. Dust on his cloak, a wooden staff beside him. Quiet, hopeful mood. The people are Middle Eastern, in plain first-century linen and wool clothing.",
-  "seed": null,
-  "steps": 9
+  "prompt": "A young shepherd man in a simple tunic sits at the mouth of a rocky cave in the wilderness at dawn, tired but safe, looking out at the first light over the hills. Dust on his cloak, a wooden staff beside him. He is completely alone, with no other people anywhere. Quiet, hopeful mood. The people are Middle Eastern, in plain first-century linen and wool clothing.",
+  "seed": 3,
+  "steps": 9,
+  "size": "1344x992"
  },
  "isa-30-18": {
   "kind": "generated",
   "model": "z-image-turbo (Tongyi-MAI, Apache-2.0) via mflux 0.24.0, -q 8",
-  "prompt": "A lone watchman stands on top of an ancient stone city wall at dawn, looking out over misty hills as the first sunlight breaks through the clouds. Pale blue and gold light, calm and expectant mood. The people are Middle Eastern, in plain first-century linen and wool clothing.",
-  "seed": null,
-  "steps": 9
+  "prompt": "A lone watchman in a simple head cloth and wool cloak stands on top of a single tall stone watchtower of an ancient city at dawn, looking out over misty hills as the first sunlight breaks through the clouds. Nobody else is on the tower or the walls. Pale blue and gold light, calm and expectant mood. The man is Middle Eastern, in plain first-century clothing.",
+  "seed": 5,
+  "steps": 9,
+  "size": "1344x992"
  },
  "pro-11-2": {
   "kind": "generated",
   "model": "z-image-turbo (Tongyi-MAI, Apache-2.0) via mflux 0.24.0, -q 8",
   "prompt": "In a sunlit potter’s workshop in an ancient village, an old potter with a white beard guides the hands of a young apprentice at a spinning clay wheel. Shelves of clay jars, dust in the light beams, warm and calm. The people are Middle Eastern, in plain first-century linen and wool clothing.",
-  "seed": null,
-  "steps": 9
+  "seed": 1,
+  "steps": 9,
+  "size": "1344x992"
  },
  "rom-12-18": {
   "kind": "generated",
   "model": "z-image-turbo (Tongyi-MAI, Apache-2.0) via mflux 0.24.0, -q 8",
   "prompt": "Two neighbors meet at a low stone wall between their houses in an ancient village at golden hour. One offers a basket of figs across the wall, the other hesitates, then reaches out. Warm light, olive trees, soft and hopeful mood. The people are Middle Eastern, in plain first-century linen and wool clothing.",
-  "seed": null,
-  "steps": 9
+  "seed": 1,
+  "steps": 9,
+  "size": "1344x992"
  },
  "psa-37-4": {
   "kind": "generated",
   "model": "z-image-turbo (Tongyi-MAI, Apache-2.0) via mflux 0.24.0, -q 8",
   "prompt": "An old shepherd with a white beard sits peacefully on a grassy hillside at sunset, his sheep grazing around him, looking out over a wide valley glowing gold. Calm, content mood. The people are Middle Eastern, in plain first-century linen and wool clothing.",
-  "seed": null,
-  "steps": 9
+  "seed": 1,
+  "steps": 9,
+  "size": "1344x992"
  },
  "rom-8-18": {
   "kind": "generated",
   "model": "z-image-turbo (Tongyi-MAI, Apache-2.0) via mflux 0.24.0, -q 8",
-  "prompt": "A long road winding through a dark valley at dawn, with golden sunlight flooding over the far mountains and starting to fill the valley. A lone traveler with a walking staff on the road, seen from behind. Hopeful, cinematic mood. The people are Middle Eastern, in plain first-century linen and wool clothing.",
-  "seed": null,
-  "steps": 9
+  "prompt": "A long dirt footpath winding through a dark rocky valley at dawn, with golden sunlight flooding over the far mountains and starting to fill the valley. A lone traveler with a walking staff on the path, seen from behind, with no other people. Hopeful, cinematic mood. The people are Middle Eastern, in plain first-century linen and wool clothing.",
+  "seed": 3,
+  "steps": 9,
+  "size": "1344x992"
  },
  "psa-32-8": {
   "kind": "generated",
   "model": "z-image-turbo (Tongyi-MAI, Apache-2.0) via mflux 0.24.0, -q 8",
   "prompt": "A father stands on a riverbank watching closely as his young child crosses a shallow stream on stepping stones in a green valley, morning light, the child glancing back at him. Gentle, safe mood. The people are Middle Eastern, in plain first-century linen and wool clothing.",
-  "seed": null,
-  "steps": 9
+  "seed": 1,
+  "steps": 9,
+  "size": "1344x992"
  },
  "pro-11-13": {
   "kind": "generated",
   "model": "z-image-turbo (Tongyi-MAI, Apache-2.0) via mflux 0.24.0, -q 8",
-  "prompt": "Two friends sit close together talking quietly on the flat rooftop of a stone house in an ancient town at dusk, a small oil lamp between them, the town’s rooftops and a deep blue evening sky behind. Intimate, calm mood. The people are Middle Eastern, in plain first-century linen and wool clothing.",
-  "seed": null,
-  "steps": 9
+  "prompt": "Two friends sit close together talking quietly on the flat rooftop of a stone house in an ancient town at dusk, a small open clay oil lamp between them, the town’s rooftops and a deep blue evening sky behind. Intimate, calm mood. The people are Middle Eastern, in plain first-century linen and wool clothing.",
+  "seed": 3,
+  "steps": 9,
+  "size": "1344x992"
  },
  "pro-10-25": {
   "kind": "generated",

@@ -38,7 +38,8 @@ WIDTH, HEIGHT = 1344, 992  # 16의 배수, 슬라이드 그림 칸(1080×800)과
 STYLE = ("Still from a Western hand-drawn 2D animated feature film, classic American animation style, "
          "expressive characters with natural proportions, lush painted backgrounds, warm cinematic lighting.")
 NEGATIVE = ("anime, manga, Japanese animation, East Asian features, text, letters, watermark, signature, logo, "
-            "frame, border, modern buildings, cars")
+            "frame, border, modern buildings, skyscrapers, cars, asphalt, paved road, road markings, "
+            "glass lantern, kerosene lamp")
 
 
 def generate(prompt: str, seeds: list[int], steps: int, out_dir: Path, name: str) -> list[Path]:
