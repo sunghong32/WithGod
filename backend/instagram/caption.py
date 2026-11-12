@@ -6,14 +6,15 @@
 
     “{WEB 본문 그대로}” {참조}
 
-    From the WithGod app’s note on this verse (written with AI):
-    {앱의 영어 풀이 검토본}
+    Swipe for the scene behind it and the WithGod app’s note … (written with AI).
 
     {요청 한 줄 — 저장·보내기·댓글}
 
     #bibleverse #dailybibleverse #{주제}
 
-풀이는 AI 로 쓴 앱 풀이라 그렇다고 밝힌다(사람·목회자가 쓴 척 금지 규칙). 훅·카드 라벨·요청 줄과
+앱 풀이는 캐러셀 마지막 카드에 싣는다(11/12 사용자 — 게시물 하나로 읽히게). 캡션은 넘겨 보라는 한 줄만
+둔다. 한 장짜리로 올릴 때만 캡션에 풀이를 싣는다. AI 로 쓴 풀이라 어디서든 그렇게 밝힌다(사람·목회자가 쓴 척
+금지 규칙). 훅·카드 라벨·요청 줄과
 캐러셀 안쪽 장 글은 `instagram/copy_en.json` 에 손으로 쓰고(API 로 만들지 않는다) 여기 규칙으로 검사한다.
 """
 from __future__ import annotations
@@ -26,14 +27,13 @@ HOOK_MAX = 125
 KICKER_MAX = 40  # 런칭 라벨 최장 38자(「When it’s taking longer than you hoped」)
 CTA_MAX = 100
 ALT_TEXT_MAX = 1000
-# 캐러셀 안쪽 장 글(card.py 의 scene·today 장)
+# 캐러셀 장면 장 글(card.py 의 scene 장)
 SCENE_MAX = 240
-TODAY_MAX = 200
-EXTRA_MAX = 90
 CREDIT_MAX = 80
 SCENE_LABELS = ("the scene", "the picture")
 
 NOTE_INTRO = "From the WithGod app’s note on this verse (written with AI):"
+SWIPE_LINE = "Swipe for the scene behind it and the WithGod app’s note on what it can mean today (written with AI)."
 BASE_HASHTAGS = ("#bibleverse", "#dailybibleverse")
 # 주제 해시태그 — 생성기가 이 안에서만 고른다(새 태그는 여기 더하고 테스트를 고친다).
 TOPIC_HASHTAGS = (
@@ -143,13 +143,14 @@ def display_ref(ref: str) -> str:
     return re.sub(r"(?<=\d)-(?=\d)", "–", ref)
 
 
-def build_caption(*, hook: str, verse_text: str, ref: str, note: str, cta: str, topic: str,
-                  app_line: str = "") -> str:
-    """캡션 조립. ref 는 표시용(display_ref) 참조, note 는 앱의 영어 풀이 검토본."""
+def build_caption(*, hook: str, verse_text: str, ref: str, cta: str, topic: str, app_line: str = "",
+                  note: str = "") -> str:
+    """캡션 조립. ref 는 표시용(display_ref) 참조. note(앱 풀이)를 주면 한 장짜리 게시물이라 캡션에
+    풀이를 싣고, 안 주면 캐러셀이라 풀이 카드로 넘겨 보라는 줄을 둔다."""
     blocks = [
         hook.strip(),
         f"“{verse_text.strip()}” {ref} (WEB)",
-        f"{NOTE_INTRO}\n{note.strip()}",
+        f"{NOTE_INTRO}\n{note.strip()}" if note else SWIPE_LINE,
         cta.strip(),
     ]
     if app_line:
@@ -180,13 +181,7 @@ def find_slide_problems(copy: dict) -> list[str]:
             problems.append("scene.alt: 비었거나 김")
         if not scene.get("art"):
             problems.append("scene.art: 그림 파일 없음")
-    today = copy.get("today")
-    if today:
-        problems += find_copy_problems(today.get("body", ""), limit=TODAY_MAX, field="today.body")
-        if today.get("emph") and today["emph"] not in today.get("body", ""):
-            problems.append("today.emph: 본문에 없는 구절")
-        if today.get("extra"):
-            problems += find_copy_problems(today["extra"], limit=EXTRA_MAX, field="today.extra")
+
     return problems
 
 
@@ -198,9 +193,10 @@ def find_post_problems(entry: dict) -> list[str]:
         + find_copy_problems(entry["cta"], limit=CTA_MAX, field="cta")
     )
     for app_line in ("", APP_LINE):
-        caption = build_caption(hook=entry["hook"], verse_text=entry["text"], ref=entry["display_ref"],
-                                note=entry["note"], cta=entry["cta"], topic=entry["topic"], app_line=app_line)
-        problems += find_caption_problems(caption)
+        for note in ("", entry["note"]):  # 캐러셀(풀이 카드)과 한 장짜리(캡션에 풀이) 둘 다
+            caption = build_caption(hook=entry["hook"], verse_text=entry["text"], ref=entry["display_ref"],
+                                    cta=entry["cta"], topic=entry["topic"], app_line=app_line, note=note)
+            problems += find_caption_problems(caption)
     if len(entry.get("alt_text", "")) > ALT_TEXT_MAX:
         problems.append("대체 텍스트 길이")
     return problems

@@ -63,16 +63,22 @@ class CopyRulesTest(unittest.TestCase):
 
     def test_slide_copy_rules(self):
         good = {"scene": {"label": "the scene", "body": "A hillside in Galilee.", "art": "x.jpg",
-                          "credit": "Carl Bloch, 1877", "alt": "Painting."},
-                "today": {"body": "Care is already at work.", "emph": "already at work.", "extra": "Save this."}}
+                          "credit": "Carl Bloch, 1877", "alt": "Painting."}}
         self.assertEqual(find_slide_problems(good), [])
         bad = json.loads(json.dumps(good))
         bad["scene"]["label"] = "the story"
-        bad["today"]["emph"] = "not there"
-        bad["today"]["body"] = "My heart — always."
+        bad["scene"]["body"] = "My heart — always."
+        bad["scene"]["credit"] = ""
         found = " ".join(find_slide_problems(bad))
-        for word in ("scene.label", "today.emph", "줄표", "사람이 쓴 척"):
+        for word in ("scene.label", "scene.credit", "줄표", "사람이 쓴 척"):
             self.assertIn(word, found)
+
+    def test_carousel_caption_points_to_the_note_card(self):
+        caption = build_caption(hook="Hook.", verse_text="Rest.", ref="Psalm 4:8", cta="Save this.", topic="#rest")
+        self.assertIn("(written with AI)", caption)
+        self.assertIn("Swipe", caption)
+        self.assertNotIn("From the WithGod app’s note on this verse", caption)
+        self.assertEqual(find_caption_problems(caption), [])
 
     def test_display_ref_and_card_text(self):
         self.assertEqual(display_ref("Psalms 34:18"), "Psalm 34:18")
@@ -101,27 +107,12 @@ class SelectionTest(unittest.TestCase):
                   if (start + timedelta(n)).timetuple()[1:3] != (12, 25)}
         self.assertFalse(picked & _HOLIDAY_ONLY)
 
-    def test_recent_verse_goes_to_the_far_side(self):
+    def test_recent_verse_is_posted_anyway(self):
+        # 런칭 게시물 등으로 최근에 올렸어도 앱 말씀을 그대로 올린다(11/12 사용자 결정)
         d = date(2026, 11, 12)
         app = app_verse_for(d).verse_id
-        recent = {app: (d - timedelta(days=5)).isoformat()}
-        vid, reason = pick_verse_id(d, recent, self.all_ids)
-        self.assertNotEqual(vid, app)
-        self.assertEqual(reason, f"recent:{app}")
-        # 다음 날 앱 말씀은 그대로 다음 차례 — 한 칸씩 밀리지 않는다
-        nxt = d + timedelta(days=1)
-        self.assertEqual(pick_verse_id(nxt, {**recent, vid: d.isoformat()}, self.all_ids),
-                         (app_verse_for(nxt).verse_id, "app"))
-        # 바꿔 올린 말씀은 앱 차례까지 반 바퀴쯤 떨어져 있다
-        rotation = [i["verse_id"] for i in self.items if i["verse_id"] not in _HOLIDAY_ONLY]
-        gap = (rotation.index(vid) - rotation.index(app)) % len(rotation)
-        self.assertGreater(min(gap, len(rotation) - gap), REPEAT_WINDOW_DAYS)
-
-    def test_old_post_is_fine_again(self):
-        d = date(2026, 11, 12)
-        app = app_verse_for(d).verse_id
-        old = {app: (d - timedelta(days=REPEAT_WINDOW_DAYS + 1)).isoformat()}
-        self.assertEqual(pick_verse_id(d, old, self.all_ids), (app, "app"))
+        recent = {app: (d - timedelta(days=1)).isoformat()}
+        self.assertEqual(pick_verse_id(d, recent, self.all_ids), (app, "app"))
 
     def test_missing_from_manifest(self):
         d = date(2026, 11, 12)
@@ -129,6 +120,15 @@ class SelectionTest(unittest.TestCase):
         vid, reason = pick_verse_id(d, {}, self.all_ids - {app})
         self.assertEqual(reason, f"missing:{app}")
         self.assertIn(vid, self.all_ids)
+        # 대신 올릴 말씀은 반 바퀴쯤 떨어진 것 — 다음 날 앱 말씀은 그대로 다음 차례
+        rotation = [i["verse_id"] for i in self.items if i["verse_id"] not in _HOLIDAY_ONLY]
+        gap = (rotation.index(vid) - rotation.index(app)) % len(rotation)
+        self.assertGreater(min(gap, len(rotation) - gap), REPEAT_WINDOW_DAYS)
+        nxt = d + timedelta(days=1)
+        self.assertEqual(pick_verse_id(nxt, {vid: d.isoformat()}, self.all_ids - {app}),
+                         (app_verse_for(nxt).verse_id, "app"))
+        # 최근에 올린 말씀은 대신 올릴 후보에서 빠진다
+        self.assertNotEqual(pick_verse_id(d, {vid: d.isoformat()}, self.all_ids - {app})[0], vid)
 
 
 # ── Graph API 가짜 ──────────────────────────────────────────────
@@ -413,12 +413,11 @@ class RunTest(unittest.TestCase):
         daily_post.run(self.cfg, self.deps)
         self.assertIn("준비된 날", self.sent[0][0])
 
-    def test_manual_posts_are_avoided(self):
+    def test_manual_posts_do_not_change_the_verse(self):
         day = date(2026, 11, 12)
         app = app_verse_for(day).verse_id
         daily_post.mark_posted(self.cfg, [app], day - timedelta(days=2))
-        out = daily_post.run(self.cfg, self.deps)
-        self.assertNotEqual(out["verse_id"], app)
+        self.assertEqual(daily_post.run(self.cfg, self.deps)["verse_id"], app)
 
     def test_env_config(self):
         cfg = daily_post.Config.from_env({"IG_MODE": "live", "STATE_DIRECTORY": "/var/lib/with-god-ig",

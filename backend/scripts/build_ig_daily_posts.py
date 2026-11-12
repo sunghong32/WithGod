@@ -7,7 +7,7 @@
     python scripts/build_ig_daily_posts.py                              # 카피가 있는 말씀 전부 + 매니페스트
     python scripts/build_ig_daily_posts.py --upload                     # + S3 에 없는 슬라이드 올리기
 
-한 게시물 = 표지(말씀) + [장면] + [오늘의 한마디] — 카피에 있는 장만 만든다. 수·일요일에 붙는 앱 안내 장은
+한 게시물 = 표지(말씀) + [장면] + 앱 풀이 카드 — 장면은 카피에 있을 때만. 수·일요일에 붙는 앱 안내 장은
 한 장만 만들어 매니페스트 `app_slide` 에 두고 실행기가 그날 끝에 붙인다.
 
 재료: 목록(daily_verses.json) · 영어 본문(앱과 같은 변환) · 영어 풀이 검토본 · 카피(instagram/copy_en.json)
@@ -28,7 +28,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from instagram.caption import build_caption, find_post_problems, find_slide_problems  # noqa: E402
 from instagram.posts import (  # noqa: E402
-    MANIFEST, en_note, image_key, load_copy, load_daily_verses, localize_all, manifest_entry,
+    MANIFEST, en_note, image_key, load_copy, load_daily_verses, localize_all, manifest_entry, tidy_copy,
 )
 
 INSTAGRAM = Path(__file__).resolve().parent.parent / "instagram"
@@ -39,7 +39,8 @@ ART_DIR = BUILD_DIR / "art"
 TEMPLATE_VERSION = "2"
 DEFAULT_BUCKET = "with-god-ig-cards"
 S3_REGION = "ap-northeast-2"
-TODAY_SOURCE = "From the WithGod app’s note on this verse, written with AI"
+NOTE_LABEL = "what it can mean today"
+NOTE_SOURCE = "The WithGod app’s note on this verse, written with AI"
 APP_SLIDE = {
     "kind": "app", "pal": "brand",
     "headline": "Tell it how you feel. *It finds the verse.*",
@@ -51,7 +52,7 @@ APP_ALT = ("Tell it how you feel. It finds the verse. WithGod searches the whole
 
 
 def slides_for(entry: dict, copy: dict) -> list[tuple[dict, str]]:
-    """(슬라이드, 대체 텍스트) 목록 — 표지 + 있으면 장면 + 있으면 오늘의 한마디."""
+    """(슬라이드, 대체 텍스트) 목록 — 표지 + 있으면 장면 + 앱 풀이 카드."""
     pal = copy["pal"]
     out = [({"kind": "verse", "pal": pal, "label": copy["label"], "text": entry["text"],
              "emph": copy["emph"], "ref": entry["display_ref"]}, entry["alt_text"])]
@@ -63,11 +64,8 @@ def slides_for(entry: dict, copy: dict) -> list[tuple[dict, str]]:
         out.append(({"kind": "scene", "pal": pal, "label": scene["label"], "body": scene["body"],
                      "art": str(art), "focus": scene.get("focus", "50% 50%"), "credit": scene["credit"]},
                     f"{scene['alt']} {scene['body']}"))
-    today = copy.get("today")
-    if today:
-        out.append(({"kind": "today", "pal": pal, "label": "for today", "body": today["body"],
-                     "emph": today.get("emph", ""), "extra": today.get("extra", ""), "source": TODAY_SOURCE},
-                    f"For today: {today['body']} {today.get('extra', '')}".strip()))
+    out.append(({"kind": "note", "pal": pal, "label": NOTE_LABEL, "body": tidy_copy(entry["note"]), "source": NOTE_SOURCE},
+                f"What it can mean today, from the WithGod app’s note on this verse (written with AI): {entry['note']}"))
     for i, (slide, _) in enumerate(out):
         slide["arrow"] = i < len(out) - 1
     return out
@@ -182,7 +180,7 @@ def main() -> int:
         for vid, e in entries.items():
             print(f"\n===== {vid} · {e['display_ref']} · {len(e['images'])}장")
             print(build_caption(hook=e["hook"], verse_text=e["text"], ref=e["display_ref"],
-                                note=e["note"], cta=e["cta"], topic=e["topic"]))
+                                cta=e["cta"], topic=e["topic"]))
         return 0
 
     MANIFEST.write_text(json.dumps({

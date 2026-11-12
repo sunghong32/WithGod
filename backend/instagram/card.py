@@ -9,7 +9,7 @@
 - scene: 그 말씀의 장면(복음서 이야기) 또는 그림(잠언 비유). 위에 그림, 아래 짧은 설명과 그림 출처.
   그림은 퍼블릭 도메인 성화이거나, 이 맥에서 로컬 오픈소스 모델(Z-Image-Turbo, Apache-2.0)로 만든 그림이다
   (`instagram/build/art/`, 출처 기록은 `instagram/art_sources.json`).
-- today: 앱 풀이에서 줄인 오늘의 한마디 + 저장 권유.
+- note: 앱의 영어 풀이 전문(AI 로 쓴 것이라 그렇게 밝힌다). 캡션 대신 카드에 실어 게시물 하나로 읽히게 한다.
 - app: 앱 안내(수·일요일만).
 
 HTML 을 Chrome 헤드리스로 찍고 Pillow 로 JPEG 로 바꾼다(API 는 JPEG 만 받는다). 운영 서버(1GB)는 렌더하지
@@ -117,10 +117,10 @@ mark{color:inherit;background:linear-gradient(transparent 56%,var(--mark) 56%,va
 .sc p{margin:18px 0 0;font-size:42px;line-height:1.34;letter-spacing:-.004em;color:var(--ink);text-wrap:pretty}
 .credit{margin-top:26px;font:500 22px/1.3 "WGSans";letter-spacing:.02em;color:var(--muted);opacity:.9}
 
-/* 오늘의 한마디 */
-.tbox{position:absolute;left:100px;right:100px;top:150px;bottom:230px;display:flex;flex-direction:column;
+/* 앱 풀이 */
+.nbox{position:absolute;left:100px;right:100px;top:130px;bottom:205px;display:flex;flex-direction:column;
   justify-content:center}
-.tbox p{margin:36px 0 0;font-size:66px;line-height:1.26;letter-spacing:-.012em;text-wrap:pretty}
+.nbox p{margin:30px 0 0;line-height:1.42;letter-spacing:-.004em;text-wrap:pretty}
 .extra{margin-top:48px;font-style:italic;font-size:40px;line-height:1.35;color:var(--muted);text-wrap:pretty}
 .src{position:absolute;left:100px;right:100px;bottom:140px;font:500 22px/1.3 "WGSans";letter-spacing:.02em;
   color:var(--muted);opacity:.85}
@@ -182,7 +182,7 @@ function noOrphan(sel){
 document.fonts.ready.then(function(){
   fit('.vtext', '.vbox', 38); noOrphan('.vtext'); fit('.vtext', '.vbox', 38);
   fit('.sc p', '.sc', 34); noOrphan('.sc p'); fit('.sc p', '.sc', 34);
-  fit('.tbox p', '.tbox', 44); noOrphan('.tbox p'); fit('.tbox p', '.tbox', 44);
+  fit('.nbox p', '.nbox', 32); noOrphan('.nbox p'); fit('.nbox p', '.nbox', 32);
   fit('.cbox h2', '.cbox', 56);
   document.body.setAttribute('data-ready', '1');
 });
@@ -203,6 +203,18 @@ def verse_size(text: str) -> int:
     if n <= 190:
         return 62
     return 56
+
+
+def note_size(text: str) -> int:
+    """앱 풀이(영어 346~676자, 보통 470자) 길이별 시작 글자 크기. 넘치면 FIT_JS 가 더 줄인다."""
+    n = len(text)
+    if n <= 420:
+        return 46
+    if n <= 520:
+        return 43
+    if n <= 600:
+        return 40
+    return 38
 
 
 def marked(text: str, emph: str = "", tag: str = "mark") -> str:
@@ -251,12 +263,10 @@ def slide_html(s: dict) -> str:
         body = (f'<div class="art"><img src="{src}" style="object-position:{e(s.get("focus", "50% 50%"))}"></div>'
                 f'<div class="sc"><div class="lab">{e(s["label"])}</div><p>{rich(s["body"])}</p>'
                 f'<div class="credit">{e(s["credit"])}</div></div>')
-    elif k == "today":
-        body = (f'<div class="tbox"><div class="lab">{e(s["label"])}</div>'
-                f'<p>{marked(s["body"], s.get("emph", ""), "em")}</p>'
-                + (f'<div class="extra">{e(s["extra"])}</div>' if s.get("extra") else "")
-                + "</div>"
-                + (f'<div class="src">{e(s["source"])}</div>' if s.get("source") else ""))
+    elif k == "note":
+        body = (f'<div class="nbox"><div class="lab">{e(s["label"])}</div>'
+                f'<p style="font-size:{note_size(s["body"])}px">{e(s["body"])}</p></div>'
+                f'<div class="src">{e(s["source"])}</div>')
     elif k == "app":
         body = (f'<div class="cbox"><h2>{rich(s["headline"])}</h2>'
                 + (f'<p>{rich(s["body"])}</p>' if s.get("body") else "")

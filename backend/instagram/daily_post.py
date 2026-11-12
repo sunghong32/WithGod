@@ -2,7 +2,7 @@
 
     python -m instagram.daily_post                 # IG_MODE 대로(기본 dry-run)
     python -m instagram.daily_post --date 2026-11-26 --no-telegram   # 그날 몫 미리보기
-    python -m instagram.daily_post --mark-posted psa-34-18,isa-41-10  # 손으로 올린 말씀 기록(겹침 방지)
+    python -m instagram.daily_post --mark-posted psa-34-18,isa-41-10  # 손으로 올린 말씀 기록(대신 올릴 후보에서 뺀다)
 
 흐름: 그날 말씀 고르기(앱 오늘의 말씀과 같게) → 매니페스트에서 캡션·이미지 키 → S3 presigned URL(1시간) →
 URL 이 밖에서 받아지는지 확인 → [live] 컨테이너 생성 → 상태 확인 → media_publish → 퍼머링크 → 기록 → 텔레그램.
@@ -258,8 +258,9 @@ def plan(cfg: Config, day: date, state: State) -> dict:
     posts = available_posts(manifest)
     verse_id, reason = pick_verse_id(day, state.last_posted_by_verse(), set(posts))
     e = posts[verse_id]
-    caption = build_caption(hook=e["hook"], verse_text=e["text"], ref=e["display_ref"], note=e["note"],
-                            cta=e["cta"], topic=e["topic"], app_line=app_line_for(day))
+    single = len(post_images(e)) == 1  # 한 장짜리면 풀이를 캡션에, 캐러셀이면 풀이 카드에
+    caption = build_caption(hook=e["hook"], verse_text=e["text"], ref=e["display_ref"], cta=e["cta"],
+                            topic=e["topic"], app_line=app_line_for(day), note=e["note"] if single else "")
     problems = find_caption_problems(caption)
     if problems:
         raise RuntimeError(f"캡션 검사 실패({verse_id}): {'; '.join(problems)}")
@@ -395,7 +396,7 @@ def _token(cfg: Config, deps: Deps, now: datetime) -> tuple[str, InstagramClient
 
 
 def mark_posted(cfg: Config, verse_ids: list[str], day: date) -> None:
-    """손으로 올린 말씀을 기록한다(자동 게시가 90일 안에 같은 말씀을 다시 올리지 않게)."""
+    """손으로 올린 말씀을 기록한다. 앱 말씀은 그래도 그대로 올리고, 준비 안 된 날 대신 올릴 후보에서만 뺀다."""
     state = State(cfg.state_dir)
     for vid in verse_ids:
         state.append({"date": day.isoformat(), "verse_id": vid, "media_id": "", "permalink": "",
