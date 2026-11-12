@@ -1,12 +1,35 @@
 {
  "version": 2,
- "generated_at": "2026-11-12T01:25:24+00:00",
+ "generated_at": "2026-11-12T01:59:11+00:00",
  "template_version": "2",
  "app_slide": {
   "image": "cards/app-b9ed337343.jpg",
   "alt_text": "Tell it how you feel. It finds the verse. WithGod searches the whole Bible for verses that speak to what you’re going through. Link in bio. Free on iPhone, iPad and Android."
  },
  "posts": {
+  "psa-34-18": {
+   "ko_reference": "시편 34:18",
+   "ko_fp": "39369f0b",
+   "ref": "Psalms 34:18",
+   "display_ref": "Psalm 34:18",
+   "text": "The LORD is near to those who have a broken heart, and saves those who have a crushed spirit.",
+   "kicker": "When you’re falling apart inside",
+   "hook": "For the days you look fine and feel like you’re falling apart.",
+   "cta": "Send this to someone who is quietly holding a lot together.",
+   "topic": "#comfort",
+   "note": "David wrote this psalm after he was rescued from a life-threatening danger, and he sang it for people who were living in fear. The verse does not wait for a heart to be tidy before God draws near; it says he is closest to the heart that has broken apart and the spirit that feels crushed. The two phrases \"broken heart\" and \"crushed spirit\" stand side by side, so the verse shows that God sees the inner collapse behind the face we put on to hold ourselves together. Even the part of you that you cannot yet put into words is already known to him, so you can let today's weight be seen just as it is.",
+   "alt_text": "Bible verse card. When you’re falling apart inside: “The LORD is near to those who have a broken heart, and saves those who have a crushed spirit.” Psalm 34:18 (World English Bible).",
+   "images": [
+    "cards/psa-34-18-1-d1e00aa57d.jpg",
+    "cards/psa-34-18-2-9f5d9080d5.jpg",
+    "cards/psa-34-18-3-b731321248.jpg"
+   ],
+   "alt_texts": [
+    "Bible verse card. When you’re falling apart inside: “The LORD is near to those who have a broken heart, and saves those who have a crushed spirit.” Psalm 34:18 (World English Bible).",
+    "Illustration: at dawn, an older woman sits down beside a young woman crying on stone steps and puts an arm around her. In the ancient world, comfort was mostly presence. Neighbors came and sat with the grieving, sometimes for days, often without saying much. This verse pictures God the same way: close by, before anything is fixed.",
+    "What it can mean today, from the WithGod app’s note on this verse (written with AI): David wrote this psalm after he was rescued from a life-threatening danger, and he sang it for people who were living in fear. The verse does not wait for a heart to be tidy before God draws near; it says he is closest to the heart that has broken apart and the spirit that feels crushed. The two phrases \"broken heart\" and \"crushed spirit\" stand side by side, so the verse shows that God sees the inner collapse behind the face we put on to hold ourselves together. Even the part of you that you cannot yet put into words is already known to him, so you can let today's weight be seen just as it is."
+   ]
+  },
   "heb-13-16": {
    "ko_reference": "히브리서 13:16",
    "ko_fp": "475ef957",
