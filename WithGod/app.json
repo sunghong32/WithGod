@@ -102,7 +102,14 @@
         }
       ],
       "expo-font",
-      "expo-localization"
+      "expo-localization",
+      [
+        "expo-secure-store",
+        {
+          "faceIDPermission": false,
+          "configureAndroidBackup": false
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
