@@ -7,7 +7,8 @@
     python scripts/build_ig_daily_posts.py                              # 카피가 있는 말씀 전부 + 매니페스트
     python scripts/build_ig_daily_posts.py --upload                     # + S3 에 없는 슬라이드 올리기
 
-한 게시물 = 표지(말씀) + [장면] + 앱 풀이 카드 — 장면은 카피에 있을 때만. 수·일요일에 붙는 앱 안내 장은
+한 게시물 = 그림 표지 + 말씀 + 그림 설명 + 앱 풀이 카드(장면이 카피에 있을 때). 장면이 없으면 말씀 카드가
+표지다. 수·일요일에 붙는 앱 안내 장은
 한 장만 만들어 매니페스트 `app_slide` 에 두고 실행기가 그날 끝에 붙인다.
 
 재료: 목록(daily_verses.json) · 영어 본문(앱과 같은 변환) · 영어 풀이 검토본 · 카피(instagram/copy_en.json)
@@ -36,7 +37,7 @@ BUILD_DIR = INSTAGRAM / "build"
 SLIDES_DIR = BUILD_DIR / "slides"
 ART_DIR = BUILD_DIR / "art"
 # 슬라이드 틀(card.py 의 CSS·HTML)을 바꾸면 올린다 — 지문이 바뀌어 모든 장을 다시 올린다.
-TEMPLATE_VERSION = "2"
+TEMPLATE_VERSION = "3"
 DEFAULT_BUCKET = "with-god-ig-cards"
 S3_REGION = "ap-northeast-2"
 NOTE_LABEL = "what it can mean today"
@@ -52,18 +53,26 @@ APP_ALT = ("Tell it how you feel. It finds the verse. WithGod searches the whole
 
 
 def slides_for(entry: dict, copy: dict) -> list[tuple[dict, str]]:
-    """(슬라이드, 대체 텍스트) 목록 — 표지 + 있으면 장면 + 앱 풀이 카드."""
+    """(슬라이드, 대체 텍스트) 목록 — 장면이 있으면 그림 표지 + 말씀 + 그림 설명(글만) + 앱 풀이 카드,
+    없으면 말씀 + 앱 풀이 카드. 그리드·피드에 먼저 보이는 장이 그림이어야 흔한 말씀 카드 계정과 구별된다."""
     pal = copy["pal"]
-    out = [({"kind": "verse", "pal": pal, "label": copy["label"], "text": entry["text"],
-             "emph": copy["emph"], "ref": entry["display_ref"]}, entry["alt_text"])]
+    verse = ({"kind": "verse", "pal": pal, "label": copy["label"], "text": entry["text"],
+              "emph": copy["emph"], "ref": entry["display_ref"]}, entry["alt_text"])
+    out = []
     scene = copy.get("scene")
     if scene:
         art = ART_DIR / scene["art"]
         if not art.exists():
             raise FileNotFoundError(f"그림 없음: {art}")
+        label = tidy_copy(copy["label"])
+        out.append(({"kind": "cover", "pal": pal, "label": label, "ref": entry["display_ref"], "art": str(art),
+                     "focus": scene.get("focus", "50% 50%")},
+                    f"{scene['alt']} Text: {label[:1].lower() + label[1:]}. {entry['display_ref']}."))
+        out.append(verse)
         out.append(({"kind": "scene", "pal": pal, "label": scene["label"], "body": scene["body"],
-                     "art": str(art), "focus": scene.get("focus", "50% 50%"), "credit": scene["credit"]},
-                    f"{scene['alt']} {scene['body']}"))
+                     "credit": scene["credit"]}, f"{scene['label'].capitalize()}: {scene['body']}"))
+    else:
+        out.append(verse)
     out.append(({"kind": "note", "pal": pal, "label": NOTE_LABEL, "body": tidy_copy(entry["note"]), "source": NOTE_SOURCE},
                 f"What it can mean today, from the WithGod app’s note on this verse (written with AI): {entry['note']}"))
     for i, (slide, _) in enumerate(out):
