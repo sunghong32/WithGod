@@ -631,13 +631,15 @@ class LanguageFeatureTest(NotificationFeatureTest):
         self.assertIsNone(accept(date(2026, 4, 23), now))
         self.assertIsNone(accept(None, now))
 
-    def _register_ny_and_seoul(self) -> None:
+    def _register_ny_and_seoul(self, verse_date: str | None = "local") -> None:
         # 둘 다 한국어 — 현지화 없이 날짜만 본다. 미국 동부 09:00, 한국 00:00 알림.
         registered_at = datetime(2026, 4, 21, 0, 0, tzinfo=ZoneInfo("UTC"))
         self.manager.register_device(token="tok-ny", platform="ios", timezone="America/New_York",
-                                     language="ko", schedule_hour=9, schedule_minute=0, now=registered_at)
+                                     language="ko", schedule_hour=9, schedule_minute=0, now=registered_at,
+                                     verse_date=verse_date)
         self.manager.register_device(token="tok-seoul", platform="android", timezone="Asia/Seoul",
-                                     language="ko", schedule_hour=0, schedule_minute=0, now=registered_at)
+                                     language="ko", schedule_hour=0, schedule_minute=0, now=registered_at,
+                                     verse_date=verse_date)
 
     def _verse_by_token(self) -> dict[str, str]:
         return {device.token: payload.data["verseId"]
@@ -662,6 +664,30 @@ class LanguageFeatureTest(NotificationFeatureTest):
             "tok-ny": self.provider.verse_for_date(date(2026, 4, 21)).verse_id,
             "tok-seoul": self.provider.verse_for_date(date(2026, 4, 22)).verse_id,
         })
+
+    def test_push_uses_korean_date_unless_app_reports_local(self) -> None:
+        # 날짜 기준을 안 보낸 기기(구버전 앱·1.6.1 전 iOS)는 홈·위젯이 한국 날짜라 푸시도 한국 날짜.
+        self._register_ny_and_seoul(verse_date=None)
+        self.manager.send_due_notifications(now=datetime(2026, 4, 21, 15, 30, tzinfo=ZoneInfo("UTC")))
+        seoul_today = self.provider.verse_for_date(date(2026, 4, 22)).verse_id
+        self.assertEqual(self._verse_by_token(), {"tok-ny": seoul_today, "tok-seoul": seoul_today})
+        # 발송 기록(중복 방지)은 날짜 기준과 상관없이 기기 현지 날짜.
+        sent_on = {d.token: d.last_daily_sent_on for d in self.store.list_devices()}
+        self.assertEqual(sent_on, {"tok-ny": "2026-04-21", "tok-seoul": "2026-04-22"})
+
+    def test_verse_date_kept_when_old_app_reregisters(self) -> None:
+        self.manager.register_device(token="tok-a", platform="android", verse_date="local")
+        self.manager.register_device(token="tok-a", platform="android")  # 날짜 기준을 안 보내는 등록
+        self.assertEqual(self.store.list_devices()[-1].verse_date, "local")
+        self.manager.register_device(token="tok-a", platform="android", verse_date="KST")
+        self.assertEqual(self.store.list_devices()[-1].verse_date, "kst")
+        self.manager.register_device(token="tok-a", platform="android", verse_date="weird")
+        self.assertEqual(self.store.list_devices()[-1].verse_date, "kst")
+        # 발송 기록·토큰 끄기가 다른 필드를 지우지 않는다.
+        self.store.mark_sent("tok-a", "2026-04-21")
+        self.store.disable_tokens(["tok-a"])
+        stored = self.store.list_devices()[-1]
+        self.assertEqual((stored.verse_date, stored.last_daily_sent_on, stored.enabled), ("kst", "2026-04-21", False))
 
     def test_send_groups_devices_by_language(self) -> None:
         from unittest.mock import patch
