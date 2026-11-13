@@ -1,7 +1,8 @@
 """그날 올릴 말씀 고르기 (이슈 #62).
 
-**앱의 오늘의 말씀과 같은 말씀**을 올린다. 게시 시각(미국 동부 07:00)은 한국 20~21시라 한국 날짜와
-미국 동부 날짜가 같다 — 앱(`/daily-verse`, 한국 날짜 기준)이 그날 보여 주는 말씀과 같다.
+**앱의 오늘의 말씀과 같은 말씀**을 올린다. 앱은 기기 현지 날짜로 말씀을 고르므로(#69) 게시하는 날
+(미국 동부 날짜)의 말씀은 미국 사용자의 앱에 그날 하루 내내 떠 있는 말씀과 같다. 게시 시각(미국 동부
+07:00)은 한국 20~21시라 한국 사용자의 앱과도 그날 자정까지 같다.
 같은 `DailyVerseProvider` 를 쓰므로 절기 고정(새해·부활절·성탄·설날·추석)과 성탄 전용 말씀
 (`_HOLIDAY_ONLY`, 눅 2:14 는 12/25 에만)도 앱 규칙 그대로 따른다.
 
@@ -15,21 +16,18 @@
 """
 from __future__ import annotations
 
-from datetime import date, datetime, time, timedelta
+from datetime import date, timedelta
 from pathlib import Path
-from zoneinfo import ZoneInfo
 
 from notifications.verse_provider import _HOLIDAY_ONLY, DailyVerseProvider
 
 DAILY_VERSES = Path(__file__).resolve().parent.parent / "notifications" / "daily_verses.json"
-APP_TZ = ZoneInfo("Asia/Seoul")  # 앱 오늘의 말씀의 날짜 기준(push_default_timezone)
 REPEAT_WINDOW_DAYS = 90
 
 
 def app_verse_for(day: date, path: Path = DAILY_VERSES):
-    """앱이 그 날짜(한국)에 내는 오늘의 말씀(DailyVerse, 한국어 카드)."""
-    noon = datetime.combine(day, time(12, 0), tzinfo=APP_TZ)
-    return DailyVerseProvider(str(path)).get_daily_verse(now=noon)
+    """앱이 그 날짜(보는 사람의 현지 날짜)에 내는 오늘의 말씀(DailyVerse, 한국어 카드)."""
+    return DailyVerseProvider(str(path)).verse_for_date(day)
 
 
 def pick_verse_id(day: date, posted: dict[str, str], available: set[str],

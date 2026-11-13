@@ -16,7 +16,7 @@ import pandas as pd
 import faiss
 from pathlib import Path
 from typing import List, Optional, Union, Literal, AsyncGenerator
-from datetime import datetime, timedelta
+from datetime import date as date_type, datetime, timedelta
 from zoneinfo import ZoneInfo
 from threading import Lock
 import sqlite3
@@ -772,9 +772,20 @@ def history_title(inp: RecommendIn):
 
 
 @app.get("/daily-verse")
-def daily_verse(lang: Optional[str] = Query(None, description="말씀 언어(미지원/비활성은 ko 폴백)")):
+def daily_verse(
+    lang: Optional[str] = Query(None, description="말씀 언어(미지원/비활성은 ko 폴백)"),
+    day: Optional[date_type] = Query(
+        None,
+        alias="date",
+        description="기기 현지 날짜 YYYY-MM-DD(#69). 없거나 지금 있을 수 없는 날짜면 서버 기본 시간대의 오늘",
+    ),
+):
     manager = _notification_manager()
-    return {"daily_verse": manager.get_daily_verse(lang=resolve_lang(lang))}
+    return {
+        "daily_verse": manager.get_daily_verse(
+            lang=resolve_lang(lang), day=manager.accept_local_date(day)
+        )
+    }
 
 
 # 관리용: 전체 토큰 목록 노출 → X-API-Key 필요.

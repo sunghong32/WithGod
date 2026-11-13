@@ -92,22 +92,26 @@ class DailyVerseProvider:
         self.path = Path(path)
 
     def get_daily_verse(self, now: datetime | None = None) -> DailyVerse:
-        verses = self._load()
-        if not verses:
-            raise RuntimeError("No daily verses configured")
         # now 미지정 시 서버 OS 타임존 대신 한국 시간 기준 '오늘'을 사용한다.
         # aware datetime 이 들어오면 그 타임존의 벽시계 날짜를 그대로 쓴다
         # (manager 가 push_default_timezone 으로 normalize 해서 넘겨준다).
         current = now if now is not None else datetime.now(_DEFAULT_TZ)
+        return self.verse_for_date(current.date())
+
+    def verse_for_date(self, day: date) -> DailyVerse:
+        """그 날짜의 오늘의 말씀. 날짜는 보는 사람의 현지 날짜다(#69) — 시간대는 부르는 쪽이 정한다."""
+        verses = self._load()
+        if not verses:
+            raise RuntimeError("No daily verses configured")
         # 절기에 고정된 말씀이 있으면 그것을 먼저 쓴다. 목록에서 못 찾으면
         # (말씀 목록이 바뀐 경우) 조용히 평소 회전으로 넘어간다.
         item = None
-        pinned = fixed_verse_id(current.date())
+        pinned = fixed_verse_id(day)
         if pinned:
             item = next((v for v in verses if v.get("verse_id") == pinned), None)
         if item is None:
             rotation = [v for v in verses if v.get("verse_id") not in _HOLIDAY_ONLY]
-            item = rotation[current.toordinal() % len(rotation)]
+            item = rotation[day.toordinal() % len(rotation)]
         return DailyVerse(
             verse_id=str(item["verse_id"]),
             reference=str(item["reference"]),
