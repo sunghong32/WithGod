@@ -1,3 +1,4 @@
+import { recallDeviceId, rememberDeviceId } from './deviceIdentity';
 import { getStorageItem, setStorageItem } from './storage';
 
 /**
@@ -28,33 +29,46 @@ export const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
 };
 
 /**
- * 설치별 안정적인 device_id 를 생성한다.
+ * 처음 쓰는 기기의 device_id 를 만든다.
  *
- * crypto/uuid 폴리필(react-native-get-random-values)이 설치돼 있지 않고
- * 신규 네이티브 의존성 추가가 금지돼 있어, 충분히 고유한 랜덤 문자열을
- * timestamp + 다중 Math.random 조합으로 생성한다. 한 번 생성하면 영속화하여
- * 재설치 전까지 동일한 값을 사용한다.
+ * crypto/uuid 폴리필(react-native-get-random-values)이 설치돼 있지 않아, 충분히
+ * 고유한 랜덤 문자열을 timestamp + 다중 Math.random 조합으로 만든다.
  */
 const generateDeviceId = (): string => {
   const random = () => Math.random().toString(36).slice(2, 10);
   return `dev-${Date.now().toString(36)}-${random()}${random()}`;
 };
 
-let cachedDeviceId: string | null = null;
+let deviceIdPromise: Promise<string> | null = null;
 
-export const getOrCreateDeviceId = async (): Promise<string> => {
-  if (cachedDeviceId) return cachedDeviceId;
-
+const loadDeviceId = async (): Promise<string> => {
   const existing = await getStorageItem(DEVICE_ID_KEY);
   if (existing) {
-    cachedDeviceId = existing;
+    void rememberDeviceId(existing);
     return existing;
   }
 
-  const created = generateDeviceId();
-  cachedDeviceId = created;
-  await setStorageItem(DEVICE_ID_KEY, created);
-  return created;
+  // 파일이 없다 = 새로 깔았거나 다시 깔았다. 앱을 지워도 남는 곳에서 먼저 찾는다(#79).
+  const id = (await recallDeviceId()) ?? generateDeviceId();
+  await setStorageItem(DEVICE_ID_KEY, id);
+  void rememberDeviceId(id);
+  return id;
+};
+
+/**
+ * 기기의 익명 ID. 지표(anon_id)와 푸시 기기 등록이 같이 쓴다.
+ *
+ * 앱 시작 때 지표와 푸시가 동시에 부르므로 한 번만 만든다 — 따로 만들면 새 기기에서
+ * 서로 다른 ID 가 생길 수 있다.
+ */
+export const getOrCreateDeviceId = (): Promise<string> => {
+  if (!deviceIdPromise) {
+    deviceIdPromise = loadDeviceId().catch((error: unknown) => {
+      deviceIdPromise = null;
+      throw error;
+    });
+  }
+  return deviceIdPromise;
 };
 
 const clampInt = (value: number, min: number, max: number): number => {
