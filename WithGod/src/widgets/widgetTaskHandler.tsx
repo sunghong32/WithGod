@@ -1,7 +1,7 @@
 import type { WidgetTaskHandlerProps } from "react-native-android-widget";
 
 import { getAppLanguage, initAppLanguage, t } from "@/shared/lib/i18n";
-import { localToday } from "@/shared/lib/localDate";
+import { verseToday } from "@/shared/lib/localDate";
 import { getStorageItem, removeStorageItem, setStorageItem } from "@/shared/lib/storage";
 
 import { DailyVerseWidget } from "./DailyVerseWidget";
@@ -100,7 +100,7 @@ export const getDailyVerseWithCache = async (): Promise<{
   // 선택/기기 언어를 먼저 반영해야 fetch 언어가 맞는다(리뷰 발견, v1.4.0).
   await initAppLanguage();
   const cached = await readCache();
-  const today = localToday();
+  const today = verseToday();
   const lang = getAppLanguage();
   if (cached && cached.day === today && cached.lang === lang) {
     return { reference: cached.reference, text: cached.text };

@@ -645,6 +645,13 @@ class DeviceRegisterIn(BaseModel):
         examples=["17.4.1"],
     )
     enabled: Optional[bool] = Field(None, examples=[True])
+    # 앱이 오늘의 말씀에 쓰는 날짜 기준(#69): "local"(기기 현지 날짜) | "kst". 푸시가 이를 따른다.
+    # 안 보내면(구버전 앱) 기존 값 유지, 새 기기는 한국 날짜.
+    verse_date: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("verse_date", "verseDate"),
+        examples=["local"],
+    )
 
 
 class DeviceDeleteOut(BaseModel):
@@ -808,6 +815,7 @@ def register_push_device(inp: DeviceRegisterIn):
             os_version=inp.osVersion or "",
             language=inp.language,
             enabled=inp.enabled,
+            verse_date=inp.verse_date,
             schedule_hour=inp.schedule_hour,
             schedule_minute=inp.schedule_minute,
         )

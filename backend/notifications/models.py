@@ -38,6 +38,10 @@ class DeviceRegistration:
     created_at: str = ""
     updated_at: str = ""
     last_daily_sent_on: str = ""
+    # 오늘의 말씀 날짜 기준(#69). "local" = 앱이 기기 현지 날짜로 말씀을 보여 준다고 알려 온 기기 —
+    # 푸시도 현지 날짜 말씀. 그 밖(""·"kst", 날짜 기준을 안 보내는 구버전 앱·1.6.1 전 iOS)은 한국 날짜.
+    # 홈·위젯·푸시가 늘 같은 말씀이 되게, 앱이 실제로 쓰는 기준을 앱이 직접 알린다.
+    verse_date: str = ""
 
 
 @dataclass(slots=True)

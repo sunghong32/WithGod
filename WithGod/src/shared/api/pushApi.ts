@@ -2,6 +2,7 @@ import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 
 import { getAppLanguage } from '@/shared/lib/i18n';
+import { verseDateMode, type VerseDateMode } from '@/shared/lib/localDate';
 
 import { parseError, logError } from './errors';
 import { apiClient } from './client';
@@ -32,6 +33,8 @@ export interface RegisterPushDevicePayload {
   schedule_minute?: number;
   app_version?: string;
   os_version?: string;
+  // 이 기기가 오늘의 말씀에 쓰는 날짜 기준(#69) — 서버가 푸시 말씀을 같은 날짜로 고른다
+  verse_date: VerseDateMode;
   // 현재 배포된 백엔드(camelCase)와의 하위호환을 위해 함께 전송
   deviceId?: string;
   appVersion?: string;
@@ -103,6 +106,7 @@ export const pushApi = {
       schedule_minute: resolvedMinute,
       app_version: resolvedAppVersion,
       os_version: resolvedOsVersion,
+      verse_date: verseDateMode(),
       // 하위호환(camelCase)
       deviceId,
       appVersion: resolvedAppVersion,

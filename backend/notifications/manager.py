@@ -59,8 +59,14 @@ class DailyVerseNotificationManager:
         utc_today = (now or datetime.now(dt_timezone.utc)).astimezone(dt_timezone.utc).date()
         return day if abs((day - utc_today).days) <= 1 else None
 
-    def _device_local_date(self, device: DeviceRegistration, now: datetime) -> date:
-        """기기 시간대의 날짜. 시간대가 깨져 있으면 기본 시간대(등록 때 검사하므로 드묾)."""
+    def _verse_day(self, device: DeviceRegistration, now: datetime) -> date:
+        """그 기기에 보낼 오늘의 말씀 날짜 — 앱이 홈·위젯에 쓰는 기준과 같게(#69).
+
+        앱이 "local" 이라고 알려 온 기기는 기기 시간대의 날짜, 나머지는 기본 시간대(한국)의 날짜.
+        시간대가 깨져 있으면 기본 시간대(등록 때 검사하므로 드묾).
+        """
+        if device.verse_date != "local":
+            return now.astimezone(self._resolve_timezone(self.settings.push_default_timezone)).date()
         try:
             tz = self._resolve_timezone(device.timezone or self.settings.push_default_timezone)
         except ValueError:
@@ -102,6 +108,7 @@ class DailyVerseNotificationManager:
         schedule_hour: int | None = None,
         schedule_minute: int | None = None,
         now: datetime | None = None,
+        verse_date: str | None = None,
     ) -> dict[str, object]:
         clean_token = token.strip()
         if not clean_token:
@@ -118,6 +125,9 @@ class DailyVerseNotificationManager:
 
         tz_name = (timezone or self.settings.push_default_timezone).strip()
         self._resolve_timezone(tz_name)
+        # 오늘의 말씀 날짜 기준(#69)은 "local"/"kst" 만 받는다. 안 보낸(구버전 앱)·모르는 값은 None → 기존 값 유지.
+        verse_mode = (verse_date or "").strip().lower()
+        verse_mode = verse_mode if verse_mode in ("local", "kst") else None
         # 그날 알림 시각이 지난 뒤 처음 등록된 기기는 캐치업 판정에 걸려 다음 폴링에 곧바로
         # 푸시가 나간다(#25). 새 행이면 오늘 몫은 보낸 것으로 쳐 두고 다음 날부터 받게 한다.
         # 기존 행은 upsert 가 last_daily_sent_on 을 보존하므로 시각을 바꿔도 그날 그대로 받는다.
@@ -141,6 +151,7 @@ class DailyVerseNotificationManager:
             schedule_hour=schedule_hour,
             schedule_minute=schedule_minute,
             last_daily_sent_on_if_created=sent_on_if_created,
+            verse_date=verse_mode,
         )
         return {
             "device": asdict(device),
@@ -161,8 +172,7 @@ class DailyVerseNotificationManager:
         if tokens:
             allowed = set(tokens)
             devices = [device for device in devices if device.token in allowed]
-        days = {device.token: self._device_local_date(device, current) for device in devices}
-        return self._send(devices, now=current, mark_sent=False, days=days)
+        return self._send(devices, now=current, mark_sent=False)
 
     def send_due_notifications(self, now: datetime | None = None) -> dict[str, object]:
         current = self._normalize_now(now)
@@ -183,12 +193,7 @@ class DailyVerseNotificationManager:
             due_devices.append(device)
             sent_dates[device.token] = local_date
 
-        outcome = self._send(
-            due_devices,
-            now=current,
-            mark_sent=False,
-            days={token: date.fromisoformat(day) for token, day in sent_dates.items()},
-        )
+        outcome = self._send(due_devices, now=current, mark_sent=False)
         result = outcome["result"]
         self.device_store.disable_tokens(result["invalid_tokens"])
         for device in due_devices:
@@ -207,12 +212,10 @@ class DailyVerseNotificationManager:
         devices: list[DeviceRegistration],
         now: datetime,
         mark_sent: bool,
-        days: dict[str, date] | None = None,
     ) -> dict[str, object]:
-        """발송. days 는 {토큰: 기기 현지 날짜} — 기기마다 그 날짜의 말씀을 보낸다(#69).
+        """발송. 기기마다 `_verse_day` 날짜의 말씀을 보낸다(#69).
 
-        days 에 없는 기기는 now 의 날짜(기본 시간대). 응답의 verse 는 기본 시간대 오늘의 말씀
-        (관리 화면·로그 호환), verses 는 실제로 보낸 {날짜: verse_id}.
+        응답의 verse 는 기본 시간대 오늘의 말씀(관리 화면·로그 호환), verses 는 실제로 보낸 {날짜: verse_id}.
         """
         verse = self.verse_provider.get_daily_verse(now=now)
         if not devices:
@@ -224,7 +227,7 @@ class DailyVerseNotificationManager:
 
         # (현지 날짜, 기기 언어)로 묶어 그날 말씀을 그 언어로 현지화해 발송한다. 발송 시점에
         # resolve_lang 으로 거르므로 비활성 언어 기기는 ko 그룹으로 온다.
-        day_of = {device.token: (days or {}).get(device.token, now.date()) for device in devices}
+        day_of = {device.token: self._verse_day(device, now) for device in devices}
         groups: dict[tuple[date, str], list[DeviceRegistration]] = {}
         for device in devices:
             groups.setdefault((day_of[device.token], resolve_lang(device.language)), []).append(device)

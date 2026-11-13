@@ -2,20 +2,20 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AppState } from "react-native";
-import { localToday } from "@/shared/lib/localDate";
+import { verseToday } from "@/shared/lib/localDate";
 import { verseApi, ApiError } from "../api";
 import { verseKeys } from "./keys";
 
 export function useDailyVerse() {
   // i18n.language 를 구독해 설정에서 언어를 바꾸면 말씀도 새 언어로 다시 불러온다.
   const { t, i18n } = useTranslation();
-  const [today, setToday] = useState(() => localToday());
+  const [today, setToday] = useState(() => verseToday());
 
   // 백그라운드에 있다가 돌아왔을 때 날짜가 바뀌었으면 쿼리 키가 바뀌어 새로 불러온다.
   useEffect(() => {
     const subscription = AppState.addEventListener("change", (state) => {
       if (state === "active") {
-        setToday(localToday());
+        setToday(verseToday());
       }
     });
     return () => subscription.remove();
@@ -23,7 +23,7 @@ export function useDailyVerse() {
 
   const query = useQuery({
     queryKey: verseKeys.daily(today, i18n.language),
-    // 기기 현지 날짜를 보내 그날 말씀을 받는다(#69).
+    // 이 기기의 말씀 날짜(현지 또는 한국 — localDate.ts)를 보내 그날 말씀을 받는다(#69).
     queryFn: () => verseApi.getDailyVerse(today),
     retry: (failureCount, error) => {
       // ApiError인 경우 retryable 체크

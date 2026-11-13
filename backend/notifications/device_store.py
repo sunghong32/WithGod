@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from datetime import datetime, timezone as dt_timezone
 from pathlib import Path
 from threading import Lock
@@ -36,6 +36,7 @@ class DeviceStore:
         schedule_minute: int | None = None,
         # 새 행에만 쓰는 초기 last_daily_sent_on. 기존 행은 보존값을 그대로 둔다(#25).
         last_daily_sent_on_if_created: str = "",
+        verse_date: str | None = None,
     ) -> tuple[DeviceRegistration, bool]:
         with self._lock:
             devices = self._read_all()
@@ -66,6 +67,7 @@ class DeviceStore:
                     created_at=existing.created_at or now,
                     updated_at=now,
                     last_daily_sent_on=existing.last_daily_sent_on,
+                    verse_date=existing.verse_date if verse_date is None else verse_date,
                 )
                 self._write_all(devices)
                 return devices[match_index], False
@@ -84,6 +86,7 @@ class DeviceStore:
                 created_at=now,
                 updated_at=now,
                 last_daily_sent_on=last_daily_sent_on_if_created,
+                verse_date=verse_date or "",
             )
             devices.append(created)
             self._write_all(devices)
@@ -121,18 +124,8 @@ class DeviceStore:
             for index, device in enumerate(devices):
                 if device.token != token:
                     continue
-                devices[index] = DeviceRegistration(
-                    token=device.token,
-                    platform=device.platform,
-                    timezone=device.timezone,
-                    device_id=device.device_id,
-                    app_version=device.app_version,
-                    os_version=device.os_version,
-                    language=device.language,
-                    enabled=device.enabled,
-                    schedule_hour=device.schedule_hour,
-                    schedule_minute=device.schedule_minute,
-                    created_at=device.created_at,
+                devices[index] = replace(
+                    device,
                     updated_at=datetime.now(dt_timezone.utc).isoformat(),
                     last_daily_sent_on=local_date,
                 )
@@ -152,21 +145,7 @@ class DeviceStore:
             for index, device in enumerate(devices):
                 if device.token not in blocked:
                     continue
-                devices[index] = DeviceRegistration(
-                    token=device.token,
-                    platform=device.platform,
-                    timezone=device.timezone,
-                    device_id=device.device_id,
-                    app_version=device.app_version,
-                    os_version=device.os_version,
-                    language=device.language,
-                    enabled=False,
-                    schedule_hour=device.schedule_hour,
-                    schedule_minute=device.schedule_minute,
-                    created_at=device.created_at,
-                    updated_at=now,
-                    last_daily_sent_on=device.last_daily_sent_on,
-                )
+                devices[index] = replace(device, enabled=False, updated_at=now)
                 changed = True
             if changed:
                 self._write_all(devices)
@@ -190,6 +169,7 @@ class DeviceStore:
                 created_at=str(item.get("created_at", "")),
                 updated_at=str(item.get("updated_at", "")),
                 last_daily_sent_on=str(item.get("last_daily_sent_on", "")),
+                verse_date=str(item.get("verse_date", "")),
             )
             for item in raw
         ]
