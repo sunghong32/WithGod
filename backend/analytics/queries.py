@@ -88,17 +88,26 @@ def get_timeseries(db_path: str, days: int = 30, now: datetime | None = None) ->
                 (start, today),
             )
         }
-        # 롤업이 아직 안 돈 날(주로 오늘)은 즉석에서 채운다.
+        # 롤업이 아직 안 돈 날과 오늘은 즉석에서 센다. 롤업(새벽 3시)은 오늘도
+        # 굳혀 두는데, 그 값을 쓰면 오늘 막대가 새벽 값에 멈춰 카드와 어긋난다(#75).
         series: list[dict[str, Any]] = []
         for offset in range(days):
             day = _shift(start, offset)
-            if day in rolled:
+            if day in rolled and day != today:
                 series.append(rolled[day])
                 continue
             dau = _active_between(conn, day, day)
             new_users = conn.execute(
                 "SELECT COUNT(*) FROM device_profile WHERE first_day = ?", (day,)
             ).fetchone()[0]
+            activity = conn.execute(
+                """
+                SELECT COUNT(*) AS events,
+                       COUNT(DISTINCT CASE WHEN session_id <> '' THEN session_id END) AS sessions
+                FROM events WHERE day = ?
+                """,
+                (day,),
+            ).fetchone()
             series.append(
                 {
                     "day": day,
@@ -107,8 +116,8 @@ def get_timeseries(db_path: str, days: int = 30, now: datetime | None = None) ->
                     "returning_users": max(0, dau - new_users),
                     "wau": _active_between(conn, _shift(day, -6), day),
                     "mau": _active_between(conn, _shift(day, -29), day),
-                    "sessions": 0,
-                    "events": 0,
+                    "sessions": activity["sessions"],
+                    "events": activity["events"],
                 }
             )
     return series

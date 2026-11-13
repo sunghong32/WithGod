@@ -243,6 +243,36 @@ class QueriesTest(AnalyticsTestBase):
         self.assertEqual(overview["dau"], 1)
         self.assertEqual(overview["new_users"], 1)
 
+    def test_today_bar_is_not_frozen_at_early_rollup(self):
+        # #75: 새벽 롤업이 오늘을 1명으로 굳힌 뒤 사용자가 더 들어와도
+        # 그래프의 오늘 막대는 카드와 같은 실시간 값이어야 한다.
+        dawn = kst(2026, 7, 23, hour=3)
+        ingest_batch(self.db, batch("early", [event("e1")]), received_at=dawn - timedelta(days=3))
+        ingest_batch(self.db, batch("early", [event("e2")]), received_at=dawn)
+        run_rollup(self.db, now=dawn)
+
+        afternoon = kst(2026, 7, 23, hour=15)
+        for i in range(3):
+            ingest_batch(
+                self.db,
+                batch(f"late-{i}", [event(f"late-{i}", session_id=f"s-late-{i}")]),
+                received_at=afternoon,
+            )
+
+        series = queries.get_timeseries(self.db, days=7, now=afternoon)
+        overview = queries.get_overview(self.db, now=afternoon)
+        today = series[-1]
+        self.assertEqual(today["day"], "2026-07-23")
+        self.assertEqual(today["dau"], overview["dau"])
+        self.assertEqual(today["dau"], 4)
+        self.assertEqual(today["new_users"], 3)
+        self.assertEqual(today["returning_users"], 1)
+        self.assertEqual(today["events"], overview["events"])
+        self.assertEqual(today["sessions"], overview["sessions"])
+        # 지난 날은 여전히 굳힌 값을 쓴다.
+        three_days_ago = next(p for p in series if p["day"] == "2026-07-20")
+        self.assertEqual(three_days_ago["dau"], 1)
+
     def test_event_counts_group_by_name(self):
         now = kst(2026, 7, 23)
         ingest_batch(
