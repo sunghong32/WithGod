@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict
-from datetime import datetime
+from datetime import date, datetime, timezone as dt_timezone
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from languages import DAILY_VERSE_TITLES, localize_ko_ref, normalize_lang, resolve_lang
@@ -30,14 +30,42 @@ class DailyVerseNotificationManager:
         self.verse_interpreter = verse_interpreter
         self.retry_backoff = retry_backoff or RetryBackoff()
 
-    def get_daily_verse(self, now: datetime | None = None, lang: str = "ko") -> dict[str, str]:
-        # naive now(또는 None)가 그대로 흘러가면 서버 OS 타임존(UTC 등) 기준 날짜가
-        # 되므로, 항상 push_default_timezone 기준으로 normalize 해서 넘긴다.
-        source = self.verse_provider.get_daily_verse(now=self._normalize_now(now))
+    def get_daily_verse(
+        self, now: datetime | None = None, lang: str = "ko", day: date | None = None
+    ) -> dict[str, str]:
+        """오늘의 말씀. day 는 기기 현지 날짜(#69, `accept_local_date` 로 거른 값).
+
+        day 가 없으면(구버전 앱·위젯) 지금처럼 push_default_timezone 의 오늘. naive now(또는 None)가
+        그대로 흘러가면 서버 OS 타임존(UTC 등) 기준 날짜가 되므로 항상 normalize 해서 넘긴다.
+        """
+        if day is not None:
+            source = self.verse_provider.verse_for_date(day)
+        else:
+            source = self.verse_provider.get_daily_verse(now=self._normalize_now(now))
         verse = self._localize_verse(source, lang)
         if self.verse_interpreter is not None:
             verse.interpretation = self.verse_interpreter.interpret(verse, lang, source=source)
         return asdict(verse)
+
+    @staticmethod
+    def accept_local_date(day: date | None, now: datetime | None = None) -> date | None:
+        """앱이 보낸 기기 현지 날짜를 받아도 되면 그대로, 아니면 None(→ 기본 시간대의 오늘).
+
+        지금 이 순간 지구 어딘가의 날짜일 수 있는 것(UTC−12 ~ UTC+14, 곧 UTC 날짜 ±1일)만 받는다.
+        시계가 크게 틀린 기기나 손으로 만든 요청이 먼 날의 말씀을 받아 가지 않게 한다.
+        """
+        if day is None:
+            return None
+        utc_today = (now or datetime.now(dt_timezone.utc)).astimezone(dt_timezone.utc).date()
+        return day if abs((day - utc_today).days) <= 1 else None
+
+    def _device_local_date(self, device: DeviceRegistration, now: datetime) -> date:
+        """기기 시간대의 날짜. 시간대가 깨져 있으면 기본 시간대(등록 때 검사하므로 드묾)."""
+        try:
+            tz = self._resolve_timezone(device.timezone or self.settings.push_default_timezone)
+        except ValueError:
+            tz = self._resolve_timezone(self.settings.push_default_timezone)
+        return now.astimezone(tz).date()
 
     @staticmethod
     def _localize_verse(verse: DailyVerse, lang: str) -> DailyVerse:
@@ -133,7 +161,8 @@ class DailyVerseNotificationManager:
         if tokens:
             allowed = set(tokens)
             devices = [device for device in devices if device.token in allowed]
-        return self._send(devices, now=current, mark_sent=False)
+        days = {device.token: self._device_local_date(device, current) for device in devices}
+        return self._send(devices, now=current, mark_sent=False, days=days)
 
     def send_due_notifications(self, now: datetime | None = None) -> dict[str, object]:
         current = self._normalize_now(now)
@@ -154,7 +183,12 @@ class DailyVerseNotificationManager:
             due_devices.append(device)
             sent_dates[device.token] = local_date
 
-        outcome = self._send(due_devices, now=current, mark_sent=False)
+        outcome = self._send(
+            due_devices,
+            now=current,
+            mark_sent=False,
+            days={token: date.fromisoformat(day) for token, day in sent_dates.items()},
+        )
         result = outcome["result"]
         self.device_store.disable_tokens(result["invalid_tokens"])
         for device in due_devices:
@@ -173,23 +207,34 @@ class DailyVerseNotificationManager:
         devices: list[DeviceRegistration],
         now: datetime,
         mark_sent: bool,
+        days: dict[str, date] | None = None,
     ) -> dict[str, object]:
+        """발송. days 는 {토큰: 기기 현지 날짜} — 기기마다 그 날짜의 말씀을 보낸다(#69).
+
+        days 에 없는 기기는 now 의 날짜(기본 시간대). 응답의 verse 는 기본 시간대 오늘의 말씀
+        (관리 화면·로그 호환), verses 는 실제로 보낸 {날짜: verse_id}.
+        """
         verse = self.verse_provider.get_daily_verse(now=now)
         if not devices:
             return {
                 "verse": asdict(verse),
+                "verses": {},
                 "result": asdict(PushDispatchResult(success_count=0, failure_count=0)),
             }
 
-        # 기기 언어별로 묶어 제목·본문을 현지화해 발송한다. 발송 시점에
+        # (현지 날짜, 기기 언어)로 묶어 그날 말씀을 그 언어로 현지화해 발송한다. 발송 시점에
         # resolve_lang 으로 거르므로 비활성 언어 기기는 ko 그룹으로 온다.
-        groups: dict[str, list[DeviceRegistration]] = {}
+        day_of = {device.token: (days or {}).get(device.token, now.date()) for device in devices}
+        groups: dict[tuple[date, str], list[DeviceRegistration]] = {}
         for device in devices:
-            groups.setdefault(resolve_lang(device.language), []).append(device)
+            groups.setdefault((day_of[device.token], resolve_lang(device.language)), []).append(device)
 
+        verses: dict[date, DailyVerse] = {}
         dispatch = PushDispatchResult(success_count=0, failure_count=0)
-        for lang, group_devices in groups.items():
-            localized = self._localize_verse(verse, lang)
+        for (day, lang), group_devices in groups.items():
+            if day not in verses:
+                verses[day] = self.verse_provider.verse_for_date(day)
+            localized = self._localize_verse(verses[day], lang)
             title_word = DAILY_VERSE_TITLES.get(lang, DAILY_VERSE_TITLES["ko"])
             title = f"{title_word} | {localized.reference}"
             payload = PushPayload(
@@ -213,12 +258,12 @@ class DailyVerseNotificationManager:
             dispatch.failed_tokens.extend(part.failed_tokens)
 
         if mark_sent:
-            local_date = now.date().isoformat()
             for device in devices:
                 if device.token not in dispatch.failed_tokens:
-                    self.device_store.mark_sent(device.token, local_date)
+                    self.device_store.mark_sent(device.token, day_of[device.token].isoformat())
         return {
             "verse": asdict(verse),
+            "verses": {day.isoformat(): v.verse_id for day, v in sorted(verses.items())},
             "result": asdict(dispatch),
         }
 

@@ -604,6 +604,65 @@ class LanguageFeatureTest(NotificationFeatureTest):
         stored = self.store.list_devices()[-1]
         self.assertEqual(stored.language, "ko")
 
+    # ── 기기 현지 날짜(#69) ──────────────────────────────────────
+
+    def test_verse_for_date_matches_daily_verse_of_that_day(self) -> None:
+        day = date(2026, 4, 21)
+        self.assertEqual(
+            self.provider.verse_for_date(day).verse_id,
+            self.provider.get_daily_verse(now=datetime(2026, 4, 21, 9, 0)).verse_id,
+        )
+
+    def test_get_daily_verse_uses_given_local_date(self) -> None:
+        # 한국은 이미 4/22 지만 미국 동부 기기가 보낸 날짜(4/21)의 말씀을 낸다.
+        now = datetime(2026, 4, 21, 15, 30, tzinfo=ZoneInfo("UTC"))
+        served = self.manager.get_daily_verse(now=now, day=date(2026, 4, 21))
+        self.assertEqual(served["verse_id"], self.provider.verse_for_date(date(2026, 4, 21)).verse_id)
+        # 날짜가 없으면(구버전 앱) 지금처럼 기본 시간대(한국)의 오늘.
+        legacy = self.manager.get_daily_verse(now=now)
+        self.assertEqual(legacy["verse_id"], self.provider.verse_for_date(date(2026, 4, 22)).verse_id)
+
+    def test_accept_local_date_only_within_a_day_of_utc(self) -> None:
+        now = datetime(2026, 4, 21, 12, 0, tzinfo=ZoneInfo("UTC"))
+        accept = DailyVerseNotificationManager.accept_local_date
+        for day in (date(2026, 4, 20), date(2026, 4, 21), date(2026, 4, 22)):
+            self.assertEqual(accept(day, now), day)
+        self.assertIsNone(accept(date(2026, 4, 19), now))
+        self.assertIsNone(accept(date(2026, 4, 23), now))
+        self.assertIsNone(accept(None, now))
+
+    def _register_ny_and_seoul(self) -> None:
+        # 둘 다 한국어 — 현지화 없이 날짜만 본다. 미국 동부 09:00, 한국 00:00 알림.
+        registered_at = datetime(2026, 4, 21, 0, 0, tzinfo=ZoneInfo("UTC"))
+        self.manager.register_device(token="tok-ny", platform="ios", timezone="America/New_York",
+                                     language="ko", schedule_hour=9, schedule_minute=0, now=registered_at)
+        self.manager.register_device(token="tok-seoul", platform="android", timezone="Asia/Seoul",
+                                     language="ko", schedule_hour=0, schedule_minute=0, now=registered_at)
+
+    def _verse_by_token(self) -> dict[str, str]:
+        return {device.token: payload.data["verseId"]
+                for devices, payload in self.gateway.calls for device in devices}
+
+    def test_due_push_sends_each_device_its_local_date_verse(self) -> None:
+        self._register_ny_and_seoul()
+        # UTC 4/21 15:30 = 미국 동부 4/21 11:30(EDT) · 한국 4/22 00:30
+        result = self.manager.send_due_notifications(now=datetime(2026, 4, 21, 15, 30, tzinfo=ZoneInfo("UTC")))
+        ny_verse = self.provider.verse_for_date(date(2026, 4, 21)).verse_id
+        seoul_verse = self.provider.verse_for_date(date(2026, 4, 22)).verse_id
+        self.assertNotEqual(ny_verse, seoul_verse)
+        self.assertEqual(self._verse_by_token(), {"tok-ny": ny_verse, "tok-seoul": seoul_verse})
+        self.assertEqual(result["verses"], {"2026-04-21": ny_verse, "2026-04-22": seoul_verse})
+        sent_on = {d.token: d.last_daily_sent_on for d in self.store.list_devices()}
+        self.assertEqual(sent_on, {"tok-ny": "2026-04-21", "tok-seoul": "2026-04-22"})
+
+    def test_send_now_uses_each_device_local_date(self) -> None:
+        self._register_ny_and_seoul()
+        self.manager.send_daily_verse_now(now=datetime(2026, 4, 21, 15, 30, tzinfo=ZoneInfo("UTC")))
+        self.assertEqual(self._verse_by_token(), {
+            "tok-ny": self.provider.verse_for_date(date(2026, 4, 21)).verse_id,
+            "tok-seoul": self.provider.verse_for_date(date(2026, 4, 22)).verse_id,
+        })
+
     def test_send_groups_devices_by_language(self) -> None:
         from unittest.mock import patch
 

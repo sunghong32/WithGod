@@ -1,6 +1,7 @@
 import type { WidgetTaskHandlerProps } from "react-native-android-widget";
 
 import { getAppLanguage, initAppLanguage, t } from "@/shared/lib/i18n";
+import { localToday } from "@/shared/lib/localDate";
 import { getStorageItem, removeStorageItem, setStorageItem } from "@/shared/lib/storage";
 
 import { DailyVerseWidget } from "./DailyVerseWidget";
@@ -8,8 +9,8 @@ import { DailyVerseWidget } from "./DailyVerseWidget";
 /**
  * 안드로이드 위젯 갱신 핸들러.
  *
- * updatePeriodMillis(30분)마다 헤드리스 JS 로 깨어나지만, 오늘의 말씀은 KST
- * 날짜 기준으로만 바뀌므로 캐시 날짜가 오늘과 같으면 네트워크를 건너뛴다
+ * updatePeriodMillis(30분)마다 헤드리스 JS 로 깨어나지만, 오늘의 말씀은 기기 현지
+ * 날짜 기준으로만 바뀌므로(#69) 캐시 날짜가 오늘과 같으면 네트워크를 건너뛴다
  * (실제 API 호출은 하루 1회). 헤드리스 태스크 전체 타임아웃이 30초라
  * fetch 타임아웃을 10초로 짧게 잡는다.
  */
@@ -24,10 +25,6 @@ interface CachedVerse {
   reference: string;
   text: string;
 }
-
-// KST(UTC+9) 기준 오늘 날짜. useDailyVerse 의 kstToday 와 동일한 규칙.
-const kstToday = (): string =>
-  new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
 const readCache = async (): Promise<CachedVerse | null> => {
   try {
@@ -51,16 +48,17 @@ const readCache = async (): Promise<CachedVerse | null> => {
   }
 };
 
-const fetchDailyVerse = async (): Promise<{
+const fetchDailyVerse = async (day: string): Promise<{
   reference: string;
   text: string;
 }> => {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   try {
-    // 언어 파라미터 — 서버가 미지원/비활성 언어는 ko 로 폴백한다(이슈 #12)
+    // 언어 파라미터 — 서버가 미지원/비활성 언어는 ko 로 폴백한다(이슈 #12).
+    // 날짜 — 기기 현지 날짜의 말씀을 받는다(#69).
     const response = await fetch(
-      `${API_URL}?lang=${encodeURIComponent(getAppLanguage())}`,
+      `${API_URL}?lang=${encodeURIComponent(getAppLanguage())}&date=${day}`,
       { signal: controller.signal },
     );
     if (!response.ok) {
@@ -102,14 +100,14 @@ export const getDailyVerseWithCache = async (): Promise<{
   // 선택/기기 언어를 먼저 반영해야 fetch 언어가 맞는다(리뷰 발견, v1.4.0).
   await initAppLanguage();
   const cached = await readCache();
-  const today = kstToday();
+  const today = localToday();
   const lang = getAppLanguage();
   if (cached && cached.day === today && cached.lang === lang) {
     return { reference: cached.reference, text: cached.text };
   }
 
   try {
-    const verse = await fetchDailyVerse();
+    const verse = await fetchDailyVerse(today);
     await setStorageItem(
       CACHE_KEY,
       JSON.stringify({ day: today, lang, ...verse } satisfies CachedVerse),

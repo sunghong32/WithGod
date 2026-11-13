@@ -128,7 +128,7 @@ struct Provider: TimelineProvider {
         VerseCache.save(verse)
         let entry = VerseEntry(date: Date(), reference: verse.reference, text: verse.text)
         // WidgetKit 갱신은 best-effort라 자정 정각이 아닌 자정 직후로 요청한다
-        completion(Timeline(entries: [entry], policy: .after(nextKstMidnight())))
+        completion(Timeline(entries: [entry], policy: .after(nextLocalMidnight())))
       } catch {
         // 네트워크 실패: 마지막 말씀 유지 + 30분 후 재시도
         let fallback = VerseCache.load()
@@ -145,8 +145,12 @@ struct Provider: TimelineProvider {
   private func fetchDailyVerse() async throws -> DailyVerse {
     // 위젯 언어(앱 내 선택 우선, 없으면 기기 언어 — L10n.lang)로 말씀을 요청한다.
     // 미지원 언어는 서버가 한국어로 폴백한다(이슈 #12·#14).
+    // 기기 현지 날짜의 말씀을 받는다(#69). 서버는 지금 있을 수 없는 날짜면 한국 날짜로 낸다.
     var components = URLComponents(string: "https://mincha.co.kr/daily-verse")!
-    components.queryItems = [URLQueryItem(name: "lang", value: L10n.lang)]
+    components.queryItems = [
+      URLQueryItem(name: "lang", value: L10n.lang),
+      URLQueryItem(name: "date", value: localToday()),
+    ]
     guard let url = components.url else {
       throw URLError(.badURL)
     }
@@ -156,11 +160,20 @@ struct Provider: TimelineProvider {
     return try JSONDecoder().decode(DailyVerseResponse.self, from: data).daily_verse
   }
 
-  /// 다음 KST 자정 + 5분. 서버의 오늘의 말씀이 KST 날짜 기준으로 바뀌므로
-  /// 기기 시간대와 무관하게 Asia/Seoul 로 계산한다.
-  private func nextKstMidnight() -> Date {
+  /// 기기 현지 날짜 YYYY-MM-DD. 오늘의 말씀은 이 날짜로 고른다(#69).
+  private func localToday() -> String {
+    let formatter = DateFormatter()
+    formatter.calendar = Calendar(identifier: .gregorian)
+    formatter.locale = Locale(identifier: "en_US_POSIX")
+    formatter.timeZone = .current
+    formatter.dateFormat = "yyyy-MM-dd"
+    return formatter.string(from: Date())
+  }
+
+  /// 다음 현지 자정 + 5분. 오늘의 말씀이 기기 현지 날짜로 바뀐다(#69).
+  private func nextLocalMidnight() -> Date {
     var calendar = Calendar(identifier: .gregorian)
-    calendar.timeZone = TimeZone(identifier: "Asia/Seoul") ?? .current
+    calendar.timeZone = .current
     let startOfToday = calendar.startOfDay(for: Date())
     let nextMidnight =
       calendar.date(byAdding: .day, value: 1, to: startOfToday)
