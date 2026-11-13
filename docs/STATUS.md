@@ -68,6 +68,10 @@ min_supported 는 1.0.0 유지(강제 업데이트 사유 없음).
       결과는 텔레그램. 지난 날 다시 올리기는 `--date YYYY-MM-DD --force`(11/13 에 11/12 몫을 그림 표지로 다시 올림). 카피·그림은 **이 맥에서 2주치씩** 앞서 만든다 — 지금 11/12~27 준비, 알림의 「준비된 날」이 7일 아래면 다음 묶음.
       카피는 `backend/instagram/copy_en.json` 에 세션에서 직접 쓴다(API 금지), 그림은 `scripts/gen_ig_art.py`(로컬 Z-Image-Turbo,
       서양 2D 애니메이션풍; 예수님 장면은 퍼블릭 도메인 성화), 렌더·업로드 `scripts/build_ig_daily_posts.py --upload`. 요령은 메모리 `instagram-account`
+- [ ] **인스타 릴스 — 첫 편 엘리야(성경 인물 이야기, 58초) 11/14 09:00 KST(미국 11/13 19:00) 예약.** 그림 위 카메라 이동 + 자막 + 직접 작곡한 음악.
+      이 맥 launchd `com.minsunghong.withgod-ig-reel-elijah` → `~/.local/share/withgod-ig-reels/elijah/publish.py`(컨테이너는 미리 만들어 FINISHED 확인, 게시 후 텔레그램·plist 삭제,
+      로그 `~/Library/Logs/withgod-ig-reel.log`). 렌더러·음악(Swift + macOS 기본 악기)·그림은 워크트리 `ig-daily-verse-3cbd0f/backend/instagram/build/reel-proto/`(git 제외).
+      기획(사용자 결정): 오늘의 말씀 재탕 없음 · 월 인물 이야기 · 수 앱 시연 · 금 번갈아(그 시절 생활 등). AI 영상 모델은 너무 느려 안 씀. 요령은 메모리 `instagram-account`
 - [x] **인스타 런칭 게시물 — 끝(11/12, 7개).** 오늘의 말씀과 겹치는 말씀 카드 2개(06·04)는 사용자 결정으로 뺐고, 남은 4개는 11/12 오전에 바로 게시.
       결과물·생성기 `docs/instagram/launch/`·`tools/make_launch_posts.py`, 게시 기록 `launch/posted.json`. 상단 고정(소개·사용법·잠 못 드는 밤) 완료(11/12, 앱에서 사용자가). launchd plist 는 지워도 된다
 - [x] **11/9 병합분 배포 — 완료(11/9).** 백엔드 PR 9개 운영 서버 `da6df40`(서버 테스트 177개, 재시작 6초).
@@ -143,6 +147,7 @@ min_supported 는 1.0.0 유지(강제 업데이트 사유 없음).
 - 2026-11-13 feat(app): #79 재설치해도 같은 익명 ID — iOS 키체인(expo-secure-store, Face ID 문구·안드로이드 백업 규칙 끔)·Android ANDROID_ID 해시(expo-application). 네이티브 모듈이 없으면(1.6.x 바이너리로 가는 OTA) 지금처럼 파일만 씀. 지표·푸시가 동시에 ID 를 만들던 경쟁도 막음. 다음 스토어 빌드부터 켜짐
 - 2026-11-13 fix(backend): #75 지표 대시보드 「일별 활성 사용자」 오늘 막대가 새벽 3시 롤업 값에 멈춤(카드 11 · 막대 1) — 롤업이 오늘도 굳히는데 그래프가 그 값을 먼저 씀. 오늘은 카드처럼 실시간으로 셈(PR #76) · 운영 배포 `a8d63ea`(서버 테스트 242개, 재시작 22초), 운영 API 로 카드 = 오늘 막대 확인
 - 2026-11-13 feat/release: #69 오늘의 말씀 날짜 — 현지 날짜(PR #70) 뒤 홈·위젯·푸시를 기기마다 맞춤(PR #72, 앱이 `verse_date` 로 알림), 서버 배포, OTA 1.6.0·1.5.0, 1.6.1 제출(iOS 62 심사·Android vc29 3트랙)
+- 2026-11-13 feat(instagram): 첫 릴스 엘리야 편 — 사용자 피드백 5회(누구인지 먼저·장면 건너뛰지 않기·말씀만 금색·끝 멘트 오래)로 다듬고 음악 작곡, 11/14 09:00 KST launchd 예약. 로컬 영상 모델(Wan 2.2)은 3.4초에 48분이라 시험 후 삭제
 - 2026-11-13 ops(instagram): 11/12 시편 34:18 을 그림 표지로 다시 게시(사용자 요청, `/p/Dfq0TjOHzvw/`) — 예전 글 표지 게시물(`/p/DfpAav9nz75/`)은 남아 있다(지우기는 앱에서)
 - 2026-11-13 feat(backend): #62 Daily Verse 첫 장을 그림으로 — 글 카드가 첫 장이면 다른 말씀 계정과 구별이 안 된다는 사용자 지적. 시안 3개 중 B(그림 꽉 채움 + 감정 라벨) 선택, 16일치 다시 렌더(가로 그림이라 `scene.focus` 로 자르는 위치 조정)
 - 2026-11-12 feat(backend): #62 인스타 Daily Verse 자동 게시 — 캐러셀(표지·장면·앱 풀이), 2주치 15개(46장), 로컬 오픈소스 모델로 장면 그림(장당 70초, 8비트 저장 모델), S3 비공개 버킷 + 임시 서명 주소, systemd 타이머 07:00 ET, 11/12 첫 게시(PR #63·#64)
