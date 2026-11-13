@@ -51,24 +51,24 @@ def run_rollup(
 
 def _rollup_day(conn: sqlite3.Connection, day: str, now: datetime) -> None:
     dau = conn.execute(
-        "SELECT COUNT(*) FROM daily_active WHERE day = ?", (day,)
+        "SELECT COUNT(*) FROM user_active WHERE day = ?", (day,)
     ).fetchone()[0]
     new_users = conn.execute(
-        "SELECT COUNT(*) FROM device_profile WHERE first_day = ?", (day,)
+        "SELECT COUNT(*) FROM user_profile WHERE first_day = ?", (day,)
     ).fetchone()[0]
     wau = conn.execute(
-        "SELECT COUNT(DISTINCT anon_id) FROM daily_active WHERE day BETWEEN ? AND ?",
+        "SELECT COUNT(DISTINCT anon_id) FROM user_active WHERE day BETWEEN ? AND ?",
         (_shift(day, -6), day),
     ).fetchone()[0]
     mau = conn.execute(
-        "SELECT COUNT(DISTINCT anon_id) FROM daily_active WHERE day BETWEEN ? AND ?",
+        "SELECT COUNT(DISTINCT anon_id) FROM user_active WHERE day BETWEEN ? AND ?",
         (_shift(day, -29), day),
     ).fetchone()[0]
 
     row = conn.execute(
         """
         SELECT COUNT(*) AS events, COUNT(DISTINCT session_id) AS sessions
-        FROM events WHERE day = ?
+        FROM user_events WHERE day = ?
         """,
         (day,),
     ).fetchone()
@@ -121,14 +121,14 @@ def _recompute_retention(conn: sqlite3.Connection, today: str) -> int:
     cohorts = [
         row["first_day"]
         for row in conn.execute(
-            "SELECT DISTINCT first_day FROM device_profile WHERE first_day >= ?",
+            "SELECT DISTINCT first_day FROM user_profile WHERE first_day >= ?",
             (oldest,),
         )
     ]
 
     for cohort_day in cohorts:
         size = conn.execute(
-            "SELECT COUNT(*) FROM device_profile WHERE first_day = ?", (cohort_day,)
+            "SELECT COUNT(*) FROM user_profile WHERE first_day = ?", (cohort_day,)
         ).fetchone()[0]
         if size == 0:
             continue
@@ -141,7 +141,7 @@ def _recompute_retention(conn: sqlite3.Connection, today: str) -> int:
             retained = conn.execute(
                 """
                 SELECT COUNT(*)
-                FROM device_profile p
+                FROM user_profile p
                 JOIN daily_active a ON a.anon_id = p.anon_id AND a.day = ?
                 WHERE p.first_day = ?
                 """,
