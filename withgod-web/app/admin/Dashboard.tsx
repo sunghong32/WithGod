@@ -205,13 +205,22 @@ export function Dashboard() {
                 label="오늘 신규"
                 value={data.overview.new_users}
                 previous={data.overview.new_users_prev}
+                hint={
+                  data.overview.review_devices_today
+                    ? `심사·테스트 기기 ${data.overview.review_devices_today}대 제외`
+                    : undefined
+                }
               />
               <StatTile label="주간 활성 (WAU)" value={data.overview.wau} />
               <StatTile label="월간 활성 (MAU)" value={data.overview.mau} />
               <StatTile
                 label="총 사용자"
                 value={data.overview.total_users}
-                hint="기기 기준 · 재설치하면 새 사용자로 잡힙니다"
+                hint={
+                  data.overview.review_devices
+                    ? `기기 기준 · 심사·테스트 기기 ${data.overview.review_devices}대 제외`
+                    : "기기 기준 · 재설치하면 새 사용자로 잡힙니다"
+                }
               />
               <StatTile label="오늘 재방문" value={data.overview.returning_users} />
               <StatTile

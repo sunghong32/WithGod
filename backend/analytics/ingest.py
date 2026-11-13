@@ -118,6 +118,7 @@ def _touch_device(
     os_version: str,
     tz: str,
 ) -> None:
+    _record_upgrade(conn, anon_id, day, platform, app_version)
     # first_day 는 한 번 정해지면 절대 덮어쓰지 않는다 — 신규 사용자 판정과
     # 리텐션 코호트가 전부 이 값에 걸려 있다.
     conn.execute(
@@ -139,3 +140,57 @@ def _touch_device(
         """,
         (anon_id, day, day, platform, app_version, app_version, os_version, tz),
     )
+
+
+# 이만큼의 기존 기기가 새 버전으로 올라오면 그날을 공개일로 본다. 1대면
+# 개발자 본인의 TestFlight·내부 테스트 설치일 수 있다.
+PUBLIC_UPGRADE_THRESHOLD = 2
+
+
+def _version_key(version: str) -> tuple[int, ...] | None:
+    try:
+        return tuple(int(part) for part in version.split("."))
+    except ValueError:
+        return None
+
+
+def _record_upgrade(
+    conn: sqlite3.Connection,
+    anon_id: str,
+    day: str,
+    platform: str,
+    app_version: str,
+) -> None:
+    """기존 기기가 더 높은 버전으로 올라왔으면 기록하고, 공개일을 정한다.
+
+    스토어에 공개돼야 기존 사용자가 업데이트를 받는다. 심사·출시 전 테스트
+    기기는 늘 새로 설치하므로 이 신호에 섞이지 않는다.
+    """
+    new_key = _version_key(app_version) if app_version else None
+    if new_key is None or platform not in ("ios", "android"):
+        return
+    row = conn.execute(
+        "SELECT first_day, last_app_version FROM device_profile WHERE anon_id = ?",
+        (anon_id,),
+    ).fetchone()
+    if row is None or row["first_day"] >= day:
+        return
+    old_key = _version_key(row["last_app_version"] or "")
+    if old_key is None or new_key <= old_key:
+        return
+
+    conn.execute(
+        "INSERT OR IGNORE INTO version_upgrade (platform, version, anon_id, day) "
+        "VALUES (?, ?, ?, ?)",
+        (platform, app_version, anon_id, day),
+    )
+    upgraded = conn.execute(
+        "SELECT COUNT(*) FROM version_upgrade WHERE platform = ? AND version = ?",
+        (platform, app_version),
+    ).fetchone()[0]
+    if upgraded >= PUBLIC_UPGRADE_THRESHOLD:
+        conn.execute(
+            "INSERT OR IGNORE INTO app_release (platform, version, public_day, source) "
+            "VALUES (?, ?, ?, 'auto')",
+            (platform, app_version, day),
+        )

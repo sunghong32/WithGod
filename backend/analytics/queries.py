@@ -15,7 +15,7 @@ def _shift(day: str, delta: int) -> str:
 
 def _active_between(conn: sqlite3.Connection, start: str, end: str) -> int:
     return conn.execute(
-        "SELECT COUNT(DISTINCT anon_id) FROM daily_active WHERE day BETWEEN ? AND ?",
+        "SELECT COUNT(DISTINCT anon_id) FROM user_active WHERE day BETWEEN ? AND ?",
         (start, end),
     ).fetchone()[0]
 
@@ -24,7 +24,8 @@ def get_overview(db_path: str, now: datetime | None = None) -> dict[str, Any]:
     """대시보드 상단 카드.
 
     오늘 값은 롤업 전이라 daily_metrics 를 믿을 수 없으므로 daily_active 에서
-    직접 센다(그래서 실시간이다).
+    직접 센다(그래서 실시간이다). 사용자 수는 전부 심사·테스트 기기를 뺀
+    값이다(db._create_user_views).
     """
     now = now or utc_now()
     today = service_day(now)
@@ -37,22 +38,27 @@ def get_overview(db_path: str, now: datetime | None = None) -> dict[str, Any]:
         mau = _active_between(conn, _shift(today, -29), today)
 
         new_today = conn.execute(
-            "SELECT COUNT(*) FROM device_profile WHERE first_day = ?", (today,)
+            "SELECT COUNT(*) FROM user_profile WHERE first_day = ?", (today,)
         ).fetchone()[0]
         new_yesterday = conn.execute(
-            "SELECT COUNT(*) FROM device_profile WHERE first_day = ?", (yesterday,)
+            "SELECT COUNT(*) FROM user_profile WHERE first_day = ?", (yesterday,)
         ).fetchone()[0]
-        total_users = conn.execute("SELECT COUNT(*) FROM device_profile").fetchone()[0]
+        total_users = conn.execute("SELECT COUNT(*) FROM user_profile").fetchone()[0]
         events_today = conn.execute(
-            "SELECT COUNT(*) FROM events WHERE day = ?", (today,)
+            "SELECT COUNT(*) FROM user_events WHERE day = ?", (today,)
         ).fetchone()[0]
         sessions_today = conn.execute(
-            "SELECT COUNT(DISTINCT session_id) FROM events WHERE day = ? AND session_id <> ''",
+            "SELECT COUNT(DISTINCT session_id) FROM user_events WHERE day = ? AND session_id <> ''",
             (today,),
         ).fetchone()[0]
         last_event_at = conn.execute(
             "SELECT MAX(ts_server) FROM events"
         ).fetchone()[0]
+        # 사용자 수에서 뺀 심사·테스트 기기(전체 / 오늘 처음 나타난 것).
+        review_devices, review_devices_today = conn.execute(
+            "SELECT COUNT(*), COALESCE(SUM(first_day = ?), 0) FROM review_device",
+            (today,),
+        ).fetchone()
 
     return {
         "day": today,
@@ -64,6 +70,8 @@ def get_overview(db_path: str, now: datetime | None = None) -> dict[str, Any]:
         "new_users_prev": new_yesterday,
         "returning_users": max(0, dau - new_today),
         "total_users": total_users,
+        "review_devices": review_devices,
+        "review_devices_today": review_devices_today,
         "sessions": sessions_today,
         "events": events_today,
         # 고착도: 월간 사용자가 한 달에 며칠이나 들어오는지. 20%면 준수한 편.
@@ -98,13 +106,13 @@ def get_timeseries(db_path: str, days: int = 30, now: datetime | None = None) ->
                 continue
             dau = _active_between(conn, day, day)
             new_users = conn.execute(
-                "SELECT COUNT(*) FROM device_profile WHERE first_day = ?", (day,)
+                "SELECT COUNT(*) FROM user_profile WHERE first_day = ?", (day,)
             ).fetchone()[0]
             activity = conn.execute(
                 """
                 SELECT COUNT(*) AS events,
                        COUNT(DISTINCT CASE WHEN session_id <> '' THEN session_id END) AS sessions
-                FROM events WHERE day = ?
+                FROM user_events WHERE day = ?
                 """,
                 (day,),
             ).fetchone()
@@ -133,7 +141,7 @@ def get_retention(db_path: str, cohorts: int = 21, now: datetime | None = None) 
             row["first_day"]: row["size"]
             for row in conn.execute(
                 """
-                SELECT first_day, COUNT(*) AS size FROM device_profile
+                SELECT first_day, COUNT(*) AS size FROM user_profile
                 WHERE first_day BETWEEN ? AND ? GROUP BY first_day
                 """,
                 (start, today),
@@ -179,7 +187,7 @@ def get_event_counts(db_path: str, days: int = 7, now: datetime | None = None) -
             for row in conn.execute(
                 """
                 SELECT name, COUNT(*) AS total, COUNT(DISTINCT anon_id) AS users
-                FROM events WHERE day BETWEEN ? AND ?
+                FROM user_events WHERE day BETWEEN ? AND ?
                 GROUP BY name ORDER BY total DESC
                 """,
                 (start, today),
@@ -200,7 +208,7 @@ def active_anon_ids(db_path: str, days: int = 30, now: datetime | None = None) -
         return {
             row["anon_id"]
             for row in conn.execute(
-                "SELECT DISTINCT anon_id FROM daily_active WHERE day BETWEEN ? AND ?",
+                "SELECT DISTINCT anon_id FROM user_active WHERE day BETWEEN ? AND ?",
                 (start, today),
             )
         }
@@ -219,7 +227,7 @@ def get_breakdown(db_path: str, days: int = 30, now: datetime | None = None) -> 
                 """
                 SELECT COALESCE(NULLIF(p.platform, ''), 'unknown') AS key,
                        COUNT(DISTINCT p.anon_id) AS users
-                FROM device_profile p
+                FROM user_profile p
                 JOIN daily_active a ON a.anon_id = p.anon_id
                 WHERE a.day BETWEEN ? AND ?
                 GROUP BY key ORDER BY users DESC
@@ -233,7 +241,7 @@ def get_breakdown(db_path: str, days: int = 30, now: datetime | None = None) -> 
                 """
                 SELECT COALESCE(NULLIF(p.last_app_version, ''), 'unknown') AS key,
                        COUNT(DISTINCT p.anon_id) AS users
-                FROM device_profile p
+                FROM user_profile p
                 JOIN daily_active a ON a.anon_id = p.anon_id
                 WHERE a.day BETWEEN ? AND ?
                 GROUP BY key ORDER BY users DESC LIMIT 12
@@ -247,7 +255,7 @@ def get_breakdown(db_path: str, days: int = 30, now: datetime | None = None) -> 
         for row in conn.execute(
             """
             SELECT p.last_tz AS tz, COUNT(DISTINCT p.anon_id) AS users
-            FROM device_profile p
+            FROM user_profile p
             JOIN daily_active a ON a.anon_id = p.anon_id
             WHERE a.day BETWEEN ? AND ?
             GROUP BY p.last_tz
@@ -273,9 +281,9 @@ def get_breakdown(db_path: str, days: int = 30, now: datetime | None = None) -> 
                                        THEN e.anon_id END) AS home,
                    COUNT(DISTINCT CASE WHEN e.name = 'mood_submit'
                                        THEN e.anon_id END) AS mood
-            FROM device_profile p
+            FROM user_profile p
             JOIN daily_active a ON a.anon_id = p.anon_id
-            LEFT JOIN events e
+            LEFT JOIN user_events e
                    ON e.anon_id = p.anon_id AND e.day BETWEEN ? AND ?
             WHERE a.day BETWEEN ? AND ?
             GROUP BY p.last_tz

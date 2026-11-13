@@ -10,6 +10,9 @@ export interface Overview {
   new_users_prev: number;
   returning_users: number;
   total_users: number;
+  /** 사용자 수에서 뺀 스토어 심사·출시 전 테스트 기기(전체 / 오늘). */
+  review_devices?: number;
+  review_devices_today?: number;
   sessions: number;
   events: number;
   stickiness: number;

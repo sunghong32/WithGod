@@ -116,10 +116,104 @@ def init_db(path: str) -> None:
                 ran_at   TEXT NOT NULL,
                 PRIMARY KEY (job_name, day)
             ) WITHOUT ROWID;
+
+            -- 버전별 스토어 공개일(KST). 심사·테스트 기기를 가려내는 기준이다(review_device).
+            -- source: seed = 지난 버전을 손으로 채운 값, auto = 기존 기기 2대 이상이
+            -- 그 버전으로 올라온 날(ingest 가 기록).
+            CREATE TABLE IF NOT EXISTS app_release (
+                platform   TEXT NOT NULL,
+                version    TEXT NOT NULL,
+                public_day TEXT NOT NULL,
+                source     TEXT NOT NULL,
+                PRIMARY KEY (platform, version)
+            ) WITHOUT ROWID;
+
+            -- 기존 기기가 새 버전으로 올라온 기록. 공개일 자동 판정용.
+            CREATE TABLE IF NOT EXISTS version_upgrade (
+                platform TEXT NOT NULL,
+                version  TEXT NOT NULL,
+                anon_id  TEXT NOT NULL,
+                day      TEXT NOT NULL,
+                PRIMARY KEY (platform, version, anon_id)
+            ) WITHOUT ROWID;
             """
         )
         _migrate_device_tz(conn)
+        conn.executemany(
+            "INSERT OR IGNORE INTO app_release (platform, version, public_day, source) "
+            "VALUES (?, ?, ?, 'seed')",
+            RELEASE_SEEDS,
+        )
         conn.commit()
+        _create_user_views(conn)
+
+
+# 지표 수집(2026-07-24) 이전·직후 버전의 공개일. 기록이 없어 스토어 제출 기록과
+# 실제 데이터(제출일에만 나타났다 사라진 기기 묶음)로 맞춘 값이다. 이후 버전은
+# ingest 가 자동으로 채운다(app_release.source = 'auto').
+# 안드로이드는 8/3 프로덕션 첫 출시 전까지 비공개 테스트뿐이었다.
+RELEASE_SEEDS: tuple[tuple[str, str, str], ...] = (
+    ("ios", "1.0.0", "2026-07-01"),
+    ("ios", "1.1.0", "2026-07-01"),
+    ("ios", "1.2.0", "2026-07-01"),
+    ("ios", "1.2.4", "2026-07-25"),
+    ("ios", "1.4.0", "2026-08-01"),
+    ("ios", "1.4.1", "2026-08-04"),
+    ("ios", "1.5.0", "2026-08-12"),
+    ("ios", "1.6.0", "2026-11-10"),
+    ("android", "1.2.1", "2026-08-03"),
+    ("android", "1.2.2", "2026-08-03"),
+    ("android", "1.2.3", "2026-08-03"),
+    ("android", "1.2.4", "2026-08-03"),
+    ("android", "1.3.0", "2026-08-03"),
+    ("android", "1.4.0", "2026-08-03"),
+    ("android", "1.4.1", "2026-08-04"),
+    ("android", "1.5.0", "2026-08-11"),
+    ("android", "1.6.0", "2026-11-10"),
+)
+
+
+def _create_user_views(conn: sqlite3.Connection) -> None:
+    """심사·테스트 기기를 뺀 뷰. 사용자 수 지표는 전부 이 뷰로 센다.
+
+    심사·테스트 기기 = 하루만 쓰고 사라졌고, 그날 쓰던 버전이 그 플랫폼에서
+    아직 공개 전(공개 당일 포함)이었던 기기. 애플 심사·구글 출시 전 보고서
+    (Test Lab) 기기가 새 버전을 낼 때마다 수십 대씩 '신규 사용자'로 잡혔다.
+    두 번째 날 다시 오면 사람으로 본다(TestFlight·비공개 테스터).
+
+    워커가 동시에 부팅하므로 DROP/CREATE 를 쓰기 잠금 하나로 묶는다.
+    """
+    conn.executescript(
+        """
+        BEGIN IMMEDIATE;
+        DROP VIEW IF EXISTS user_events;
+        DROP VIEW IF EXISTS user_profile;
+        DROP VIEW IF EXISTS user_active;
+        DROP VIEW IF EXISTS review_device;
+        CREATE VIEW review_device AS
+            SELECT p.anon_id, p.platform, p.first_day, p.first_app_version
+            FROM device_profile p
+            WHERE p.platform IN ('ios', 'android')
+              AND COALESCE(p.first_app_version, '') <> ''
+              AND p.last_day = p.first_day
+              AND NOT EXISTS (
+                  SELECT 1 FROM app_release r
+                  WHERE r.platform = p.platform
+                    AND r.version = p.first_app_version
+                    AND r.public_day < p.first_day
+              );
+        CREATE VIEW user_active AS
+            SELECT day, anon_id FROM daily_active
+            WHERE anon_id NOT IN (SELECT anon_id FROM review_device);
+        CREATE VIEW user_profile AS
+            SELECT * FROM device_profile
+            WHERE anon_id NOT IN (SELECT anon_id FROM review_device);
+        CREATE VIEW user_events AS
+            SELECT * FROM events
+            WHERE anon_id NOT IN (SELECT anon_id FROM review_device);
+        COMMIT;
+        """
+    )
 
 
 def _migrate_device_tz(conn: sqlite3.Connection) -> None:

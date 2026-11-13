@@ -45,6 +45,14 @@ class AnalyticsTestBase(unittest.TestCase):
         self._tmp = tempfile.TemporaryDirectory()
         self.db = str(Path(self._tmp.name) / "analytics.sqlite3")
         init_db(self.db)
+        # 기본 테스트 버전(1.2.0)은 아주 예전에 공개된 것으로 둔다 — 그래야
+        # 하루만 쓴 테스트 기기가 심사 기기로 빠지지 않는다.
+        with session(self.db) as conn:
+            for platform in ("ios", "android"):
+                conn.execute(
+                    "INSERT OR REPLACE INTO app_release VALUES (?, '1.2.0', '2000-01-01', 'test')",
+                    (platform,),
+                )
 
     def tearDown(self):
         self._tmp.cleanup()
@@ -323,6 +331,116 @@ class QueriesTest(AnalyticsTestBase):
 
         breakdown = queries.get_breakdown(self.db, days=30, now=now)
         self.assertEqual(breakdown["countries"], [{"key": "JP", "users": 1}])
+
+
+class ReviewDeviceTest(AnalyticsTestBase):
+    """스토어 심사·출시 전 테스트 기기는 사용자 수에서 뺀다."""
+
+    def open_app(self, anon_id, moment, version="1.2.0", platform="android", event_id=None):
+        ingest_batch(
+            self.db,
+            batch(anon_id, [event(event_id or f"{anon_id}-{moment.isoformat()}")],
+                  app_version=version, platform=platform),
+            received_at=moment,
+        )
+
+    def set_public(self, version, day, platform="android"):
+        with session(self.db) as conn:
+            conn.execute(
+                "INSERT OR REPLACE INTO app_release VALUES (?, ?, ?, 'test')",
+                (platform, version, day),
+            )
+
+    def test_prerelease_one_day_device_is_excluded_everywhere(self):
+        now = kst(2026, 11, 13, hour=15)
+        self.open_app("reviewer", now, version="1.6.1")   # 아직 공개 전 버전
+        self.open_app("person", now)                      # 공개된 버전
+
+        overview = queries.get_overview(self.db, now=now)
+        self.assertEqual(overview["dau"], 1)
+        self.assertEqual(overview["new_users"], 1)
+        self.assertEqual(overview["total_users"], 1)
+        self.assertEqual(overview["events"], 1)
+        self.assertEqual(overview["review_devices"], 1)
+        self.assertEqual(overview["review_devices_today"], 1)
+
+        self.assertEqual(queries.get_timeseries(self.db, days=1, now=now)[-1]["dau"], 1)
+        breakdown = queries.get_breakdown(self.db, now=now)
+        self.assertEqual(sum(row["users"] for row in breakdown["platforms"]), 1)
+        self.assertEqual(queries.active_anon_ids(self.db, now=now), {"person"})
+
+        run_rollup(self.db, now=now)
+        with session(self.db) as conn:
+            row = conn.execute(
+                "SELECT dau, new_users FROM daily_metrics WHERE day = '2026-11-13'"
+            ).fetchone()
+        self.assertEqual((row["dau"], row["new_users"]), (1, 1))
+
+    def test_prerelease_device_that_comes_back_is_a_person(self):
+        # TestFlight·비공개 테스터는 다음 날에도 쓴다 → 사람으로 센다.
+        self.open_app("tester", kst(2026, 11, 12), version="1.6.1")
+        now = kst(2026, 11, 13)
+        self.open_app("tester", now, version="1.6.1")
+
+        overview = queries.get_overview(self.db, now=now)
+        self.assertEqual(overview["total_users"], 1)
+        self.assertEqual(overview["review_devices"], 0)
+
+    def test_release_day_counts_as_prerelease(self):
+        # 공개 당일엔 심사 기기와 실제 설치가 섞인다 — 하루만 쓴 기기는 뺀다.
+        self.set_public("1.6.0", "2026-11-10")
+        self.open_app("on-release-day", kst(2026, 11, 10), version="1.6.0")
+        self.open_app("after-release", kst(2026, 11, 11), version="1.6.0")
+
+        overview = queries.get_overview(self.db, now=kst(2026, 11, 11))
+        self.assertEqual(overview["total_users"], 1)
+        self.assertEqual(overview["review_devices"], 1)
+
+    def test_unknown_or_web_version_is_never_excluded(self):
+        now = kst(2026, 11, 13)
+        self.open_app("no-version", now, version="")
+        self.open_app("web", now, version="9.9.9", platform="web")
+        self.assertEqual(queries.get_overview(self.db, now=now)["total_users"], 2)
+
+    def test_two_existing_devices_upgrading_marks_version_public(self):
+        for name in ("old-a", "old-b"):
+            self.open_app(name, kst(2026, 11, 1))
+        self.open_app("reviewer", kst(2026, 11, 9), version="1.9.0")
+
+        self.open_app("old-a", kst(2026, 11, 10), version="1.9.0")
+        with session(self.db) as conn:
+            self.assertIsNone(conn.execute(
+                "SELECT 1 FROM app_release WHERE platform = 'android' AND version = '1.9.0'"
+            ).fetchone())  # 한 대(개발자 본인일 수 있음)로는 정하지 않는다
+
+        self.open_app("old-b", kst(2026, 11, 11), version="1.9.0")
+        with session(self.db) as conn:
+            release = conn.execute(
+                "SELECT public_day, source FROM app_release "
+                "WHERE platform = 'android' AND version = '1.9.0'"
+            ).fetchone()
+        self.assertEqual((release["public_day"], release["source"]), ("2026-11-11", "auto"))
+
+        self.open_app("newcomer", kst(2026, 11, 12), version="1.9.0")
+        overview = queries.get_overview(self.db, now=kst(2026, 11, 12))
+        # old-a, old-b, newcomer — 공개 전에 나타났다 사라진 reviewer 만 빠진다
+        self.assertEqual(overview["total_users"], 3)
+        self.assertEqual(overview["review_devices"], 1)
+
+    def test_downgrade_or_same_version_is_not_an_upgrade(self):
+        self.open_app("a", kst(2026, 11, 1), version="1.9.0")
+        self.open_app("a", kst(2026, 11, 2), version="1.9.0")
+        self.open_app("b", kst(2026, 11, 1), version="1.9.0")
+        self.open_app("b", kst(2026, 11, 2), version="1.2.0")
+        with session(self.db) as conn:
+            self.assertEqual(conn.execute("SELECT COUNT(*) FROM version_upgrade").fetchone()[0], 0)
+
+    def test_seeds_cover_past_releases(self):
+        with session(self.db) as conn:
+            day = conn.execute(
+                "SELECT public_day FROM app_release WHERE platform = 'ios' AND version = '1.6.0'"
+            ).fetchone()[0]
+        self.assertEqual(day, "2026-11-10")
 
 
 class TzCountryTest(unittest.TestCase):
