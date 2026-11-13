@@ -516,3 +516,31 @@ class CopyDataTest(unittest.TestCase):
         en = localize_all(items)
         missing = [vid for vid, c in copies.items() if c["emph"] not in card_text(en[vid]["text"])]
         self.assertEqual(missing, [])
+
+
+class SlideOrderTest(unittest.TestCase):
+    """캐러셀 순서 — 장면 그림이 있으면 그림 표지가 첫 장이다(그리드·피드에 먼저 보이는 장, 11/13 결정)."""
+
+    def test_art_cover_first(self):
+        import importlib.util
+
+        path = Path(__file__).resolve().parent.parent / "scripts" / "build_ig_daily_posts.py"
+        spec = importlib.util.spec_from_file_location("build_ig_daily_posts", path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        entry = {"text": "Be still.", "display_ref": "Psalm 46:10", "alt_text": "Verse alt.", "note": "A note."}
+        copy = {"label": "When it’s loud", "emph": "Be still.", "pal": "mist",
+                "scene": {"label": "the picture", "body": "A quiet hill at dusk.", "alt": "Illustration: a hill.",
+                          "art": "x.jpg", "focus": "60% 50%", "credit": "Illustration by WithGod, made with AI"}}
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / "x.jpg").write_bytes(b"x")
+            with patch.object(mod, "ART_DIR", Path(d)):
+                slides = mod.slides_for(entry, copy)
+        self.assertEqual([s["kind"] for s, _ in slides], ["cover", "verse", "scene", "note"])
+        cover, alt = slides[0]
+        self.assertEqual((cover["focus"], cover["ref"]), ("60% 50%", "Psalm 46:10"))
+        self.assertTrue(alt.startswith("Illustration: a hill.") and "when it’s loud" in alt)
+        self.assertNotIn("art", slides[2][0])  # 그림은 표지에만, 셋째 장은 설명 글만
+        self.assertEqual([s["arrow"] for s, _ in slides], [True, True, True, False])
+        del copy["scene"]
+        self.assertEqual([s["kind"] for s, _ in mod.slides_for(entry, copy)], ["verse", "note"])

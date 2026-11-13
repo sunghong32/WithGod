@@ -5,10 +5,13 @@
 한 계정으로 보여야 해서 팔레트·글꼴·여백 값을 그대로 옮겼다.
 
 슬라이드 종류(한 게시물 = 2~4장 캐러셀):
-- verse: 표지. 말씀 + 라벨 + 참조. 그리드에 보이는 장.
-- scene: 그 말씀의 장면(복음서 이야기) 또는 그림(잠언 비유). 위에 그림, 아래 짧은 설명과 그림 출처.
+- cover: 표지(그리드에 보이는 장). 장면 그림을 꽉 채우고 아래에 감정 라벨 + 참조를 얹는다. 첫 장이 글
+  카드면 흔한 말씀 카드 계정과 구별되지 않아(11/13 사용자 지적) 그림을 앞에 둔다.
   그림은 퍼블릭 도메인 성화이거나, 이 맥에서 로컬 오픈소스 모델(Z-Image-Turbo, Apache-2.0)로 만든 그림이다
-  (`instagram/build/art/`, 출처 기록은 `instagram/art_sources.json`).
+  (`instagram/build/art/`, 출처 기록은 `instagram/art_sources.json`). 가로 그림이라 4:5 로 꽉 채우면 양옆이
+  잘린다 — 어디를 남길지는 카피의 `scene.focus`(object-position).
+- verse: 말씀 + 라벨 + 참조.
+- scene: 그림의 배경 설명과 그림 출처. `art` 를 주면 위에 그림, 아래 설명(옛 틀). 표지가 그림이면 글만.
 - note: 앱의 영어 풀이 전문(AI 로 쓴 것이라 그렇게 밝힌다). 캡션 대신 카드에 실어 게시물 하나로 읽히게 한다.
 - app: 앱 안내(수·일요일만).
 
@@ -117,6 +120,24 @@ mark{color:inherit;background:linear-gradient(transparent 56%,var(--mark) 56%,va
 .sc p{margin:18px 0 0;font-size:42px;line-height:1.34;letter-spacing:-.004em;color:var(--ink);text-wrap:pretty}
 .credit{margin-top:26px;font:500 22px/1.3 "WGSans";letter-spacing:.02em;color:var(--muted);opacity:.9}
 
+/* 그림 표지 */
+.full{position:absolute;inset:0;background:#000}
+.full img{width:100%;height:100%;object-fit:cover;display:block}
+.shade{position:absolute;left:0;right:0;bottom:0;height:640px;
+  background:linear-gradient(180deg,rgba(14,12,24,0) 0%,rgba(14,12,24,.42) 45%,rgba(14,12,24,.78) 100%)}
+.ov{position:absolute;left:96px;right:96px;bottom:150px;color:#FFF8EC}
+.ov .lab{color:rgba(255,248,236,.96);font-size:60px;line-height:1.16;text-wrap:balance;
+  text-shadow:0 2px 18px rgba(0,0,0,.25)}
+.ov .vref{margin-top:22px;font-size:28px;color:rgba(255,248,236,.82)}
+.cover::after{opacity:calc(var(--grain) * .5)}
+.cover .foot{color:rgba(255,248,236,.86)}
+
+/* 장면 설명(글만) */
+.sbox{position:absolute;left:100px;right:100px;top:140px;bottom:210px;display:flex;flex-direction:column;
+  justify-content:center}
+.sbox p{margin:30px 0 0;font-size:50px;line-height:1.38;letter-spacing:-.004em;color:var(--ink);text-wrap:pretty}
+.sbox .credit{margin-top:40px;font-size:24px}
+
 /* 앱 풀이 */
 .nbox{position:absolute;left:100px;right:100px;top:130px;bottom:205px;display:flex;flex-direction:column;
   justify-content:center}
@@ -182,6 +203,7 @@ function noOrphan(sel){
 document.fonts.ready.then(function(){
   fit('.vtext', '.vbox', 38); noOrphan('.vtext'); fit('.vtext', '.vbox', 38);
   fit('.sc p', '.sc', 34); noOrphan('.sc p'); fit('.sc p', '.sc', 34);
+  fit('.sbox p', '.sbox', 36); noOrphan('.sbox p'); fit('.sbox p', '.sbox', 36);
   fit('.nbox p', '.nbox', 32); noOrphan('.nbox p'); fit('.nbox p', '.nbox', 32);
   fit('.cbox h2', '.cbox', 56);
   document.body.setAttribute('data-ready', '1');
@@ -254,10 +276,19 @@ def slide_html(s: dict) -> str:
     cls = f"s p-{pal}" + (" dark" if pal in DARK else "")
     arrow = s.get("arrow", False)
     e = html.escape
-    if k == "verse":
+    if k == "cover":
+        src = art_path(s["art"]).as_uri()
+        cls += " cover"
+        body = (f'<div class="full"><img src="{src}" style="object-position:{e(s.get("focus", "50% 50%"))}"></div>'
+                f'<div class="shade"></div><div class="ov"><div class="lab">{e(lower_first(s["label"]))}</div>'
+                f'<div class="vref">{e(s["ref"])}</div></div>')
+    elif k == "verse":
         body = (f'<div class="vbox"><div class="lab">{e(lower_first(s["label"]))}</div>'
                 f'<div class="vtext" style="font-size:{verse_size(s["text"])}px">{marked(s["text"], s.get("emph", ""))}</div>'
                 f'<div class="vref">{e(s["ref"])}<span class="tr">WEB</span></div></div>')
+    elif k == "scene" and not s.get("art"):
+        body = (f'<div class="sbox"><div class="lab">{e(s["label"])}</div><p>{rich(s["body"])}</p>'
+                f'<div class="credit">{e(s["credit"])}</div></div>')
     elif k == "scene":
         src = art_path(s["art"]).as_uri()
         body = (f'<div class="art"><img src="{src}" style="object-position:{e(s.get("focus", "50% 50%"))}"></div>'
