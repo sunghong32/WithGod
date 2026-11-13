@@ -160,11 +160,12 @@ const handleSsePayload = (
 };
 
 export const verseApi = {
-  // 오늘의 말씀 조회 (풀이 interpretation 포함)
-  getDailyVerse: async (): Promise<DailyVerse> => {
+  // 오늘의 말씀 조회 (풀이 interpretation 포함). date 는 이 기기의 말씀 날짜 YYYY-MM-DD(#69,
+  // localDate.ts) — 서버는 지금 있을 수 없는 날짜면 무시하고 한국 날짜로 낸다.
+  getDailyVerse: async (date?: string): Promise<DailyVerse> => {
     try {
       const { data } = await apiClient.get("/daily-verse", {
-        params: { lang: getAppLanguage() },
+        params: { lang: getAppLanguage(), ...(date ? { date } : {}) },
       });
       const { daily_verse } = DailyVerseResponseSchema.parse(data);
       return daily_verse;
