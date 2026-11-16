@@ -17,6 +17,7 @@ const ALLOWED_METRICS = new Set([
   "events",
   "breakdown",
   "languages",
+  "link-clicks",
 ]);
 
 const ALLOWED_PARAMS = new Set(["days", "cohorts"]);

@@ -136,6 +136,18 @@ def init_db(path: str) -> None:
                 day      TEXT NOT NULL,
                 PRIMARY KEY (platform, version, anon_id)
             ) WITHOUT ROWID;
+
+            -- 웹 앱 받기 링크(/get) 클릭. 웹 서버가 리다이렉트 직후 기록한다(link_clicks.py).
+            -- 하루 몇 건 수준이라 롤업 없이 영구 보관한다.
+            CREATE TABLE IF NOT EXISTS link_click (
+                id        INTEGER PRIMARY KEY AUTOINCREMENT,
+                ts_server TEXT NOT NULL,      -- 수신 시각 UTC
+                day       TEXT NOT NULL,      -- 수신 시각의 KST 날짜
+                source    TEXT NOT NULL,      -- /get?src= 값(웹이 정리한 것)
+                platform  TEXT NOT NULL,      -- ios · android · other
+                visitor   TEXT                -- 웹이 만든 하루짜리 방문자 해시(IP 원문 아님)
+            );
+            CREATE INDEX IF NOT EXISTS ix_link_click_day ON link_click(day);
             """
         )
         _migrate_device_tz(conn)
