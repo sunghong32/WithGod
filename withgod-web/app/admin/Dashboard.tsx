@@ -8,6 +8,7 @@ import {
   fetchBreakdown,
   fetchEvents,
   fetchLanguages,
+  fetchLinkClicks,
   fetchOverview,
   fetchRetention,
   fetchTimeseries,
@@ -15,6 +16,7 @@ import {
   type DailyPoint,
   type EventCount,
   type LanguageBreakdown,
+  type LinkClicks as LinkClicksData,
   type Overview,
   type Retention,
 } from "@/lib/analytics";
@@ -24,6 +26,7 @@ import { AppVersionControl } from "./components/AppVersionControl";
 import { CountryFunnel } from "./components/CountryFunnel";
 import { LanguageByCountry } from "./components/LanguageByCountry";
 import { LanguageControl } from "./components/LanguageControl";
+import { LinkClicks } from "./components/LinkClicks";
 import { BreakdownList } from "./components/BreakdownList";
 import { ChartCard } from "./components/ChartCard";
 import { EventTable } from "./components/EventTable";
@@ -41,6 +44,7 @@ interface DashboardData {
   events: EventCount[];
   breakdown: Breakdown;
   languages: LanguageBreakdown | null;
+  linkClicks: LinkClicksData | null;
 }
 
 // 국가 코드(ISO 3166-1 alpha-2) → "🇰🇷 대한민국". 이름은 브라우저 로케일
@@ -83,7 +87,7 @@ export function Dashboard() {
       setLoading(true);
       setError("");
       try {
-        const [overview, timeseries, retention, events, breakdown, languages] =
+        const [overview, timeseries, retention, events, breakdown, languages, linkClicks] =
           await Promise.all([
             fetchOverview(),
             fetchTimeseries(days),
@@ -94,6 +98,7 @@ export function Dashboard() {
             fetchBreakdown(days),
             // 구버전 백엔드에는 없는 경로라 실패해도 대시보드 전체를 막지 않는다.
             fetchLanguages(days).catch(() => null),
+            fetchLinkClicks(days).catch(() => null),
           ]);
         setData({
           overview,
@@ -102,6 +107,7 @@ export function Dashboard() {
           events: events.events,
           breakdown,
           languages,
+          linkClicks,
         });
       } catch (caught) {
         if (caught instanceof UnauthorizedError) {
@@ -310,6 +316,13 @@ export function Dashboard() {
                   rows={data.breakdown.country_funnel ?? []}
                   label={countryLabel}
                 />
+              </ChartCard>
+
+              <ChartCard
+                title="앱 받기 링크 클릭"
+                subtitle={`최근 ${range}일 · /get?src=… 출처별 · 미리보기 봇 제외`}
+              >
+                <LinkClicks data={data.linkClicks} />
               </ChartCard>
             </div>
 

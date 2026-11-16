@@ -7,7 +7,7 @@ from typing import Any, List, Optional
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
-from analytics import queries
+from analytics import link_clicks, queries
 from analytics.db import init_db, service_day
 from analytics.ingest import ingest_batch
 from analytics.ratelimit import SlidingWindowLimiter
@@ -158,6 +158,35 @@ def languages_by_country(days: int = Query(default=30, ge=1, le=180)) -> dict[st
         # 최근 N일에 앱을 열지 않아 제외된 등록 기기 수(누적과의 차이).
         "inactive_devices": skipped,
     }
+
+
+class LinkClickIn(BaseModel):
+    """웹 앱 받기 링크(/get) 클릭 한 건. 웹 서버만 보낸다(관리 키)."""
+
+    source: str = Field(..., max_length=32, examples=["ig-dm"])
+    platform: str = Field(..., max_length=16, examples=["ios"])
+    visitor: Optional[str] = Field(default=None, max_length=64, description="하루짜리 방문자 해시")
+
+
+@router.post(
+    "/admin/analytics/link-clicks",
+    status_code=202,
+    dependencies=[Depends(require_analytics_admin)],
+    tags=["analytics"],
+)
+def collect_link_click(payload: LinkClickIn) -> dict[str, Any]:
+    try:
+        link_clicks.record_click(
+            _db_path(), payload.source, payload.platform, payload.visitor
+        )
+    except link_clicks.InvalidLinkClick as exc:
+        raise HTTPException(status_code=422, detail=f"invalid {exc}") from exc
+    return {"accepted": True}
+
+
+@router.get("/admin/analytics/link-clicks", dependencies=[Depends(require_analytics_admin)], tags=["analytics"])
+def link_click_counts(days: int = Query(default=30, ge=1, le=180)) -> dict[str, Any]:
+    return link_clicks.get_link_clicks(_db_path(), days=days)
 
 
 @router.post("/admin/analytics/rollup", dependencies=[Depends(require_analytics_admin)], tags=["analytics"])

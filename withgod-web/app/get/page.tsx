@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 
+import { clientIp, recordLinkClick } from "@/lib/linkClicks";
 import {
   appStoreUrl,
   detectPlatform,
@@ -17,7 +19,8 @@ import IpadRedirect from "./IpadRedirect";
  *
  * 휴대폰이면 기기에 맞는 스토어로 바로 보내고, PC·링크 미리보기 봇처럼
  * 기기를 알 수 없으면 두 스토어 버튼이 있는 안내 페이지를 보여 준다.
- * `src` 는 스토어 쪽 유입 경로 집계(App Store 캠페인·Play UTM)에 실린다.
+ * `src` 는 스토어 쪽 유입 경로 집계(App Store 캠페인·Play UTM)에 실리고,
+ * 클릭 자체도 출처별로 백엔드에 남는다(lib/linkClicks.ts → 어드민 대시보드).
  */
 
 const TITLE = "WithGod — Daily Bible Verses";
@@ -35,8 +38,13 @@ type PageProps = {
 
 export default async function GetAppPage({ searchParams }: PageProps) {
   const source = normalizeSource((await searchParams).src);
-  const userAgent = (await headers()).get("user-agent") ?? "";
+  const headerList = await headers();
+  const userAgent = headerList.get("user-agent") ?? "";
   const platform = detectPlatform(userAgent);
+
+  // 응답을 보낸 뒤 기록한다 — 리다이렉트를 늦추지 않고, redirect() 뒤에도 실행된다.
+  const ip = clientIp(headerList);
+  after(() => recordLinkClick({ source, platform, userAgent, ip }));
 
   const ios = appStoreUrl(source);
   const android = playStoreUrl(source);

@@ -84,6 +84,23 @@ export interface LanguageBreakdown {
   inactive_devices?: number;
 }
 
+/** 앱 받기 링크(/get?src=…) 클릭. 웹 서버가 기록한다(lib/linkClicks.ts). */
+export interface LinkClicks {
+  days: number;
+  sources: {
+    source: string;
+    clicks: number;
+    /** 같은 사람이 같은 날 여러 번 눌러도 한 번 */
+    visitors: number;
+    ios: number;
+    android: number;
+    other: number;
+    last_at: string;
+  }[];
+  /** 최근 클릭(최신순, 최대 20건) */
+  recent: { at: string; source: string; platform: string }[];
+}
+
 export class UnauthorizedError extends Error {}
 
 const request = async <T>(path: string): Promise<T> => {
@@ -115,3 +132,6 @@ export const fetchBreakdown = (days: number) =>
 
 export const fetchLanguages = (days: number) =>
   request<LanguageBreakdown>(`languages?days=${days}`);
+
+export const fetchLinkClicks = (days: number) =>
+  request<LinkClicks>(`link-clicks?days=${days}`);
