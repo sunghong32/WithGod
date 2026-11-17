@@ -7,6 +7,7 @@ import {
   needsConsentPrompt,
   setTelemetryEnabled,
 } from "@/shared/lib/telemetry";
+import { useModalTurn } from "@/shared/hooks";
 import { ModalBackdrop } from "./ModalBackdrop";
 
 /**
@@ -22,6 +23,7 @@ import { ModalBackdrop } from "./ModalBackdrop";
 export function TelemetryConsentModal() {
   const { t } = useTranslation();
   const [visible, setVisible] = useState(false);
+  const turn = useModalTurn("telemetryConsent", visible);
 
   useEffect(() => {
     let mounted = true;
@@ -41,7 +43,8 @@ export function TelemetryConsentModal() {
 
   return (
     <Modal
-      visible={visible}
+      visible={turn.visible}
+      onDismiss={turn.onDismiss}
       transparent
       animationType="fade"
       // onRequestClose(안드로이드 뒤로가기)에서 닫지 않는다 — 선택을 강제한다.

@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useModalTurn } from "@/shared/hooks";
 import { ModalBackdrop } from "./ModalBackdrop";
 
 const WIDGET_PREVIEW = require("../assets/widget/daily-verse-preview.png");
@@ -38,10 +39,13 @@ const ANDROID_STEPS = [
 export function WidgetGuideModal({ visible, onClose }: Props) {
   const { t } = useTranslation();
   const steps = Platform.OS === "ios" ? IOS_STEPS : ANDROID_STEPS;
+  // 늦게 온 업데이트 안내 등과 겹치지 않게 차례를 받는다(#92)
+  const turn = useModalTurn("widgetGuide", visible);
 
   return (
     <Modal
-      visible={visible}
+      visible={turn.visible}
+      onDismiss={turn.onDismiss}
       transparent
       animationType="fade"
       onRequestClose={onClose}
