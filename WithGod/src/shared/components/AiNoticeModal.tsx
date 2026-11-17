@@ -2,6 +2,7 @@ import { baseFontFamily, colors, scaleFont } from "@/shared/styles";
 import { Ionicons } from "@expo/vector-icons";
 import { useTranslation } from "react-i18next";
 import { Modal, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { useModalTurn } from "@/shared/hooks";
 import { ModalBackdrop } from "./ModalBackdrop";
 
 type Props = {
@@ -17,9 +18,12 @@ type Props = {
  */
 export function AiNoticeModal({ visible, onClose }: Props) {
   const { t } = useTranslation();
+  // 업데이트 안내가 떠 있으면 닫힌 뒤에 뜬다(#92)
+  const turn = useModalTurn("aiNotice", visible);
   return (
     <Modal
-      visible={visible}
+      visible={turn.visible}
+      onDismiss={turn.onDismiss}
       transparent
       animationType="fade"
       onRequestClose={onClose}

@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { Linking, Modal, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 import { checkForUpdate, type UpdateStatus } from "@/shared/lib/appUpdate";
+import { useModalTurn } from "@/shared/hooks";
 import { ModalBackdrop } from "./ModalBackdrop";
 
 /**
@@ -13,10 +14,14 @@ import { ModalBackdrop } from "./ModalBackdrop";
  * - forced: 닫을 수 없고 '업데이트'만 (구버전으로 계속 쓰지 못하게)
  * - optional: '업데이트' / '나중에'
  * 서버 미응답이면 아무것도 뜨지 않는다(checkForUpdate 가 none 반환).
+ * 통계 동의창 등 다른 안내가 떠 있으면 그게 닫힌 뒤에 뜬다(useModalTurn, #92).
  */
 export function UpdatePromptModal() {
   const { t } = useTranslation();
   const [status, setStatus] = useState<UpdateStatus>({ type: "none" });
+  // 닫았는지. status 는 그대로 두어 닫히는 애니메이션 동안 내용이 바뀌지 않게 한다.
+  const [closed, setClosed] = useState(false);
+  const turn = useModalTurn("updatePrompt", status.type !== "none" && !closed);
 
   useEffect(() => {
     let mounted = true;
@@ -37,14 +42,15 @@ export function UpdatePromptModal() {
       // 스토어 열기 실패는 조용히 넘긴다.
     });
     // 강제 업데이트가 아니면 스토어로 보낸 뒤 팝업을 닫는다.
-    if (!forced) setStatus({ type: "none" });
+    if (!forced) setClosed(true);
   };
 
-  const dismiss = () => setStatus({ type: "none" });
+  const dismiss = () => setClosed(true);
 
   return (
     <Modal
-      visible
+      visible={turn.visible}
+      onDismiss={turn.onDismiss}
       transparent
       animationType="fade"
       // 강제 업데이트면 뒤로가기로도 닫히지 않게 한다.
