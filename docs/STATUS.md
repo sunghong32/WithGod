@@ -76,7 +76,7 @@ min_supported 는 1.0.0 유지(강제 업데이트 사유 없음).
       도구 `backend/instagram/reels/`(render.py 영상 · music.swift 음악 · finish.py 합치기·표지 · reel_queue.py 예약), 편마다 원본은 `episodes/<slug>/`,
       그림·중간 파일은 `~/.local/share/withgod-ig-reels/work/<slug>/`. 다 만든 편은 `reel_queue.py add <폴더>` → launchd `com.minsunghong.withgod-ig-reels`
       (10분마다: 3시간 전 S3 업로드·컨테이너 → 게시 → 텔레그램 링크). **다음 편이 비면 72·24시간 전에 텔레그램이 알린다**(11/16 월요일 편이 아무도 모르게 빔).
-      `reel_queue.py status` 로 슬롯·차례 확인. 올린 편: 엘리야(11/14) · 한나(11/17, 월요일 몫). 요령은 메모리 `instagram-account`
+      `reel_queue.py status` 로 슬롯·차례 확인. 올린 편: 엘리야(11/14) · 한나(11/17, 월요일 몫) · 앱 시연 「잠 못 드는 밤」(11/18 예약, 큐에 있음). 요령은 메모리 `instagram-account`
 - [x] **인스타 런칭 게시물 — 끝(11/12, 7개).** 오늘의 말씀과 겹치는 말씀 카드 2개(06·04)는 사용자 결정으로 뺐고, 남은 4개는 11/12 오전에 바로 게시.
       결과물·생성기 `docs/instagram/launch/`·`tools/make_launch_posts.py`, 게시 기록 `launch/posted.json`. 상단 고정(소개·사용법·잠 못 드는 밤) 완료(11/12, 앱에서 사용자가). launchd plist 는 지워도 된다
 - [x] **11/9 병합분 배포 — 완료(11/9).** 백엔드 PR 9개 운영 서버 `da6df40`(서버 테스트 177개, 재시작 6초).
@@ -148,6 +148,7 @@ min_supported 는 1.0.0 유지(강제 업데이트 사유 없음).
 
 ## 최근 변경 이력
 
+- 2026-11-17 feat(instagram): 첫 앱 시연 릴스 「I told a Bible app I couldn’t sleep」(36.6초) — 시뮬레이터에서 실제 앱 응답(시편 119:114)을 녹화해 그대로 씀, 11/18 19:00 ET 큐. 렌더러가 영상 장면을 차례로 읽게 고침(통째로 올리면 수 GB), 밝은 화면용 `card` 자막·자막별 `fo`
 - 2026-11-17 chore(instagram): 릴스 게시 시각을 다시 따져 봄(사용자 질문 「아침 7시가 낫지 않나」) — 아침 7시 ET 는 서부 새벽 4시라 뺌. 20:00 으로 옮겼다가(PR #87) 사용자 결정으로 19:00 유지
 - 2026-11-17 feat(instagram): 릴스 월·수·금 예약 큐(`backend/instagram/reels/reel_queue.py` + launchd) — 주기만 정하고 예약·미리 만든 편이 없어 11/16 월요일 편이 비었다. 빈 슬롯 텔레그램 알림 · 금요일 형식 순번 기록 · 렌더러를 워크트리 임시 폴더에서 레포로. 한나 편(사무엘상 1장) 제작·게시
 - 2026-11-16 feat(web,backend): /get 링크 클릭을 src 별로 집계 — 인스타 DM 에 `?src=ig-dm` 링크를 보냈는데 스토어 통계는 늦고 작은 숫자를 숨겨 한 건을 볼 수 없어서. PR #83, 운영 배포 `9dd92b4`(서버 테스트 256개, 재시작 6초) + Vercel 자동, 운영 `deploy-check` 클릭 1건 기록·봇 제외 확인 후 그 행은 지움
