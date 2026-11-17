@@ -1,0 +1,287 @@
+{
+ "out": "reel-silent.mp4",
+ "dur": 58.0,
+ "bg": "#1a120c",
+ "snaps": [
+  17.5,
+  19.8,
+  21.5,
+  49.0,
+  52.0,
+  57.5
+ ],
+ "shots": [
+  {
+   "img": "art/d_fire_2.png",
+   "t0": 0,
+   "t1": 11.0,
+   "cam": [
+    [
+     0,
+     450,
+     360,
+     430
+    ],
+    [
+     5.0,
+     560,
+     450,
+     520
+    ],
+    [
+     9.0,
+     860,
+     496,
+     558
+    ],
+    [
+     11.8,
+     870,
+     496,
+     558
+    ]
+   ]
+  },
+  {
+   "img": "art/e_queen_1.png",
+   "t0": 11.0,
+   "t1": 16.6,
+   "fade": 0.6,
+   "cam": [
+    [
+     11.0,
+     930,
+     496,
+     558
+    ],
+    [
+     16.6,
+     660,
+     500,
+     540
+    ],
+    [
+     17.4,
+     640,
+     500,
+     535
+    ]
+   ]
+  },
+  {
+   "img": "art/g_flee_1.png",
+   "t0": 16.6,
+   "t1": 20.4,
+   "fade": 0.6,
+   "cam": [
+    [
+     16.6,
+     820,
+     496,
+     558
+    ],
+    [
+     20.4,
+     790,
+     505,
+     530
+    ],
+    [
+     21.2,
+     785,
+     506,
+     525
+    ]
+   ]
+  },
+  {
+   "img": "art/a_alone_2.png",
+   "t0": 20.4,
+   "t1": 25.4,
+   "fade": 0.8,
+   "cam": [
+    [
+     20.4,
+     700,
+     496,
+     558
+    ],
+    [
+     25.4,
+     800,
+     510,
+     520
+    ],
+    [
+     26.3,
+     805,
+     512,
+     515
+    ]
+   ]
+  },
+  {
+   "img": "art/b_bread_1.png",
+   "t0": 25.4,
+   "t1": 41.0,
+   "fade": 0.9,
+   "cam": [
+    [
+     25.4,
+     560,
+     500,
+     540
+    ],
+    [
+     32.9,
+     330,
+     496,
+     558
+    ],
+    [
+     35.6,
+     380,
+     500,
+     540
+    ],
+    [
+     41.0,
+     470,
+     470,
+     470
+    ],
+    [
+     42.2,
+     475,
+     468,
+     465
+    ]
+   ]
+  },
+  {
+   "img": "art/f_eat_2.png",
+   "t0": 41.0,
+   "t1": 45.4,
+   "fade": 1.2,
+   "cam": [
+    [
+     41.0,
+     640,
+     496,
+     558
+    ],
+    [
+     45.4,
+     760,
+     480,
+     520
+    ],
+    [
+     46.8,
+     765,
+     478,
+     515
+    ]
+   ]
+  },
+  {
+   "img": "art/c_journey_2.png",
+   "t0": 45.4,
+   "t1": 58.0,
+   "fade": 1.4,
+   "cam": [
+    [
+     45.4,
+     790,
+     496,
+     558
+    ],
+    [
+     58.0,
+     720,
+     470,
+     505
+    ]
+   ]
+  }
+ ],
+ "texts": [
+  {
+   "t0": 0.0,
+   "t1": 3.0,
+   "fi": 0,
+   "html": "<div class='h1'>Even the bravest people hit a wall.</div>"
+  },
+  {
+   "t0": 3.2,
+   "t1": 6.4,
+   "html": "<p class='t'>Elijah was one of the greatest prophets in the Bible.</p>"
+  },
+  {
+   "t0": 6.6,
+   "t1": 10.8,
+   "html": "<p class='t'>He stood alone against 450 prophets of Baal, and God answered him with fire from heaven.</p>"
+  },
+  {
+   "t0": 11.2,
+   "t1": 13.6,
+   "html": "<div class='h1'>Then one message broke him.</div>"
+  },
+  {
+   "t0": 13.8,
+   "t1": 16.5,
+   "html": "<p class='t'>Queen Jezebel swore to kill him by the next day.</p>"
+  },
+  {
+   "t0": 16.9,
+   "t1": 20.3,
+   "html": "<p class='t'>So he ran for his life, deep into the desert.</p>"
+  },
+  {
+   "t0": 20.7,
+   "t1": 25.3,
+   "html": "<p class='t'>After a day’s walk, he sat down under a tree and told God, “It is enough.”</p>"
+  },
+  {
+   "t0": 25.7,
+   "t1": 29.3,
+   "html": "<p class='t'>He fell asleep there. An angel touched him: “Get up and eat.”</p>"
+  },
+  {
+   "t0": 29.5,
+   "t1": 32.9,
+   "html": "<p class='t'>Beside his head: bread baked on hot coals, and a jar of water.</p>"
+  },
+  {
+   "t0": 33.1,
+   "t1": 35.4,
+   "html": "<p class='t'>He ate, drank, and lay down again.</p>"
+  },
+  {
+   "t0": 35.6,
+   "t1": 40.9,
+   "html": "<p class='t'>The angel came back a second time:</p><div class='v' style='margin-top:26px'>“Arise and eat, because the journey is too great for you.”</div><div class='r'>1 Kings 19:7</div>"
+  },
+  {
+   "t0": 41.3,
+   "t1": 45.3,
+   "html": "<div class='h1'>God didn’t lecture him. He fed him and let him rest.</div>"
+  },
+  {
+   "t0": 45.7,
+   "t1": 49.3,
+   "html": "<p class='t'>With that strength, he walked 40 days to the mountain of God.</p>"
+  },
+  {
+   "t0": 49.5,
+   "t1": 58.4,
+   "html": "<div class='h1'>Worn out today? Start where God started with Elijah: sleep, and a good meal.</div>"
+  },
+  {
+   "t0": 51.0,
+   "t1": 58.4,
+   "raw": true,
+   "html": "<div class='hd'>@withgod.app · find your verse, link in bio</div>"
+  }
+ ]
+}
