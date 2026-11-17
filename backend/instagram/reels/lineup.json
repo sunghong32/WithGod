@@ -1,0 +1,23 @@
+{
+ "_doc": "릴스 편성표 — 키는 미국 동부(ET) 게시 날짜. reel_queue.py 가 빈 슬롯 알림·status 에 주제를 띄우고 add 때 형식을 맞춘다. 초안은 2026-11-17 세션(사용자 확인 전). 주제는 바꿔도 되고, 사실은 만들 때마다 원래 기록으로 확인한다.",
+ "2026-11-16": {"format": "character", "topic": "한나 — 아무도 몰라주는 간절함 (사무엘상 1장)", "note": "11/17 KST 늦게 게시"},
+ "2026-11-18": {"format": "demo", "topic": "I told a Bible app I can't sleep", "note": "앱에 '잠이 안 와요'를 적고 말씀이 나오는 화면"},
+ "2026-11-20": {"format": "painting", "topic": "렘브란트 「탕자의 귀환」 — 아버지의 두 손", "note": "11/13 시안 있음(무음) — 음악·자막 규칙 맞춰 다듬기. 눅 15:24"},
+ "2026-11-23": {"format": "character", "topic": "마르다 — 할 일에 치일 때 (누가복음 10:38–42)", "note": "추수감사절(11/26) 주간"},
+ "2026-11-25": {"format": "demo", "topic": "I told a Bible app I'm dreading the family dinner", "note": "추수감사절 전날"},
+ "2026-11-27": {"format": "hymn", "topic": "「Now Thank We All Our God」 — 30년 전쟁·역병 속 목사 마르틴 링카르트", "note": "추수감사절 다음 날. 장례 수·작사 연도는 원래 기록 확인"},
+ "2026-11-30": {"format": "character", "topic": "사가랴와 엘리사벳 — 오래 기다린 기도 (누가복음 1장)", "note": "대림절 시작(11/29)"},
+ "2026-12-02": {"format": "demo", "topic": "I told a Bible app I feel behind in life"},
+ "2026-12-04": {"format": "life", "topic": "나사렛에서 베들레헴까지 — 걸어서 며칠?", "note": "대림절 특집. 거리는 경로마다 다름(약 110~150km) — 확인"},
+ "2026-12-07": {"format": "character", "topic": "요나 — 도망치고 싶을 때"},
+ "2026-12-09": {"format": "demo", "topic": "I told a Bible app I'm anxious about money"},
+ "2026-12-11": {"format": "prayer", "topic": "성 패트릭의 흉갑 기도 \"Christ with me, Christ before me\"", "note": "패트릭에게 돌려지는 기도(후대 작품일 가능성) — '전해지는'으로 표기"},
+ "2026-12-14": {"format": "character", "topic": "요셉 — 계획이 다 무너졌을 때 (마태복음 1:18–25)", "note": "대림절"},
+ "2026-12-16": {"format": "demo", "topic": "I told a Bible app this is my first Christmas without her", "note": "연말 상실"},
+ "2026-12-18": {"format": "hymn", "topic": "「Silent Night」 — 1818년 오베른도르프, 기타로 처음 부른 노래", "note": "고장 난 오르간·쥐 이야기는 전설 — 쓰지 않거나 전설이라고 밝힘"},
+ "2026-12-21": {"format": "character", "topic": "목자들 — 밤새 일하던 평범한 사람들이 먼저 들은 소식 (누가복음 2:8–20)", "note": "아기 예수 장면은 퍼블릭 도메인 성화"},
+ "2026-12-23": {"format": "demo", "topic": "I told a Bible app I feel lonely this Christmas"},
+ "2026-12-25": {"format": "painting", "topic": "성탄 성화 읽기 — 혼토르스트 「목자들의 경배」 등 퍼블릭 도메인", "note": "성탄절"},
+ "2026-12-28": {"format": "character", "topic": "룻 — 다 잃고 새로 시작할 때", "note": "새해 앞"},
+ "2026-12-30": {"format": "demo", "topic": "I told a Bible app I'm nervous about the new year"}
+}
