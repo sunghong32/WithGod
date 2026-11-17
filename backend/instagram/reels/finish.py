@@ -4,7 +4,7 @@
     python3 finish.py <작업폴더>      # 폴더에 spec.json · cover-spec.json · events.json(compose.py 결과)이 있어야 한다
 
 순서: render.py spec.json(무음 1080×1920) → music.swift events.json(오프라인 렌더, 원음이 작다) → 소리 크기 맞춤
-(엘리야 편과 같은 크기: loudnorm I=-18, 최고 -1.5dB) + 끝 2.4초 페이드 → AAC 192k 로 합침. 표지는 cover-spec 의
+(엘리야 편과 같은 크기: loudnorm I=-18, 최고 -1.5dB) + 끝 2.4초 페이드 → AAC 192k 로 합침(spec 의 "lofi": true 면 로파이 거르기·잡음). 표지는 cover-spec 의
 0초 장면을 JPEG 로 저장한다(인스타 릴스 표지 1080×1920).
 """
 import json
@@ -27,9 +27,17 @@ def main() -> int:
     run(sys.executable, HERE / 'render.py', w / 'spec.json', cwd=w)
     run('swift', HERE / 'music.swift', w / 'events.json', w / 'music.wav', dur + 0.6, cwd=w)
     fade_at = max(0.0, dur - 2.4)
-    run('ffmpeg', '-y', '-loglevel', 'error', '-i', silent, '-i', w / 'music.wav', '-map', '0:v', '-map', '1:a',
-        '-c:v', 'copy', '-af', f'loudnorm=I=-18:TP=-1.5:LRA=11,afade=t=out:st={fade_at}:d=2.4', '-ar', '44100',
-        '-c:a', 'aac', '-b:a', '192k', '-t', str(dur), '-movflags', '+faststart', w / 'reel.mp4')
+    tail = f'loudnorm=I=-18:TP=-1.5:LRA=11,afade=t=out:st={fade_at}:d=2.4'
+    if spec.get('lofi'):  # 수요일 Mia: 고음을 깎고 살짝 눌러 + 아주 작은 테이프 잡음(분홍 잡음)
+        audio = ['-f', 'lavfi', '-i', f'anoisesrc=color=pink:amplitude=0.02:seed=7:duration={dur + 1}',
+                 '-filter_complex', '[1]lowpass=f=4200,acompressor=threshold=-20dB:ratio=3[m];'
+                 f'[2]highpass=f=900,lowpass=f=7000,volume=0.35[h];[m][h]amix=inputs=2:normalize=0,{tail}[a]',
+                 '-map', '0:v', '-map', '[a]']
+    else:
+        audio = ['-map', '0:v', '-map', '1:a', '-af', tail]
+    run('ffmpeg', '-y', '-loglevel', 'error', '-i', silent, '-i', w / 'music.wav', *audio,
+        '-c:v', 'copy', '-ar', '44100', '-c:a', 'aac', '-b:a', '192k', '-t', str(dur), '-movflags', '+faststart',
+        w / 'reel.mp4')
     if (w / 'cover-spec.json').exists():
         cover = json.loads((w / 'cover-spec.json').read_text())
         run(sys.executable, HERE / 'render.py', w / 'cover-spec.json', cwd=w)
