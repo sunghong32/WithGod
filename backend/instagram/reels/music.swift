@@ -1,33 +1,65 @@
-// 사용: swift music.swift events.json out.wav 총초  (events: [{t, dur, note, vel, inst: "piano"|"strings"}])
-// macOS 기본 GS 악기(gs_instruments.dls)로 피아노(0)·현악(49)을 오프라인 렌더하고 홀 잔향을 건다.
+// 사용: swift music.swift events.json out.wav 총초
+// macOS 기본 GS 악기(gs_instruments.dls, General MIDI 128가지 + 드럼)로 오프라인 렌더한다.
+//
+// events.json 은 둘 중 하나:
+//   [ {t, dur, note, vel, inst}, ... ]                       — 예전 형식(피아노·현악, 홀 잔향 28)
+//   {"mix": {...}, "reverb": "mediumRoom", "wet": 20, "events": [...]}
+// inst: "piano"(0) · "strings"(49) · "drums"(GM 드럼, 36 킥 · 38 스네어 · 42 닫힌 하이햇 …) · "gm<번호>"(GM 악기 번호,
+//       예: gm4 일렉 피아노 · gm33 베이스 · gm89 따뜻한 패드 · gm11 비브라폰 · gm24 나일론 기타 · gm46 하프)
+// mix: {"<inst>": {"vol": 0~1, "dry": true}} — dry 면 잔향을 거치지 않는다(드럼·베이스).
 import AVFoundation
 import AudioToolbox
 
 struct Ev: Decodable { let t: Double; let dur: Double; let note: Int; let vel: Int; let inst: String }
+struct Mix: Decodable { let vol: Double?; let dry: Bool? }
+struct Song: Decodable { let events: [Ev]; let mix: [String: Mix]?; let reverb: String?; let wet: Double? }
+
 let args = CommandLine.arguments
-let events = try JSONDecoder().decode([Ev].self, from: Data(contentsOf: URL(fileURLWithPath: args[1])))
+let data = try Data(contentsOf: URL(fileURLWithPath: args[1]))
+var song: Song
+if let s = try? JSONDecoder().decode(Song.self, from: data) {
+    song = s
+} else {
+    song = Song(events: try JSONDecoder().decode([Ev].self, from: data), mix: ["strings": Mix(vol: 0.55, dry: false)],
+                reverb: nil, wet: nil)
+}
 let outURL = URL(fileURLWithPath: args[2]); let total = Double(args[3])!
 let dls = URL(fileURLWithPath: "/System/Library/Components/CoreAudio.component/Contents/Resources/gs_instruments.dls")
 
+let presets: [String: AVAudioUnitReverbPreset] = ["largeHall": .largeHall, "mediumHall": .mediumHall,
+    "mediumRoom": .mediumRoom, "smallRoom": .smallRoom, "largeRoom": .largeRoom, "plate": .plate, "cathedral": .cathedral]
 let engine = AVAudioEngine()
-let piano = AVAudioUnitSampler(), strings = AVAudioUnitSampler()
-let sub = AVAudioMixerNode(), reverb = AVAudioUnitReverb()
-reverb.loadFactoryPreset(.largeHall); reverb.wetDryMix = 28
-for n in [piano, strings, sub, reverb] as [AVAudioNode] { engine.attach(n) }
+let wetBus = AVAudioMixerNode(), dryBus = AVAudioMixerNode(), reverb = AVAudioUnitReverb()
+reverb.loadFactoryPreset(presets[song.reverb ?? "largeHall"] ?? .largeHall); reverb.wetDryMix = Float(song.wet ?? 28)
 let fmt = AVAudioFormat(standardFormatWithSampleRate: 44100, channels: 2)!
-engine.connect(piano, to: sub, format: fmt); engine.connect(strings, to: sub, format: fmt)
-engine.connect(sub, to: reverb, format: fmt); engine.connect(reverb, to: engine.mainMixerNode, format: fmt)
-strings.volume = 0.55
+for n in [wetBus, dryBus, reverb] as [AVAudioNode] { engine.attach(n) }
+engine.connect(wetBus, to: reverb, format: fmt); engine.connect(reverb, to: engine.mainMixerNode, format: fmt)
+engine.connect(dryBus, to: engine.mainMixerNode, format: fmt)
+
+var samplers: [String: AVAudioUnitSampler] = [:]
+for name in Set(song.events.map { $0.inst }).sorted() {
+    let s = AVAudioUnitSampler(); engine.attach(s)
+    let m = song.mix?[name]
+    engine.connect(s, to: (m?.dry ?? false) ? dryBus : wetBus, format: fmt)
+    s.volume = Float(m?.vol ?? 1.0)
+    samplers[name] = s
+}
 try engine.enableManualRenderingMode(.offline, format: fmt, maximumFrameCount: 512)
 try engine.start()
 let msb = UInt8(kAUSampler_DefaultMelodicBankMSB), lsb = UInt8(kAUSampler_DefaultBankLSB)
-try piano.loadSoundBankInstrument(at: dls, program: 0, bankMSB: msb, bankLSB: lsb)
-try strings.loadSoundBankInstrument(at: dls, program: 49, bankMSB: msb, bankLSB: lsb)
+for (name, s) in samplers {
+    if name == "drums" {
+        try s.loadSoundBankInstrument(at: dls, program: 0, bankMSB: UInt8(kAUSampler_DefaultPercussionBankMSB), bankLSB: lsb)
+    } else {
+        let program: UInt8 = name == "piano" ? 0 : name == "strings" ? 49 : UInt8(name.dropFirst(2)) ?? 0
+        try s.loadSoundBankInstrument(at: dls, program: program, bankMSB: msb, bankLSB: lsb)
+    }
+}
 
 struct Act { let t: Double; let on: Bool; let note: UInt8; let vel: UInt8; let s: AVAudioUnitSampler }
 var acts: [Act] = []
-for e in events {
-    let s = e.inst == "strings" ? strings : piano
+for e in song.events {
+    let s = samplers[e.inst]!
     acts.append(Act(t: e.t, on: true, note: UInt8(e.note), vel: UInt8(e.vel), s: s))
     acts.append(Act(t: e.t + e.dur, on: false, note: UInt8(e.note), vel: 0, s: s))
 }
