@@ -51,18 +51,25 @@ AI 영상 모델(로컬 Wan 2.2 는 3.4초에 48분 — 사용자가 중단), �
 - **성화 읽기**: 그림 한 장을 확대해 따라간다(렘브란트 「탕자의 귀환」 시안 11/13). 큰 PD 그림은 캔버스 결 때문에 용량이 크다 — crf 22~24.
 - **앱 시연 = 시리즈 「Mia」**(사용자 결정 11/17): 광고처럼 보이면 안 된다. 매주 같은 인물 Mia 가 진짜 고민을 안고
   WithGod 앱을 쓰는 이야기로 만들고, 편성표 주제(잠 못 드는 밤 → 추수감사절 가족 식사 → 뒤처진 느낌 → 돈 걱정 → 첫 성탄 상실 →
-  외로운 성탄 → 새해)를 Mia 한 사람의 연말로 잇는다. 본보기 `episodes/cant-sleep`(1화 「3:07 a.m.」, 42초).
+  외로운 성탄 → 새해)를 Mia 한 사람의 연말로 잇는다. 본보기 `episodes/cant-sleep`(1화 「3:07 a.m.」, 60초).
   - 월요일 인물 이야기와 한눈에 다르게: 화풍·인물·방·자막 모양은 [mia.py](mia.py) 에 고정(3D 애니메이션, 세로 1088×1936,
     Inter 산세리프 속마음 자막). 음악은 피아노 대신 로파이(일렉 피아노 gm4·베이스 gm33·드럼·비브라폰 gm11·패드 gm89,
     `music.swift` 의 song 형식), spec 에 `"lofi": true` 면 finish.py 가 고음을 깎고 잡음을 아주 조금 섞는다.
   - 광고처럼 보였던 것(11/17 시안 두 개): 떠 있는 휴대폰 카드, 큰 스티커 문구, "It found a verse for that" 같은 기능 설명,
     신나는 음악. 자막은 Mia 의 속마음만 쓰고, 앱 이름은 이야기 속에서 한 번 "the WithGod app"(Bible app 아님).
+  - **글은 여유 있게**(사용자 11/17 2차): 자막 한 줄마다 3~4초 이상, 앱 이름이 나오는 자막은 특히 오래. 앱 화면 위에는 자막을 얹지 않는다.
+  - **고민을 입력하는 장면을 넣는다** — 화면 키보드로 한 글자씩 치는 실제 녹화. 시뮬레이터는 키 하나에 1~2초가 걸리니
+    `episodes/cant-sleep/build_app.py` 처럼 글자가 바뀐 프레임만 이어 초당 약 6자로 줄인다(시간만 줄이고 화면은 그대로).
+    Mac 에서 키 입력을 보내면(시뮬레이터 `text`) 화면 키보드가 내려가 버리니, 키보드의 키를 하나씩 탭한다
+    (마침표는 123 → `.`, 자동 고침이 cant→can't 를 해 준다).
   - 흐름: 고민(그림 2~3장) → 앱을 연다 → 실제 앱 화면을 전체 화면으로(자막 없이, 마음에 남은 줄로 천천히 다가감) →
     조용해진 Mia → 금색 위로의 말씀 → 보는 사람에게 돌려주는 한 줄 + `Mia · every Wednesday · @withgod.app`.
   - 녹화: Release 앱이 깔린 iPhone 17 Pro 시뮬레이터(023E2DDB, 11/13 빌드, OTA 꺼짐). 업데이트 안내 창은 「Later」를 탭해 닫는다.
     `xcrun simctl status_bar <udid> override --time "3:07" …` 로 상태 막대 시각을 장면에 맞추고(끝나면 `clear`),
-    `xcrun simctl io <udid> recordVideo --codec=h264 take.mov &` → `xcrun simctl openurl <udid> "withgod://result?mood=<인코딩>"` → 40초 뒤 `pkill -INT -f recordVideo`.
-    입력창 탭·글자 넣기는 시뮬레이터에서 안 먹었다(11/17) — 홈에서 바로 딥링크로 넘어가고, 결과 화면 말풍선이 입력한 말을 보여 준다.
+    `xcrun simctl io <udid> recordVideo --codec=h264 take.mov &` → 입력·보내기 → 응답이 다 나온 뒤 `pkill -INT -f recordVideo`.
+    홈 터치가 안 먹으면 알림 안내(프라이밍)와 업데이트 안내가 겹친 것 — 앱 저장소 `Documents/withgod-storage.json` 에
+    `withgod.notifications.primingSeen: "true"` 를 넣고 다시 실행한다(11/17, 앱 쪽 수정은 따로).
+    결과 화면만 필요하면 딥링크 `withgod://result?mood=<인코딩>` 로 바로 연다.
   - 녹화는 가변 프레임이라 `ffmpeg -vf fps=30` 로 바꿔 `video` 장면에 쓴다(render.py 가 장면마다 차례로 읽는다). 찾는 중(약 7초)은
     잘라 낸다. 카메라는 화면 전체 폭(1206) — 카드 양옆이 잘리지 않게, 위·아래 맞춤으로만 움직인다. 앱 화면을 꾸미지 않는다.
   - 캡션에 Mia 가 우리가 만든 애니메이션 인물이라는 것, 앱이 AI 로 말씀을 고르고 글을 쓴다는 점, "영상 속 휴대폰 화면은 실제 앱과
