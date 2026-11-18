@@ -56,8 +56,9 @@ OpenAI 시절 이탈리아어만 gpt-4o 로 올리던 장치는 `LLM_MODEL_IT`(�
 **1.6.0(iPad 지원)이 양 스토어 공개(11/10 확인)** — App Store 2026-11-09 17:35 UTC 릴리스(iTunes Lookup us·jp·kr),
 Play vc28 production·alpha·internal `completed`. **1.6.1(#69 iOS 위젯 현지 날짜) 제출(11/13)** — iOS 빌드 62 심사 대기(승인 시 자동 공개), Android vc29 production·alpha·internal 100%. latest 는 App Store 공개 후 1시간 안에 자동으로 1.6.1.
 ⚠️ runtimeVersion 이 `appVersion` 정책이라 **`eas update` 는 app.json version(지금 1.6.1) 빌드에만 닿는다** — 1.6.0·1.5.0 에
-남은 사용자에게도 보내려면 version 을 바꿔 runtime 마다 따로 낸다. 마지막 OTA — iOS 1.6.1 `f1a08f71`·1.6.0 `f6d02628`(11/18, #92 만),
-Android 1.6.0 `08002c7a`(11/13, 1.6.1 은 없음). **1.5.0 이하는 min_supported 로 막았으니 더 내지 않는다.**
+남은 사용자에게도 보내려면 version 을 바꿔 runtime 마다 따로 낸다. 마지막 OTA(11/18, #92 만) — 1.6.1 iOS `f1a08f71`·Android `2a3e8b85`,
+1.6.0 iOS `f6d02628`·Android `8192abcc`. **OTA 는 iOS·Android 를 같은 번들로 같이 낸다**(플랫폼별로 갈리면 관리가 복잡해진다 — 사용자 지적).
+**1.5.0 이하는 min_supported 로 막았으니 더 내지 않는다.**
 `/app-version` latest 는 iTunes 조회로 자동으로 따라간다(1시간마다, 애플 CDN 캐시 우회 — #56). 1.6.0 은 11/10 09:12 반영.
 **min_supported 1.6.0(11/18)** — 1.5.0 이하는 강제 업데이트(1.5.0 은 11/11 뒤 실행 0대, 1.6.x 와 SDK·최소 OS 같음). iOS·Android 가 한 값을 같이 쓴다.
 
@@ -65,8 +66,8 @@ Android 1.6.0 `08002c7a`(11/13, 1.6.1 은 없음). **1.5.0 이하는 min_support
 
 - [x] **#92 iOS 안내 모달 겹침 → 홈 먹통 — 수정·배포 완료(11/18, PR #93).** iOS 는 모달을 하나만 present 하고, 거절된 RN Modal 은 보이지 않는
       전체 화면 호스트로 남아 터치를 다 먹는다. 수정은 `useModalTurn` 차례표 — **앱이 스스로 띄우는 새 모달은 이걸 거칠 것.**
-      OTA 는 iOS 만, 수정만(브랜치 `ota/1.6.1-modal-turn`·`ota/1.6.0-modal-turn` = 각 runtime 의 마지막 코드 + 수정, #79 안 실음).
-      Android 는 이 버그가 없고 미검증이라 다음 스토어 빌드에 실린다 — 그 빌드에서 안내 모달 차례(동의창→업데이트→프라이밍)를 한 번 볼 것
+      OTA 는 수정만(브랜치 `ota/1.6.1-modal-turn`·`ota/1.6.0-modal-turn` = 각 runtime 의 마지막 코드 + 수정, #79 안 실음), iOS·Android 같은 번들.
+      Android 는 이 버그가 없지만 플랫폼끼리 코드가 갈리지 않게 같이 냈다 — 에뮬레이터(로컬 릴리스 APK)에서 동의창→업데이트→프라이밍 차례·홈 입력 확인
 - [x] **앱 받기 링크(/get) 클릭 집계 — 운영 배포 완료(11/16, PR #83 `9dd92b4`).** 웹이 리다이렉트 뒤(`after()`) 백엔드
       `POST /admin/analytics/link-clicks`(관리 키)로 src·기기·하루짜리 방문자 해시(IP 원문 안 보냄)를 남기고, 어드민 「앱 받기 링크 클릭」
       카드가 출처별 클릭·방문자·최근 20건을 보여 준다(미리보기 봇 제외). 외부에 거는 링크는 `/get?src=<출처>`(예: 인스타 DM `ig-dm`)
@@ -141,8 +142,7 @@ Android 1.6.0 `08002c7a`(11/13, 1.6.1 은 없음). **1.5.0 이하는 min_support
 
 ## 최근 변경 이력
 
-- 2026-11-18 release: #92 OTA iOS 1.6.1 `f1a08f71`·1.6.0 `f6d02628`(수정만) + min_supported 1.0.0 → 1.6.0 — 날짜별 실행을 보니 1.5.0 은 11/11 뒤 0대라 1.5.0 OTA 대신 강제 업데이트로 정리(사용자 결정)
-- 2026-11-17 fix(app): #92 iOS 안내 모달이 겹치면 홈이 터치를 받지 않던 문제 — 차례표 `useModalTurn`(동의창·업데이트·프라이밍·AI 사과·위젯 안내를 하나씩, onDismiss 뒤 다음). 시뮬레이터 Release 1.6.0 에 새 번들로 4가지 조합 확인 · PR #93
+- 2026-11-18 fix/release: #92 iOS 안내 모달이 겹치면 홈 먹통 — 차례표 `useModalTurn`(PR #93, 시뮬레이터 4조합·에뮬레이터 확인). OTA 1.6.1·1.6.0 iOS·Android(수정만) + min_supported 1.6.0(1.5.0 은 11/11 뒤 실행 0대라 OTA 대신 강제 업데이트, 사용자 결정)
 - 2026-11-17 feat(instagram): 수요일 앱 시연을 시리즈 「Mia」로 — 첫 편이 인물 이야기와 똑같아 보이고 다시 만든 시안은 광고 같다는 사용자 피드백으로, 3D 애니 인물 Mia 가 고민을 안고 WithGod 앱을 쓰는 이야기(실제 앱 녹화, 로파이 음악, 속마음 자막). 1화 「3:07 a.m.」 11/18 큐(2차: 실제로 한 글자씩 치는 장면·자막 여유 있게, 60초, 시편 4:8). render.py 앱 화면 장면·자막별 CSS, music.swift GM 128 악기·드럼
 - 2026-11-17 chore(instagram): 릴스 게시 시각을 다시 따져 봄(사용자 질문 「아침 7시가 낫지 않나」) — 아침 7시 ET 는 서부 새벽 4시라 뺌. 20:00 으로 옮겼다가(PR #87) 사용자 결정으로 19:00 유지
 - 2026-11-17 feat(instagram): 릴스 월·수·금 예약 큐(`backend/instagram/reels/reel_queue.py` + launchd) — 주기만 정하고 예약·미리 만든 편이 없어 11/16 월요일 편이 비었다. 빈 슬롯 텔레그램 알림 · 금요일 형식 순번 기록 · 렌더러를 워크트리 임시 폴더에서 레포로. 한나 편(사무엘상 1장) 제작·게시
