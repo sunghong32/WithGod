@@ -55,8 +55,8 @@ OpenAI 시절 이탈리아어만 gpt-4o 로 올리던 장치는 `LLM_MODEL_IT`(�
 
 **1.6.0(iPad 지원)이 양 스토어 공개(11/10 확인)** — App Store 2026-11-09 17:35 UTC 릴리스(iTunes Lookup us·jp·kr),
 Play vc28 production·alpha·internal `completed`. **1.6.1(#69 iOS 위젯 현지 날짜) 제출(11/13)** — iOS 빌드 62 심사 대기(승인 시 자동 공개), Android vc29 production·alpha·internal 100%. latest 는 App Store 공개 후 1시간 안에 자동으로 1.6.1.
-⚠️ runtimeVersion 이 `appVersion` 정책이라 **이제 `eas update` 는 1.6.0 빌드에만 닿는다** — 1.5.0 에 남은 사용자에게도
-보내려면 runtime 1.5.0 으로 따로 내야 한다. 1.5.0 의 마지막 OTA 는 `7a43d408`(11/9, #30·#26 JS).
+⚠️ runtimeVersion 이 `appVersion` 정책이라 **`eas update` 는 app.json version(지금 1.6.1) 빌드에만 닿는다** — 1.6.0·1.5.0 에
+남은 사용자에게도 보내려면 version 을 바꿔 runtime 마다 따로 낸다. 마지막 OTA 는 1.6.0 `08002c7a`·1.5.0 `4bc21f51`(11/13), 1.6.1 은 아직 없음.
 `/app-version` latest 는 iTunes 조회로 자동으로 따라간다(1시간마다, 애플 CDN 캐시 우회 — #56). 1.6.0 은 11/10 09:12 반영.
 min_supported 는 1.0.0 유지(강제 업데이트 사유 없음).
 
@@ -65,7 +65,8 @@ min_supported 는 1.0.0 유지(강제 업데이트 사유 없음).
 - [ ] **#92 iOS 안내 모달 겹침 → 홈 먹통 — PR #93 리뷰 대기(11/17).** iOS 는 모달을 하나만 present 하고, 거절된 RN Modal 은 보이지 않는
       전체 화면 호스트로 남아 터치를 다 먹는다. 막히는 경우: 옛 버전(1.5.0·1.6.0) + 업데이트 안내 + AI 사과 안내(사과를 못 본 사용자는 켤 때마다),
       유럽 첫 실행의 통계 동의창 + 알림 프라이밍(모든 버전). 수정은 `useModalTurn` 차례표 — **앱이 스스로 띄우는 새 모달은 이걸 거칠 것.**
-      병합 뒤 OTA 를 runtime 1.6.0·1.5.0 에 각각 내야 막힌 사용자에게 닿는다(배포는 사용자 확인 후)
+      OTA 는 runtime 1.6.1·1.6.0·1.5.0 셋 다(유럽 첫 실행은 1.6.1 도 막힘). 셋의 앱 JS 는 지금 같다(1.6.1 빌드 `d3f6c0c`·1.6.0 OTA `afa44e6`·
+      1.5.0 OTA `a78890b`) — 그 위에 수정 커밋만 얹어 version 만 바꿔 세 번 낸다(#79 는 안 실음, 충돌 없음 확인). 배포는 사용자 확인 후
 - [x] **앱 받기 링크(/get) 클릭 집계 — 운영 배포 완료(11/16, PR #83 `9dd92b4`).** 웹이 리다이렉트 뒤(`after()`) 백엔드
       `POST /admin/analytics/link-clicks`(관리 키)로 src·기기·하루짜리 방문자 해시(IP 원문 안 보냄)를 남기고, 어드민 「앱 받기 링크 클릭」
       카드가 출처별 클릭·방문자·최근 20건을 보여 준다(미리보기 봇 제외). 외부에 거는 링크는 `/get?src=<출처>`(예: 인스타 DM `ig-dm`)
