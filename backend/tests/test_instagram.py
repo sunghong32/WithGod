@@ -89,16 +89,21 @@ class CopyRulesTest(unittest.TestCase):
         self.assertIn("\n\nA Bible verse about rest, for a long week.\n\n", caption)
 
     def test_slide_copy_rules(self):
-        good = {"scene": {"label": "the scene", "body": "A hillside in Galilee.", "art": "x.jpg",
-                          "credit": "Carl Bloch, 1877", "alt": "Painting."}}
-        self.assertEqual(find_slide_problems(good), [])
-        bad = json.loads(json.dumps(good))
-        bad["scene"]["label"] = "the story"
-        bad["scene"]["body"] = "My heart — always."
-        bad["scene"]["credit"] = ""
-        found = " ".join(find_slide_problems(bad))
-        for word in ("scene.label", "scene.credit", "줄표", "사람이 쓴 척"):
-            self.assertIn(word, found)
+        good = {"word": "Near.", "topic": "#comfort"}
+        self.assertEqual(find_slide_problems(good, "The LORD is near to those who have a broken heart."), [])
+        self.assertEqual(find_slide_problems({"word": "Be still.", "topic": "#peace"}, "Be still, and know."), [])
+        for word in ("near", "Near", "Three whole words.", "Extraordinarily.", ""):
+            self.assertTrue(find_slide_problems({"word": word, "topic": "#comfort"}), word)
+        self.assertIn("본문에 없음", " ".join(find_slide_problems({"word": "Glory.", "topic": "#hope"}, "Be still.")))
+        self.assertIn("mood", " ".join(find_slide_problems({"word": "Near.", "topic": "#comfort", "mood": "sad"})))
+
+    def test_every_topic_has_a_mood(self):
+        from instagram.caption import MOODS, TOPIC_HASHTAGS, TOPIC_MOOD, mood_for
+
+        self.assertEqual(sorted(TOPIC_MOOD), sorted(TOPIC_HASHTAGS))
+        self.assertTrue(set(TOPIC_MOOD.values()) <= set(MOODS))
+        self.assertEqual(mood_for({"topic": "#trust"}), "peace")
+        self.assertEqual(mood_for({"topic": "#trust", "mood": "comfort"}), "comfort")
 
     def test_carousel_caption_points_to_the_note_card(self):
         caption = build_caption(hook="Hook.", verse_text="Rest.", ref="Psalm 4:8", cta="Save this.", topic="#rest")
@@ -528,6 +533,7 @@ class CopyDataTest(unittest.TestCase):
         self.assertEqual(sorted(set(copies) - ids), [])
         bad = {}
         for vid, c in copies.items():
+            self.assertNotIn("scene", c, vid)  # 그림 장은 11/19 에 뺐다
             p = (find_copy_problems(c["label"], limit=40, field="label")
                  + find_copy_problems(c["hook"], limit=125, field="hook")
                  + find_copy_problems(c["cta"], limit=100, field="cta") + find_slide_problems(c))
@@ -543,31 +549,48 @@ class CopyDataTest(unittest.TestCase):
         en = localize_all(items)
         missing = [vid for vid, c in copies.items() if c["emph"] not in card_text(en[vid]["text"])]
         self.assertEqual(missing, [])
+        # 표지의 한 단어도 본문에 그대로 있어야 둘째 장으로 이어진다
+        words = {vid: p for vid, c in copies.items() if (p := find_slide_problems(c, card_text(en[vid]["text"])))}
+        self.assertEqual(words, {})
 
 
 class SlideOrderTest(unittest.TestCase):
-    """캐러셀 순서 — 장면 그림이 있으면 그림 표지가 첫 장이다(그리드·피드에 먼저 보이는 장, 11/13 결정)."""
+    """캐러셀 순서 — 표지(오늘의 한 단어) → 말씀 → 앱 풀이, 세 장이 같은 분위기(11/19 결정)."""
 
-    def test_art_cover_first(self):
+    def load(self):
         import importlib.util
 
         path = Path(__file__).resolve().parent.parent / "scripts" / "build_ig_daily_posts.py"
         spec = importlib.util.spec_from_file_location("build_ig_daily_posts", path)
         mod = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(mod)
+        return mod
+
+    def test_word_cover_first(self):
+        mod = self.load()
         entry = {"text": "Be still.", "display_ref": "Psalm 46:10", "alt_text": "Verse alt.", "note": "A note."}
-        copy = {"label": "When it’s loud", "emph": "Be still.", "pal": "mist",
-                "scene": {"label": "the picture", "body": "A quiet hill at dusk.", "alt": "Illustration: a hill.",
-                          "art": "x.jpg", "focus": "60% 50%", "credit": "Illustration by WithGod, made with AI"}}
-        with tempfile.TemporaryDirectory() as d:
-            (Path(d) / "x.jpg").write_bytes(b"x")
-            with patch.object(mod, "ART_DIR", Path(d)):
-                slides = mod.slides_for(entry, copy)
-        self.assertEqual([s["kind"] for s, _ in slides], ["cover", "verse", "scene", "note"])
+        copy = {"label": "When it’s loud", "emph": "Be still.", "pal": "mist", "topic": "#peace", "word": "Be still."}
+        slides = mod.slides_for(entry, copy)
+        self.assertEqual([s["kind"] for s, _ in slides], ["word", "verse", "note"])
+        self.assertEqual({s["mood"] for s, _ in slides}, {"peace"})
+        self.assertEqual({s["pal"] for s, _ in slides}, {"mist"})
         cover, alt = slides[0]
-        self.assertEqual((cover["focus"], cover["ref"]), ("60% 50%", "Psalm 46:10"))
-        self.assertTrue(alt.startswith("Illustration: a hill.") and "when it’s loud" in alt)
-        self.assertNotIn("art", slides[2][0])  # 그림은 표지에만, 셋째 장은 설명 글만
-        self.assertEqual([s["arrow"] for s, _ in slides], [True, True, True, False])
-        del copy["scene"]
-        self.assertEqual([s["kind"] for s, _ in mod.slides_for(entry, copy)], ["verse", "note"])
+        self.assertEqual((cover["word"], cover["ref"]), ("Be still.", "Psalm 46:10"))
+        self.assertIn("When it’s loud: Be still. Psalm 46:10", alt)
+        self.assertEqual([s["arrow"] for s, _ in slides], [True, True, False])
+        copy["mood"] = "comfort"
+        self.assertEqual({s["mood"] for s, _ in mod.slides_for(entry, copy)}, {"comfort"})
+
+    def test_card_html_carries_the_mood(self):
+        from instagram.card import slide_html
+
+        doc = slide_html({"kind": "word", "pal": "twilight", "mood": "comfort", "label": "When it hurts",
+                          "word": "Near.", "ref": "Psalm 34:18"})
+        self.assertIn("m-comfort", doc)
+        self.assertIn('class="fx stars"', doc)  # 어두운 팔레트의 위로 = 별
+        self.assertIn("Near<i>.</i>", doc)
+        verse = slide_html({"kind": "verse", "pal": "paper", "mood": "wisdom", "label": "L", "text": "Be wise.",
+                            "emph": "wise", "ref": "Proverbs 1:1"})
+        self.assertIn('class="fx wrule"', verse)
+        app = slide_html({"kind": "app", "pal": "brand", "headline": "H", "body": "B", "mood": "joy"})
+        self.assertNotIn('class="fx', app)  # 앱 안내 장은 브랜드 장 그대로

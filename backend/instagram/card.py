@@ -4,16 +4,21 @@
 필름 질감, Fraunces 본문, 핵심 구절 형광펜, 왼쪽 정렬, 아래 @withgod.app. 프로필 그리드가 런칭 9개와
 한 계정으로 보여야 해서 팔레트·글꼴·여백 값을 그대로 옮겼다.
 
-슬라이드 종류(한 게시물 = 2~4장 캐러셀):
-- cover: 표지(그리드에 보이는 장). 장면 그림을 꽉 채우고 아래에 감정 라벨 + 참조를 얹는다. 첫 장이 글
-  카드면 흔한 말씀 카드 계정과 구별되지 않아(11/13 사용자 지적) 그림을 앞에 둔다.
-  그림은 퍼블릭 도메인 성화이거나, 이 맥에서 로컬 오픈소스 모델(Z-Image-Turbo, Apache-2.0)로 만든 그림이다
-  (`instagram/build/art/`, 출처 기록은 `instagram/art_sources.json`). 가로 그림이라 4:5 로 꽉 채우면 양옆이
-  잘린다 — 어디를 남길지는 카피의 `scene.focus`(object-position).
+슬라이드 종류(한 게시물 = 표지 → 말씀 → 앱 풀이, 수·일요일엔 + 앱 안내):
+- word: 표지(그리드에 보이는 장) — 「오늘의 한 단어」. 말씀에서 고른 낱말 하나(카피의 `word`, 예 「Near.」)를
+  아주 크게, 마침표만 강조색, 왼쪽 위에 감정 라벨 스티커, 아래 참조. 그림·사진은 쓰지 않는다(11/19 사용자:
+  "사진을 안 쓰는 방향으로 우리만의 디자인"). 성경 시대 그림은 월요일 릴스(인물 이야기)의 몫이다.
 - verse: 말씀 + 라벨 + 참조.
-- scene: 그림의 배경 설명과 그림 출처. `art` 를 주면 위에 그림, 아래 설명(옛 틀). 표지가 그림이면 글만.
 - note: 앱의 영어 풀이 전문(AI 로 쓴 것이라 그렇게 밝힌다). 캡션 대신 카드에 실어 게시물 하나로 읽히게 한다.
 - app: 앱 안내(수·일요일만).
+
+분위기(`mood`, 카피의 주제 태그에서 정한다 — caption.mood_for): 표지·말씀·풀이 장이 같은 배경 요소를 써서
+넘겨도 한 장처럼 이어진다. 오늘의 말씀이 늘 밝지는 않아서(11/19 사용자) 말씀 성격에 따라 바꾼다.
+- comfort 위로: 가운데, 부드러운 기울임 단어, 둥근 달빛(어두운 팔레트면 옅은 별)
+- hope 소망: 아래에서 빛이 올라옴(어두운 팔레트면 별 — 밤에서 시작하는 소망)
+- peace 평안: 왼쪽 위 둥근 빛, 부드러운 글씨
+- wisdom 지혜: 위쪽에 얇은 기울임 단어 + 강조색 선
+- joy 기쁨: 아주 굵게, 오른쪽 위 해
 
 HTML 을 Chrome 헤드리스로 찍고 Pillow 로 JPEG 로 바꾼다(API 는 JPEG 만 받는다). 운영 서버(1GB)는 렌더하지
 않는다 — 미리 찍어 S3 에 올려 두고 서버는 게시만 한다.
@@ -29,11 +34,9 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 FONTS = HERE / "fonts"
-ART = HERE / "build" / "art"
 CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 W, H = 1080, 1350
 JPEG_QUALITY = 92
-ART_H = 800  # scene 장의 그림 높이
 
 # 어두운 팔레트 — 형광펜 대신 이탤릭 강조색을 쓴다(런칭과 같다).
 DARK = {"brand", "night", "twilight", "sage"}
@@ -111,32 +114,45 @@ mark{color:inherit;background:linear-gradient(transparent 56%,var(--mark) 56%,va
 .vref{margin-top:46px;font:500 30px "WGSans";letter-spacing:.03em;color:var(--muted)}
 .vref .tr{margin-left:12px;font-size:22px;letter-spacing:.12em;opacity:.8}
 
-/* 장면 */
-.art{position:absolute;left:0;top:0;width:1080px;height:ART_Hpx;overflow:hidden;background:#000}
-.art img{width:100%;height:100%;object-fit:cover;display:block}
-.art::after{content:"";position:absolute;left:0;right:0;bottom:0;height:3px;background:rgba(0,0,0,.08)}
-.sc{position:absolute;left:100px;right:100px;top:calc(ART_Hpx + 54px);bottom:150px;display:flex;flex-direction:column}
-.sc .lab{font-size:40px}
-.sc p{margin:18px 0 0;font-size:42px;line-height:1.34;letter-spacing:-.004em;color:var(--ink);text-wrap:pretty}
-.credit{margin-top:26px;font:500 22px/1.3 "WGSans";letter-spacing:.02em;color:var(--muted);opacity:.9}
+/* 표지 — 오늘의 한 단어 */
+.tag{position:absolute;left:100px;top:116px;font:600 30px/1 "WGSans";letter-spacing:.01em;background:var(--tag-bg,var(--ink));
+  color:var(--tag-ink,#FBF4E6);padding:16px 30px;border-radius:999px;transform:rotate(-3deg);transform-origin:left center;
+  box-shadow:0 8px 20px rgba(0,0,0,.10);max-width:860px}
+.wbox{position:absolute;left:92px;right:92px;top:240px;bottom:200px;display:flex;flex-direction:column;justify-content:flex-end}
+.word{font-weight:600;font-size:300px;line-height:.95;letter-spacing:-.045em;white-space:nowrap;color:var(--ink);
+  font-variation-settings:"SOFT" 100,"WONK" 1}
+.word i{font-style:normal;color:var(--accent)}
+.wref{margin-top:34px;margin-left:8px;font:500 30px "WGSans";letter-spacing:.03em;color:var(--muted)}
 
-/* 그림 표지 */
-.full{position:absolute;inset:0;background:#000}
-.full img{width:100%;height:100%;object-fit:cover;display:block}
-.shade{position:absolute;left:0;right:0;bottom:0;height:640px;
-  background:linear-gradient(180deg,rgba(14,12,24,0) 0%,rgba(14,12,24,.42) 45%,rgba(14,12,24,.78) 100%)}
-.ov{position:absolute;left:96px;right:96px;bottom:150px;color:#FFF8EC}
-.ov .lab{color:rgba(255,248,236,.96);font-size:60px;line-height:1.16;text-wrap:balance;
-  text-shadow:0 2px 18px rgba(0,0,0,.25)}
-.ov .vref{margin-top:22px;font-size:28px;color:rgba(255,248,236,.82)}
-.cover::after{opacity:calc(var(--grain) * .5)}
-.cover .foot{color:rgba(255,248,236,.86)}
+/* 분위기별 배경 요소(표지·말씀·풀이 장 공통) */
+.fx{position:absolute;pointer-events:none}
+.stars{left:0;top:0;width:3px;height:3px;border-radius:50%;background:#fff;opacity:.55;
+  box-shadow:120px 160px #fff,300px 90px #fffbe8,520px 210px #fff,760px 120px #fff,900px 300px #fffbe8,
+  640px 380px #fff,210px 330px #fff,980px 70px #fff,420px 60px #fff,840px 470px #fff,60px 520px #fff,
+  350px 470px #fffbe8,1010px 560px #fff,700px 600px #fffbe8}
+.moon{right:-120px;top:-120px;width:560px;height:560px;border-radius:50%;
+  background:radial-gradient(circle,rgba(255,255,255,.6),rgba(255,255,255,0) 68%)}
+.dark .moon{background:radial-gradient(circle,rgba(255,236,210,.30),rgba(255,236,210,0) 68%)}
+.rise{left:-25%;right:-25%;bottom:-460px;height:1100px;border-radius:50%;
+  background:radial-gradient(closest-side,rgba(255,240,206,.95),rgba(255,240,206,0))}
+.dark .rise{background:radial-gradient(closest-side,rgba(255,196,140,.62),rgba(255,196,140,0))}
+.halo{left:-260px;top:-260px;width:900px;height:900px;border-radius:50%;
+  background:radial-gradient(circle,rgba(255,255,255,.8),rgba(255,255,255,0) 68%)}
+.dark .halo{background:radial-gradient(circle,rgba(255,255,255,.14),rgba(255,255,255,0) 68%)}
+.sunr{right:-240px;top:-240px;width:860px;height:860px;border-radius:50%;
+  background:radial-gradient(circle,rgba(255,252,236,1) 0%,rgba(255,241,200,.9) 36%,rgba(255,226,170,0) 70%)}
+.wrule{left:100px;top:118px;width:150px;height:5px;background:var(--accent)}
+.rule{width:150px;height:5px;background:var(--accent);margin:46px 0 0 10px}
 
-/* 장면 설명(글만) */
-.sbox{position:absolute;left:100px;right:100px;top:140px;bottom:210px;display:flex;flex-direction:column;
-  justify-content:center}
-.sbox p{margin:30px 0 0;font-size:50px;line-height:1.38;letter-spacing:-.004em;color:var(--ink);text-wrap:pretty}
-.sbox .credit{margin-top:40px;font-size:24px}
+/* 분위기별 한 단어 */
+.m-comfort .wbox{justify-content:center;top:200px;bottom:240px}
+.m-comfort .word{font-style:italic;font-weight:400;font-size:270px;letter-spacing:-.03em;font-variation-settings:"SOFT" 100,"WONK" 0}
+.m-comfort .word i{font-style:italic}
+.m-peace .word{font-weight:500;letter-spacing:-.035em}
+.m-wisdom .wbox{justify-content:flex-start;top:320px}
+.m-wisdom .word{font-style:italic;font-weight:300;font-size:290px;letter-spacing:-.035em;font-variation-settings:"SOFT" 0,"WONK" 1}
+.m-wisdom .word i{font-style:italic}
+.m-joy .word{font-weight:800;font-size:330px;letter-spacing:-.05em}
 
 /* 앱 풀이 */
 .nbox{position:absolute;left:100px;right:100px;top:130px;bottom:205px;display:flex;flex-direction:column;
@@ -155,7 +171,7 @@ mark{color:inherit;background:linear-gradient(transparent 56%,var(--mark) 56%,va
 .cbox p{margin:40px 0 0;font-size:48px;line-height:1.36;color:var(--soft);max-width:860px;text-wrap:pretty}
 .pill{margin-top:58px;font:600 34px/1 "WGSans";background:var(--tag-bg);color:var(--tag-ink);padding:22px 40px;
   border-radius:999px;transform:rotate(-2deg);transform-origin:left center;box-shadow:0 10px 24px rgba(0,0,0,.12)}
-""".replace("ART_H", str(ART_H))
+"""
 
 # 상자를 넘치면 글자를 2px씩 줄이고, 마지막 줄 외톨이 단어를 피한다(런칭과 같은 방식).
 FIT_JS = """
@@ -202,8 +218,7 @@ function noOrphan(sel){
 }
 document.fonts.ready.then(function(){
   fit('.vtext', '.vbox', 38); noOrphan('.vtext'); fit('.vtext', '.vbox', 38);
-  fit('.sc p', '.sc', 34); noOrphan('.sc p'); fit('.sc p', '.sc', 34);
-  fit('.sbox p', '.sbox', 36); noOrphan('.sbox p'); fit('.sbox p', '.sbox', 36);
+  fit('.word', '.wbox', 120);
   fit('.nbox p', '.nbox', 32); noOrphan('.nbox p'); fit('.nbox p', '.nbox', 32);
   fit('.cbox h2', '.cbox', 56);
   document.body.setAttribute('data-ready', '1');
@@ -260,10 +275,18 @@ def lower_first(text: str) -> str:
     return text[:1].lower() + text[1:]
 
 
-def art_path(art: str) -> Path:
-    """그림 경로 — 상대 경로면 instagram/art/ 기준."""
-    p = Path(art)
-    return p if p.is_absolute() else ART / p
+def _fx(mood: str, dark: bool, kind: str) -> str:
+    """분위기 배경 요소. 표지·말씀·풀이 장에만(앱 안내 장은 브랜드 장이라 그대로)."""
+    if not mood or kind not in ("word", "verse", "note"):
+        return ""
+    stars = '<div class="fx stars"></div>' if dark else ""
+    return {
+        "comfort": stars + '<div class="fx moon"></div>',
+        "hope": stars + '<div class="fx rise"></div>',
+        "peace": '<div class="fx halo"></div>',
+        "wisdom": "" if kind == "word" else '<div class="fx wrule"></div>',  # 표지는 단어 아래 선
+        "joy": '<div class="fx sunr"></div>',
+    }[mood]
 
 
 def _foot(arrow: bool) -> str:
@@ -276,24 +299,19 @@ def slide_html(s: dict) -> str:
     cls = f"s p-{pal}" + (" dark" if pal in DARK else "")
     arrow = s.get("arrow", False)
     e = html.escape
-    if k == "cover":
-        src = art_path(s["art"]).as_uri()
-        cls += " cover"
-        body = (f'<div class="full"><img src="{src}" style="object-position:{e(s.get("focus", "50% 50%"))}"></div>'
-                f'<div class="shade"></div><div class="ov"><div class="lab">{e(lower_first(s["label"]))}</div>'
-                f'<div class="vref">{e(s["ref"])}</div></div>')
+    if s.get("mood"):
+        cls += f" m-{s['mood']}"
+    fx = _fx(s.get("mood", ""), pal in DARK, k)
+    if k == "word":
+        w = e(s["word"])
+        w = w[:-1] + "<i>.</i>" if w.endswith(".") else w
+        rule = '<div class="rule"></div>' if s.get("mood") == "wisdom" else ""
+        body = (f'<div class="tag">{e(lower_first(s["label"]))}</div>'
+                f'<div class="wbox"><div class="word">{w}</div>{rule}<div class="wref">{e(s["ref"])}</div></div>')
     elif k == "verse":
         body = (f'<div class="vbox"><div class="lab">{e(lower_first(s["label"]))}</div>'
                 f'<div class="vtext" style="font-size:{verse_size(s["text"])}px">{marked(s["text"], s.get("emph", ""))}</div>'
                 f'<div class="vref">{e(s["ref"])}<span class="tr">WEB</span></div></div>')
-    elif k == "scene" and not s.get("art"):
-        body = (f'<div class="sbox"><div class="lab">{e(s["label"])}</div><p>{rich(s["body"])}</p>'
-                f'<div class="credit">{e(s["credit"])}</div></div>')
-    elif k == "scene":
-        src = art_path(s["art"]).as_uri()
-        body = (f'<div class="art"><img src="{src}" style="object-position:{e(s.get("focus", "50% 50%"))}"></div>'
-                f'<div class="sc"><div class="lab">{e(s["label"])}</div><p>{rich(s["body"])}</p>'
-                f'<div class="credit">{e(s["credit"])}</div></div>')
     elif k == "note":
         body = (f'<div class="nbox"><div class="lab">{e(s["label"])}</div>'
                 f'<p style="font-size:{note_size(s["body"])}px">{e(s["body"])}</p></div>'
@@ -307,7 +325,7 @@ def slide_html(s: dict) -> str:
     else:
         raise ValueError(k)
     doc = (f"<!doctype html><html><head><meta charset='utf-8'><style>{CSS}</style></head>"
-           f'<body><div class="{cls}">{body}{_foot(arrow)}</div>{FIT_JS}</body></html>')
+           f'<body><div class="{cls}">{fx}{body}{_foot(arrow)}</div>{FIT_JS}</body></html>')
     return doc.replace("FONTS/", FONTS.as_uri() + "/")
 
 

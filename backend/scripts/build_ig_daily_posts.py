@@ -7,12 +7,12 @@
     python scripts/build_ig_daily_posts.py                              # 카피가 있는 말씀 전부 + 매니페스트
     python scripts/build_ig_daily_posts.py --upload                     # + S3 에 없는 슬라이드 올리기
 
-한 게시물 = 그림 표지 + 말씀 + 그림 설명 + 앱 풀이 카드(장면이 카피에 있을 때). 장면이 없으면 말씀 카드가
-표지다. 수·일요일에 붙는 앱 안내 장은
+한 게시물 = 표지(오늘의 한 단어) + 말씀 + 앱 풀이 카드. 세 장 모두 그 말씀의 분위기(주제 태그 →
+caption.mood_for)로 색·배경 요소를 맞춘다. 수·일요일에 붙는 앱 안내 장은
 한 장만 만들어 매니페스트 `app_slide` 에 두고 실행기가 그날 끝에 붙인다.
 
-재료: 목록(daily_verses.json) · 영어 본문(앱과 같은 변환) · 영어 풀이 검토본 · 카피(instagram/copy_en.json)
-· 장면 그림(instagram/build/art/, git 제외 — 출처는 instagram/art_sources.json).
+재료: 목록(daily_verses.json) · 영어 본문(앱과 같은 변환) · 영어 풀이 검토본 · 카피(instagram/copy_en.json).
+그림은 쓰지 않는다(11/19 — 성경 시대 그림은 월요일 릴스의 몫, 표지는 우리 글자 디자인).
 슬라이드는 `instagram/build/slides/` 에 쌓인다. S3 키는 슬라이드 내용 지문이라 바뀐 장만 새로 올라간다.
 """
 from __future__ import annotations
@@ -27,7 +27,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from instagram.caption import build_caption, find_post_problems, find_slide_problems  # noqa: E402
+from instagram.caption import build_caption, find_post_problems, find_slide_problems, mood_for  # noqa: E402
 from instagram.posts import (  # noqa: E402
     MANIFEST, en_note, image_key, load_copy, load_daily_verses, localize_all, manifest_entry, tidy_copy,
 )
@@ -35,9 +35,8 @@ from instagram.posts import (  # noqa: E402
 INSTAGRAM = Path(__file__).resolve().parent.parent / "instagram"
 BUILD_DIR = INSTAGRAM / "build"
 SLIDES_DIR = BUILD_DIR / "slides"
-ART_DIR = BUILD_DIR / "art"
 # 슬라이드 틀(card.py 의 CSS·HTML)을 바꾸면 올린다 — 지문이 바뀌어 모든 장을 다시 올린다.
-TEMPLATE_VERSION = "3"
+TEMPLATE_VERSION = "4"
 DEFAULT_BUCKET = "with-god-ig-cards"
 S3_REGION = "ap-northeast-2"
 NOTE_LABEL = "what it can mean today"
@@ -53,28 +52,19 @@ APP_ALT = ("Tell it how you feel. It finds the verse. WithGod searches the whole
 
 
 def slides_for(entry: dict, copy: dict) -> list[tuple[dict, str]]:
-    """(슬라이드, 대체 텍스트) 목록 — 장면이 있으면 그림 표지 + 말씀 + 그림 설명(글만) + 앱 풀이 카드,
-    없으면 말씀 + 앱 풀이 카드. 그리드·피드에 먼저 보이는 장이 그림이어야 흔한 말씀 카드 계정과 구별된다."""
-    pal = copy["pal"]
-    verse = ({"kind": "verse", "pal": pal, "label": copy["label"], "text": entry["text"],
-              "emph": copy["emph"], "ref": entry["display_ref"]}, entry["alt_text"])
-    out = []
-    scene = copy.get("scene")
-    if scene:
-        art = ART_DIR / scene["art"]
-        if not art.exists():
-            raise FileNotFoundError(f"그림 없음: {art}")
-        label = tidy_copy(copy["label"])
-        out.append(({"kind": "cover", "pal": pal, "label": label, "ref": entry["display_ref"], "art": str(art),
-                     "focus": scene.get("focus", "50% 50%")},
-                    f"{scene['alt']} Text: {label[:1].lower() + label[1:]}. {entry['display_ref']}."))
-        out.append(verse)
-        out.append(({"kind": "scene", "pal": pal, "label": scene["label"], "body": scene["body"],
-                     "credit": scene["credit"]}, f"{scene['label'].capitalize()}: {scene['body']}"))
-    else:
-        out.append(verse)
-    out.append(({"kind": "note", "pal": pal, "label": NOTE_LABEL, "body": tidy_copy(entry["note"]), "source": NOTE_SOURCE},
-                f"What it can mean today, from the WithGod app’s note on this verse (written with AI): {entry['note']}"))
+    """(슬라이드, 대체 텍스트) 목록 — 표지(오늘의 한 단어) + 말씀 + 앱 풀이 카드. 세 장이 같은 분위기."""
+    pal, mood = copy["pal"], mood_for(copy)
+    label = tidy_copy(copy["label"])
+    word = tidy_copy(copy["word"])
+    out = [
+        ({"kind": "word", "pal": pal, "mood": mood, "label": label, "word": word, "ref": entry["display_ref"]},
+         f"Daily verse cover. {label}: {word} {entry['display_ref']}."),
+        ({"kind": "verse", "pal": pal, "mood": mood, "label": copy["label"], "text": entry["text"],
+          "emph": copy["emph"], "ref": entry["display_ref"]}, entry["alt_text"]),
+        ({"kind": "note", "pal": pal, "mood": mood, "label": NOTE_LABEL, "body": tidy_copy(entry["note"]),
+          "source": NOTE_SOURCE},
+         f"What it can mean today, from the WithGod app’s note on this verse (written with AI): {entry['note']}"),
+    ]
     for i, (slide, _) in enumerate(out):
         slide["arrow"] = i < len(out) - 1
     return out
@@ -82,8 +72,6 @@ def slides_for(entry: dict, copy: dict) -> list[tuple[dict, str]]:
 
 def slide_digest(slide: dict) -> str:
     h = hashlib.sha256((TEMPLATE_VERSION + json.dumps(slide, sort_keys=True, ensure_ascii=False)).encode())
-    if slide.get("art"):
-        h.update(Path(slide["art"]).read_bytes())
     return h.hexdigest()
 
 
@@ -143,12 +131,8 @@ def main() -> int:
         e = manifest_entry(item, en[vid], copy, note)
         if copy["emph"] not in e["text"]:
             problems.append(f"{vid} emph: 본문에 없는 구절")
-        problems += [f"{vid} {p}" for p in find_post_problems(e) + find_slide_problems(copy)]
-        try:
-            slides = slides_for(e, copy)
-        except FileNotFoundError as exc:
-            problems.append(f"{vid} {exc}")
-            continue
+        problems += [f"{vid} {p}" for p in find_post_problems(e) + find_slide_problems(copy, e["text"])]
+        slides = slides_for(e, copy)
         e["images"], e["alt_texts"] = [], []
         for n, (slide, alt) in enumerate(slides, 1):
             key = image_key(f"{vid}-{n}", slide_digest(slide))
