@@ -142,5 +142,131 @@
   "topic": "#comfort",
   "pal": "twilight",
   "word": "Near."
+ },
+ "pro-14-10": {
+  "label": "When no one quite gets it",
+  "emph": "The heart knows its own bitterness and joy;",
+  "hook": "Some things you feel can’t be fully explained to anyone, and that’s allowed.",
+  "cta": "Send this to a friend who keeps a lot to themselves.",
+  "topic": "#comfort",
+  "pal": "lilac",
+  "word": "Heart."
+ },
+ "mat-5-41": {
+  "label": "When someone asks too much",
+  "emph": "go with him two.",
+  "hook": "The second mile is the one nobody can make you walk.",
+  "cta": "Save this for the next request that feels like a lot.",
+  "topic": "#kindness",
+  "pal": "sunrise",
+  "word": "Give."
+ },
+ "pro-11-17": {
+  "label": "Before you say the sharp thing",
+  "emph": "The merciful man does good to his own soul,",
+  "hook": "Kindness lands on two people: the one who gets it and the one who gives it.",
+  "cta": "Save this for the next time a sharp reply is ready to go.",
+  "topic": "#wisdom",
+  "pal": "sand",
+  "word": "Merciful."
+ },
+ "psa-37-23": {
+  "label": "When you’ve stumbled again",
+  "emph": "Though he stumble, he shall not fall,",
+  "hook": "A stumble and a fall can start out looking exactly the same.",
+  "cta": "Send this to someone getting back up today.",
+  "topic": "#encouragement",
+  "pal": "dawn",
+  "word": "Holds."
+ },
+ "pro-11-24": {
+  "label": "When holding on feels safer",
+  "emph": "There is one who scatters, and increases yet more.",
+  "hook": "Some things only grow once you stop gripping them.",
+  "cta": "Save this for a week when everything feels tight.",
+  "topic": "#trust",
+  "pal": "sagelight",
+  "word": "Scatters."
+ },
+ "rom-12-21": {
+  "label": "When someone was unkind first",
+  "emph": "overcome evil with good.",
+  "hook": "You get to choose what the unkindness turns into.",
+  "cta": "Save this for the next message that stings.",
+  "topic": "#courage",
+  "pal": "mist",
+  "word": "Overcome."
+ },
+ "heb-13-5": {
+  "label": "When money is on your mind",
+  "emph": "I will in no way leave you,",
+  "hook": "Bank balances go up and down. This promise stays the same size.",
+  "cta": "Save this for the end of a tight month.",
+  "topic": "#trust",
+  "pal": "sage",
+  "word": "Content."
+ },
+ "isa-58-6": {
+  "label": "When someone near you is weighed down",
+  "emph": "to let the oppressed go free,",
+  "hook": "The most meaningful thing you do this week might be lifting someone else’s load.",
+  "cta": "Send this to someone who carries more than their share.",
+  "topic": "#kindness",
+  "pal": "rose",
+  "word": "Free."
+ },
+ "jas-1-5": {
+  "label": "When you don’t know what to do",
+  "emph": "who gives to all liberally and without reproach,",
+  "hook": "Asking for help is allowed to be the first step instead of the last resort.",
+  "cta": "Save this for the next decision you can’t figure out alone.",
+  "topic": "#wisdom",
+  "pal": "paper",
+  "word": "Ask."
+ },
+ "isa-33-6": {
+  "label": "When everything keeps shifting",
+  "emph": "There will be stability in your times,",
+  "hook": "When the ground keeps moving, it helps to know what doesn’t.",
+  "cta": "Save this for a season of too many changes.",
+  "topic": "#strength",
+  "pal": "night",
+  "word": "Stability."
+ },
+ "pro-11-25": {
+  "label": "For a friend running on empty",
+  "emph": "He who waters shall be watered also himself.",
+  "hook": "Watering someone else’s garden has a way of reaching your own.",
+  "cta": "Send this to the friend who always shows up for everyone.",
+  "topic": "#kindness",
+  "pal": "sand",
+  "word": "Watered."
+ },
+ "mat-5-44": {
+  "label": "With someone who hurt you",
+  "emph": "love your enemies, bless those who curse you,",
+  "hook": "Love can start as a decision, long before the feeling catches up.",
+  "cta": "Save this for a name that still stings.",
+  "topic": "#forgiveness",
+  "pal": "twilight",
+  "word": "Bless."
+ },
+ "mat-6-34": {
+  "label": "When tomorrow is already loud",
+  "emph": "don’t be anxious for tomorrow,",
+  "hook": "Today has enough in it. Tomorrow can wait its turn.",
+  "cta": "Save this for a night when tomorrow won’t stop talking.",
+  "topic": "#peace",
+  "pal": "lilac",
+  "word": "Each day."
+ },
+ "psa-40-1": {
+  "label": "When the waiting feels endless",
+  "emph": "He set my feet on a rock,",
+  "hook": "Long waits can still end on solid ground.",
+  "cta": "Send this to someone who has been waiting a long time.",
+  "topic": "#patience",
+  "pal": "dawn",
+  "word": "Rock."
  }
 }

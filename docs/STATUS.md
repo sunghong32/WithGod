@@ -75,7 +75,7 @@ Play vc28 production·alpha·internal `completed`. **1.6.1(#69 iOS 위젯 현지
       표지 「오늘의 한 단어」(말씀 속 낱말 + 감정 스티커, 11/19~) · 말씀 · 앱 영어 풀이(AI 표기), 수·일요일엔 앱 안내 장. 세 장은 분위기
       (주제 태그 → 위로·소망·평안·지혜·기쁨)대로 색·배경 요소를 맞춘다. 그림·사진은 안 쓴다(성경 시대 그림은 월요일 릴스 몫). 운영 서버
       `with-god-ig-post.timer`(07:00 America/New_York) → `python -m instagram.daily_post`, 설정 `/etc/with-god-ig.env`, 기록 `/var/lib/with-god-ig/`,
-      결과는 텔레그램. 지난 날 다시 올리기는 `--date YYYY-MM-DD --force`. 카피는 **이 맥에서 2주치씩** 앞서 쓴다 — 지금 11/12~27 준비, 알림의 「준비된 날」이 7일 아래면 다음 묶음.
+      결과는 텔레그램. 지난 날 다시 올리기는 `--date YYYY-MM-DD --force`. 카피는 **이 맥에서 2주치씩** 앞서 쓴다 — 지금 12/11 까지 준비(11/19), 알림의 「준비된 날」이 7일 아래면 다음 묶음.
       카피 `backend/instagram/copy_en.json`(`word` 포함)은 세션에서 직접 쓴다(API 금지), 렌더 `scripts/build_ig_daily_posts.py`, 업로드는 `--upload`(boto3) 또는 aws cli. 캡션은 해시태그 5개(`#bibleverse` 포함, 주제 짝 태그는 `caption.TOPIC_PAIRS`) + 카드 라벨로 만든 검색어 줄(11/19). 요령은 메모리 `instagram-account`
 - [ ] **인스타 릴스 월·수·금 19:00 ET(한국 다음 날 09:00, 서머타임엔 08:00) — 큐 + 이 맥 launchd(11/17~).** 월 성경 인물 이야기 · 수 앱 시연(시리즈 「Mia」, `mia.py`) ·
       금 번갈아(그 시절 생활 → 성화 읽기 → 찬송가 이야기 → 오래된 기도문), 대림절(11/29~12/24) 특집 · 오늘의 말씀 재탕 없음(사용자 결정 11/13).
