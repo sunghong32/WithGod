@@ -262,7 +262,8 @@ def plan(cfg: Config, day: date, state: State) -> dict:
     e = posts[verse_id]
     single = len(post_images(e)) == 1  # 한 장짜리면 풀이를 캡션에, 캐러셀이면 풀이 카드에
     caption = build_caption(hook=e["hook"], verse_text=e["text"], ref=e["display_ref"], cta=e["cta"],
-                            topic=e["topic"], app_line=app_line_for(day), note=e["note"] if single else "")
+                            topic=e["topic"], app_line=app_line_for(day), note=e["note"] if single else "",
+                            kicker=e.get("kicker", ""))
     problems = find_caption_problems(caption)
     if problems:
         raise RuntimeError(f"캡션 검사 실패({verse_id}): {'; '.join(problems)}")

@@ -2,6 +2,7 @@
 """릴스 한 편 마무리: 무음 영상 + 음악 → reel.mp4, 표지 spec → cover.jpg. 결과 폴더는 reel_queue.py add 로 넣는다.
 
     python3 finish.py <작업폴더>      # 폴더에 spec.json · cover-spec.json · events.json(compose.py 결과)이 있어야 한다
+    python3 finish.py <작업폴더> --skip-open-check   # 첫 장면 검사(render.opening_problems)를 건너뛴다 — 이유가 있을 때만
 
 순서: render.py spec.json(무음 1080×1920) → music.swift events.json(오프라인 렌더, 원음이 작다) → 소리 크기 맞춤
 (엘리야 편과 같은 크기: loudnorm I=-18, 최고 -1.5dB) + 끝 2.4초 페이드 → AAC 192k 로 합침(spec 의 "lofi": true 면 로파이 거르기·잡음). 표지는 cover-spec 의
@@ -22,6 +23,13 @@ def run(*cmd, cwd=None):
 def main() -> int:
     w = Path(sys.argv[1]).resolve()
     spec = json.loads((w / 'spec.json').read_text())
+    sys.path.insert(0, str(HERE))
+    from render import opening_problems
+    found = opening_problems(spec)
+    if found and '--skip-open-check' not in sys.argv[2:]:
+        print('\n'.join(f'⚠ 첫 장면: {p}' for p in found), file=sys.stderr)
+        print('README 「첫 3초」 규칙대로 spec 을 고치거나, 이유가 있으면 --skip-open-check', file=sys.stderr)
+        return 2
     dur = float(spec['dur'])
     silent = Path(spec['out']) if Path(spec['out']).is_absolute() else w / spec['out']
     run(sys.executable, HERE / 'render.py', w / 'spec.json', cwd=w)
