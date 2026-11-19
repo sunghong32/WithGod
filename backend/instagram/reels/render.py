@@ -18,6 +18,9 @@ img 장면의 "marks"(성화 읽기 표시 — 그림 좌표라 카메라를 따
   {"t0", "t1", "ring": [x, y, rx, ry], "draw": 0.45}    금색 동그라미가 draw 초 동안 그려진다
   {"t0", "t1", "spot": [x, y, rx, ry], "dim": 0.62}     그 타원 밖을 어둡게(조명)
   {"t0", "t1", "tag": html, "at": [x, y], "off": [dx, dy]}  번호(.num)·이름표(.lbl)를 그 점(+화면 픽셀 off)에 톡 띄운다
+  · gallery(미술관 — 벽에 건 액자 + 클로즈업): {"gallery": {"img", "hole": [x, y, 폭, 높이](가상 화면 1080×1920 의 그림 자리),
+   "frame": 액자 폭, "wall": CSS 배경}, "cam": [[시각, 중심x, 중심y, 폭]…](가상 화면 좌표, [540, 960, 1080] = 액자 전체)}
+   자막 "pos": "under" = 액자 아래(가운데 정렬, .n 내레이션 글씨). 내레이션은 narrate.py(Kokoro) → spec "voice".
 spec 의 "css" 는 자막 HTML 에 덧붙는다(편·시리즈마다 다른 글꼴·상자).
 spec 의 "crf"(기본 18)는 화질 — 큰 PD 성화는 캔버스 결 때문에 18 이면 30Mbps 를 넘는다(인스타 상한 25Mbps), 22~24 로.
 """
@@ -67,18 +70,22 @@ p{{margin:0}} p+p{{margin-top:26px}}
 .vc{{position:absolute;left:70px;right:110px;padding:26px 34px 30px;border-radius:22px;background:rgba(14,11,9,.86);
   border-left:7px solid #F4C76A;box-shadow:0 10px 40px rgba(0,0,0,.4)}}
 .vc .ref{{font:700 26px "I";letter-spacing:.13em;color:#F4C76A;text-transform:uppercase;margin-bottom:14px}}
+/* 미술관(gallery) 장면 — 액자 아래 내레이션 자막, 가운데 정렬 */
+.b.under{{top:1300px;left:70px;right:70px;text-align:center}}
+.n{{font-size:54px;line-height:1.25;text-wrap:balance}}
+.under .v{{font-size:52px}} .under .r{{margin-top:18px}}
 .vc .q{{font-family:"D";font-variation-settings:"SOFT" 50;font-size:46px;line-height:1.24;color:#FFF8EC;text-wrap:pretty}}
 """
 
-def shoot(body: str, out: Path, css: str = '') -> Image.Image:
+def shoot(body: str, out: Path, css: str = '', scale: int = 1) -> Image.Image:
     h = out.with_suffix('.html')
     h.write_text(f"<!doctype html><html><head><meta charset='utf-8'><style>{CSS}{css}</style></head><body>{body}</body></html>", encoding='utf-8')
     with tempfile.TemporaryDirectory() as prof:
-        subprocess.run([CHROME, '--headless=new', '--disable-gpu', '--hide-scrollbars', '--force-device-scale-factor=1',
+        subprocess.run([CHROME, '--headless=new', '--disable-gpu', '--hide-scrollbars', f'--force-device-scale-factor={scale}',
                         f'--window-size={W},{H+200}', '--default-background-color=00000000', '--virtual-time-budget=4000',
                         f'--user-data-dir={prof}', '--allow-file-access-from-files', f'--screenshot={out}', h.as_uri()],
                        check=True, capture_output=True, timeout=120)
-    return Image.open(out).convert('RGBA').crop((0, 0, W, H))
+    return Image.open(out).convert('RGBA').crop((0, 0, W * scale, H * scale))
 
 def ease(t): return t * t * (3 - 2 * t)
 
@@ -226,15 +233,49 @@ def spot(fr, cx, cy, rx, ry, dim):
     dark.putalpha(m.point(lambda v: int(v * dim)))
     fr.alpha_composite(dark)
 
+# ── 미술관 장면(gallery, 11/19) ─────────────────────────────────────
+# 사용자: "그림이 70% 로 줄어 액자에 걸리고, 아래에 글이 뜨고 내레이션이 깔린다. 설명이 나올 때 그림을 클로즈업."
+# 가상 화면(1080×1920) 위에 벽·금색 액자를 두고 그림을 hole 에 넣는다. cam 은 이 가상 화면 좌표 —
+# [540, 960, 1080] 이 액자 전체, 그림 디테일은 hole 안의 좁은 창(그림 원본 → 가상 배율 = hole 폭 / 원본 폭).
+NOISE = ("url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E"
+         "%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix "
+         "values='0 0 0 0 .5  0 0 0 0 .45  0 0 0 0 .4  0 0 0 .10 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' "
+         "filter='url(%23n)'/%3E%3C/svg%3E\")")
+WALL = ("radial-gradient(ellipse 60% 30% at 50% 31%, rgba(255,214,150,.17), rgba(255,214,150,0) 72%), "
+        "radial-gradient(ellipse 125% 80% at 50% 38%, #3a322b 0%, #251e19 55%, #110d0a 100%)")
+GOLD = ("linear-gradient(160deg,#5e4316 0%,#b08a3e 13%,#f1d68c 25%,#c9a352 37%,#7e5f24 50%,#d9b96a 64%,#f4dfa0 75%,"
+        "#a07c35 88%,#5a4015 100%)")
+
+def gallery_html(g) -> str:
+    """벽(그림 자리만 비운 네 띠) + 금색 액자 + 그림 가장자리 그림자. 그림 자리는 투명으로 남는다."""
+    hx, hy, hw, hh = g['hole']; F = g.get('frame', 40)
+    wall = g.get('wall', WALL)
+    strips = [(0, 0, W, hy), (0, hy + hh, W, H - hy - hh), (0, hy, hx, hh), (hx + hw, hy, W - hx - hw, hh)]
+    box = lambda x, y, w, h, cls, st='': (f"<div class='{cls}' style='position:absolute;box-sizing:border-box;left:{x}px;top:{y}px;"
+                                          f"width:{w}px;height:{h}px;{st}'></div>")
+    out = ''.join(box(x, y, w, h, 'w', f'background-position:{-x}px {-y}px') for x, y, w, h in strips)
+    out += box(hx - F, hy - F, hw + 2 * F, hh + 2 * F, 'fr', f'border-width:{F}px')
+    r = int(F * .42)
+    out += box(hx - F + r, hy - F + r, hw + 2 * (F - r), hh + 2 * (F - r), 'rg')
+    out += box(hx - 7, hy - 7, hw + 14, hh + 14, 'lip')
+    out += box(hx, hy, hw, hh, 'ins')
+    css = (f".w{{background:{NOISE},{wall};background-size:240px 240px,{W}px {H}px,{W}px {H}px}}"
+           f".fr{{border-style:solid;border-image:{GOLD} 1;outline:3px solid #3a280b;"
+           "box-shadow:0 46px 90px rgba(0,0,0,.72),0 14px 30px rgba(0,0,0,.5)}"
+           ".rg{border:3px solid rgba(255,240,190,.5);box-shadow:0 0 0 2px rgba(60,40,10,.5),inset 0 0 0 2px rgba(60,40,10,.4)}"
+           ".lip{border:7px solid #2c200c;box-shadow:inset 0 0 0 1px rgba(255,230,160,.35)}"
+           ".ins{box-shadow:inset 0 10px 22px rgba(0,0,0,.55),inset 0 0 14px rgba(0,0,0,.45)}")
+    return f"<style>{css}</style>{out}"
+
 def back(t):  # 톡 튀어나오기(살짝 넘쳤다 돌아옴)
     c = 1.7; t -= 1
     return 1 + (c + 1) * t ** 3 + c * t ** 2
 
 def shade(pos):
     im = Image.new('RGBA', (W, H), (0, 0, 0, 0)); d = ImageDraw.Draw(im)
-    mid = 560 if pos == 'top' else 1180
+    mid, spread, top = {'top': (560, 560, 170), 'low': (1180, 560, 170), 'under': (1420, 430, 150)}[pos]
     for y in range(H):
-        a = int(170 * max(0.0, 1 - abs(y - mid) / 560) ** 1.3)
+        a = int(top * max(0.0, 1 - abs(y - mid) / spread) ** 1.3)
         if a: d.line([(0, y), (W, y)], fill=(10, 8, 6, a))
     return im
 
@@ -245,6 +286,7 @@ def main():
     paths = {s['img'] for s in spec['shots'] if 'img' in s}
     paths |= {p['img'] for s in spec['shots'] for p in s.get('panels', [])}
     paths |= {s['under_img'] for s in spec['shots'] if 'under_img' in s}
+    paths |= {s['gallery']['img'] for s in spec['shots'] if 'gallery' in s}
     imgs = {p: Image.open(p).convert('RGB') for p in paths}
     vids = {}
     for k, s in enumerate(spec['shots']):
@@ -265,13 +307,21 @@ def main():
         cls = t.get('pos', 'top')
         body = t['html'] if t.get('raw') else f'<div class="b {cls}">{t["html"]}</div>'
         texts.append((t['t0'], t['t1'], shoot(body, work / f't{i}.png', spec.get('css', '')), cls if not t.get('raw') else None, t.get('fi', 0.6), t.get('fo', 0.6)))  # fo: 사라지는 시간
-    shades = {'top': shade('top'), 'low': shade('low')}
+    shades = {p: shade(p) for p in ('top', 'low', 'under')}
     for si, s in enumerate(spec['shots']):
         for mi, m in enumerate(s.get('marks', [])):
             if 'tag' in m:  # 번호·이름표는 한 번 찍어 둔다(테두리만 남기고 잘라서)
                 im = shoot(f"<div style='position:absolute;left:40px;top:40px'>{m['tag']}</div>", work / f'm{si}_{mi}.png',
                            spec.get('css', ''))
                 m['_lay'] = im.crop(im.getbbox())
+        if 'gallery' in s:  # 벽·액자 층(3배로 한 번 찍음) + 그림 축소판(멀리서 볼 때 결이 일렁이지 않게)
+            g = s['gallery']; src = imgs[g['img']]
+            lay3 = shoot(gallery_html(g), work / f'gallery{si}.png', spec.get('css', ''), scale=3)
+            mips, f = {1: src}, 1
+            while f < 8:
+                f *= 2
+                mips[f] = src.resize((src.width // f, src.height // f), Image.LANCZOS)
+            s['_g'] = (lay3.convert('RGBa'), lay3.resize((W, H), Image.LANCZOS).convert('RGBa'), mips)
         if 'panels' in s and 'under' in s:  # 나란히 보기 밑에 깔 그림 — 흐리고 어둡게, 한 번만
             cx, cy, w = s['under']; k = w / W; h = w * H / W
             u = imgs[s.get('under_img', s['panels'][0]['img'])].transform(
@@ -342,9 +392,30 @@ def main():
                     lay = lay.copy(); lay.putalpha(lay.getchannel('A').point(lambda v: int(v * al)))
                 dx, dy = m.get('off', [0, 0])
                 put(fr, lay, sx(m['at'][0]) + dx - lay.width / 2, sy(m['at'][1]) + dy - lay.height / 2)
+    def render_gallery(s, t):
+        lay3, lay1, mips = s['_g']
+        hx, hy, hw, hh = s['gallery']['hole']
+        cx, cy, w = cam_at(s['cam'], t); k = w / W; h = w * H / W
+        x0, y0 = cx - w / 2, cy - h / 2
+        sp = hw / mips[1].width          # 가상 px / 원본 px
+        r = k / sp                       # 원본 px / 출력 px
+        f = 1
+        while f * 2 <= r and f < 8:
+            f *= 2
+        q = r / f
+        fr = mips[f].transform((W, H), Image.AFFINE, (q, 0, (x0 - hx) / sp / f, 0, q, (y0 - hy) / sp / f), Image.BICUBIC,
+                               fillcolor=bg)
+        pad = 30  # 그림 가장자리 그림자까지 창 밖이면 액자 층을 건너뛴다
+        if not (x0 >= hx + pad and y0 >= hy + pad and x0 + w <= hx + hw - pad and y0 + h <= hy + hh - pad):
+            lay = (lay1.transform((W, H), Image.AFFINE, (k, 0, x0, 0, k, y0), Image.BICUBIC) if k >= 0.66 else
+                   lay3.transform((W, H), Image.AFFINE, (3 * k, 0, 3 * x0, 0, 3 * k, 3 * y0), Image.BICUBIC))
+            fr = fr.convert('RGBA'); fr.alpha_composite(lay.convert('RGBA')); fr = fr.convert('RGB')
+        return fr
     def render_shot(s, t):
         if 'screen' in s:
             return render_screen(s, t)
+        if 'gallery' in s:
+            return render_gallery(s, t)
         if 'panels' in s:
             return render_panels(s, t)
         cx, cy, w = cam_at(s['cam'], t); h = w * H / W
@@ -364,7 +435,7 @@ def main():
         if prev and t < s['t0'] + f:
             fr = Image.blend(render_shot(prev[0], t), fr, ease((t - s['t0']) / f))
         fr = fr.convert('RGBA')
-        for pos in ('top', 'low'):
+        for pos in ('top', 'low', 'under'):
             a = max([fade(t, a0, b0, fo, fi) for a0, b0, _, c, fi, fo in texts if c == pos] or [0])
             if a: fr.alpha_composite(Image.blend(Image.new('RGBA', (W, H), (0, 0, 0, 0)), shades[pos], a))
         draw_marks(fr, s, t)

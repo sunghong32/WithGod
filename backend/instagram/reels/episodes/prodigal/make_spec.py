@@ -1,148 +1,121 @@
-"""성화 읽기 「탕자의 귀환 — 사람들이 놓치는 디테일 4개」 spec(장면·카메라·표시·자막) → spec.json, cover-spec.json.
+"""성화 읽기 「렘브란트 〈탕자의 귀환〉 그림 이야기」 — 미술관 액자 + 내레이션 → narration.json · voice.wav · spec.json · cover-spec.json.
 
-그림풀이처럼 보이게(사용자 11/19: "그림에 글만 바뀌면 그냥 그림이다, 궁금증도 안 생긴다"):
-- 첫 화면부터 그림 위에 금색 동그라미가 그려지고, 그림 전체에 번호 1~4 를 찍어 "디테일 4개"를 예고한다.
-- 디테일마다 번호 띠(1 / 4 · THE HANDS) → 동그라미·조명으로 짚기 → 숨은 뒷얘기 → 「In the Bible」 카드로 성경 구절과 잇는다.
-- 두 손은 나란히 놓고 비교한다(panels).
-카메라 [시각, 중심x, 중심y, 폭] · 표시(marks) 좌표는 원본(3840×5011) 픽셀. 9:16 창의 높이 = 폭 × 1.778.
+사용자 11/19(세 번째 안): "그림 이야기로 시작해서 그림이 70% 로 줄어 액자에 걸리고, 아래에 글이 뜨고, 그 설명을 내레이션이
+같이 읽어 준다. 그림에 원·숫자 표시는 안 하고, 해당 설명이 나올 때 그림을 클로즈업." 목소리는 계정의 Mia(af_heart).
 
     python3 get_art.py <작업폴더> && python3 make_spec.py <작업폴더>
-    python3 ../../render.py <작업폴더>/spec.json --only 1.0,7.5     # 자리 잡을 때 스냅만
+    # 문장이 바뀌면 TTS venv 로 narrate.py 를 다시 돌려 timeline.json(문장마다 시작·끝)을 만들고 그 시각에 자막·카메라를 맞춘다.
 
-자리(원본 픽셀): 아버지 얼굴 (1129, 1829)·머리 위 1530 · 아들 머리 (1043, 2557) · 가는 손(보는 쪽 왼쪽) (885, 2980) ·
-굵은 손(오른쪽) (1255, 2955) · 아들 허리의 짧은 칼 (1190, 3790, 손잡이 3573~칼집 끝 4013) · 맨발 (510, 4540) ·
-벗겨진 신 (720, 4700) · 닳은 신 (1110, 4590) · 큰아들 얼굴 (3040, 1000)·모은 두 손 (3010, 2150).
-자막 띠: top = 화면 y 300~600, low = 1100~1400. 「In the Bible」 카드(.vc)는 raw 로 top 픽셀을 직접 준다.
+가상 화면(1080×1920): 그림 자리 HOLE = (162, 236) 756×987(화면 폭의 70%), 금색 액자 40px, 아래 자막 y 1300~.
+카메라는 이 가상 화면 좌표. 디테일은 원본(3840×5011) 픽셀로 적고 close() 가 가상 좌표로 바꾼다.
+자리(원본): 아버지 얼굴 (1129, 1829) · 아들 머리 (1043, 2557) · 가는 손 (885, 2980) · 굵은 손 (1255, 2955) ·
+맨발 (510, 4540) · 닳은 신 (1110, 4590) · 큰아들 얼굴 (3040, 1000)·모은 두 손 (3010, 2150).
 """
+import hashlib
 import json
+import subprocess
 import sys
 from pathlib import Path
 
-W = Path(sys.argv[1])
+HERE = Path(__file__).resolve().parent
+REELS = HERE.parent.parent
+TTS_PY = Path.home() / '.local/share/withgod-tts/venv/bin/python'
+W = Path(sys.argv[1]).resolve()
 IMG = str(W / 'art' / 'prodigal-3840.jpg')
-WHOLE = [1920, 2505, 3840]  # 그림 전체(위·아래 띠)
-DUR = 57.0
-
-SLENDER, BROAD = [885, 2980, 165, 200], [1255, 2955, 180, 195]
-SWORD = [1190, 3790, 100, 255]
-BARE, WORN = [510, 4540, 135, 270], [1110, 4590, 145, 250]
-BRO_HANDS = [3010, 2150, 175, 150]
+SRC_W, SRC_H = 3840, 5011
+HOLE = [162, 236, 756, round(756 * SRC_H / SRC_W)]
+K = HOLE[2] / SRC_W  # 가상 px / 원본 px
+FRAME = [540, 960, 1080]  # 액자 전체
 
 
-def num(n):
-    return f"<div class='num'>{n}</div>"
+def close(x, y, w, at=760):
+    """원본 (x, y) 디테일을 화면 높이 at 에 두는 원본 폭 w 의 창 → 가상 화면 카메라 [cx, cy, w]."""
+    cy = y + (960 - at) * w / 1080
+    return [round(HOLE[0] + x * K, 2), round(HOLE[1] + cy * K, 2), round(w * K, 2)]
 
 
-def lbl(text):
-    return f"<div class='lbl'>{text}</div>"
-
-
-def tag(n, what):
-    return f"<span class='tag'>{n} / 4 · {what}</span>"
-
-
-def card(ref, quote, top):
-    return {'raw': True, 'html': f"<div class='vc' style='top:{top}px'><div class='ref'>In the Bible · {ref}</div>"
-                                 f"<div class='q'>{quote}</div></div>"}
-
-
-def plbl(text, left):  # 나란히 보기 판 아래쪽 이름표(화면 좌표)
-    return {'raw': True, 'html': f"<div class='lbl' style='position:absolute;left:{left}px;top:1356px'>{text}</div>"}
-
-
-shots = [
-    # 0초: 두 손 — 0.25·0.5초에 동그라미가 그려지고 2.4초까지 1.25배 밀고 들어간다
-    {'img': IMG, 't0': 0.0, 't1': 2.45, 'cam': [[0, 1070, 2972, 1350], [2.4, 1070, 2960, 1080]],
-     'marks': [{'t0': 0.25, 't1': 2.6, 'ring': SLENDER}, {'t0': 0.5, 't1': 2.6, 'ring': BROAD}]},
-    # 그림 전체 — 번호 1~4 가 차례로 찍힌다(손 · 칼 · 발 · 오른쪽 남자)
-    {'img': IMG, 't0': 2.45, 't1': 6.4, 'fade': 0.2, 'cam': [[2.45, *WHOLE], [6.4, 1900, 2560, 3500]],
-     'marks': [{'t0': 4.6, 't1': 6.6, 'tag': num(1), 'at': [1070, 2960]},
-               {'t0': 4.85, 't1': 6.6, 'tag': num(2), 'at': [1250, 3790]},
-               {'t0': 5.1, 't1': 6.6, 'tag': num(3), 'at': [800, 4560]},
-               {'t0': 5.35, 't1': 6.6, 'tag': num(4), 'at': [3040, 1650]}]},
-    # 1 손: 나란히 비교(왼쪽 가는 손 · 오른쪽 굵은 손 — 그림에서 놓인 자리 그대로)
-    {'t0': 6.4, 't1': 12.6, 'fade': 0.25, 'under': [1900, 2560, 3500], 'under_img': IMG,
-     'panels': [{'img': IMG, 'box': [60, 650, 470, 800], 'from': [-560, 0],
-                 'cam': [[6.4, 890, 2985, 360], [12.6, 890, 2990, 320]]},
-                {'img': IMG, 'box': [550, 650, 470, 800], 'from': [560, 0],
-                 'cam': [[6.4, 1250, 2960, 360], [12.6, 1250, 2965, 320]]}]},
-    # 아버지가 아들을 안은 모습 + 눅 15:20 카드
-    {'img': IMG, 't0': 12.6, 't1': 16.4, 'fade': 0.4, 'cam': [[12.6, 1070, 2180, 1500], [16.4, 1070, 2170, 1400]]},
-    # 2 아들: 깎은 머리·해진 옷 → 허리의 짧은 칼(조명 + 동그라미 + 이름표)
-    {'img': IMG, 't0': 16.4, 't1': 26.6, 'fade': 0.4,
-     'cam': [[16.4, 1060, 2800, 1200], [19.2, 1060, 2840, 1150], [20.0, 1190, 3720, 1000], [26.6, 1190, 3740, 950]],
-     'marks': [{'t0': 19.9, 't1': 23.0, 'spot': [1190, 3790, 190, 340]},
-               {'t0': 20.2, 't1': 23.0, 'ring': SWORD},
-               {'t0': 20.7, 't1': 23.0, 'tag': lbl('a short sword'), 'at': [1190, 3790], 'off': [270, -200]}]},
-    # 3 발: 맨발(신이 벗겨져 옆에) · 닳은 신 → 눅 15:22 카드 → 맨발에 다시 조명
-    {'img': IMG, 't0': 26.6, 't1': 35.4, 'fade': 0.4, 'cam': [[26.6, 820, 4616, 1000], [35.4, 820, 4600, 940]],
-     'marks': [{'t0': 27.1, 't1': 30.3, 'ring': BARE}, {'t0': 27.7, 't1': 30.3, 'ring': WORN},
-               {'t0': 27.4, 't1': 30.3, 'tag': lbl('bare'), 'at': [510, 4540], 'off': [0, -330]},
-               {'t0': 28.0, 't1': 30.3, 'tag': lbl('worn through'), 'at': [1110, 4590], 'off': [-20, -320]},
-               {'t0': 32.7, 't1': 35.6, 'spot': [560, 4560, 260, 330], 'dim': 0.55}]},
-    # 4 오른쪽 남자: 얼굴과 모은 두 손 → 물러나 아버지·아들과 떨어져 선 거리 + 조명
-    {'img': IMG, 't0': 35.4, 't1': 44.6, 'fade': 0.4,
-     'cam': [[35.4, 3000, 1457, 1900], [38.6, 3000, 1470, 1800], [40.0, 2200, 2505, 3700], [44.6, 2200, 2505, 3600]],
-     'marks': [{'t0': 36.0, 't1': 39.3, 'ring': BRO_HANDS},
-               {'t0': 39.6, 't1': 44.8, 'spot': [3030, 1750, 560, 1300], 'dim': 0.58}]},
-    # 말씀: 아버지와 아들
-    {'img': IMG, 't0': 44.6, 't1': 50.2, 'fade': 0.6, 'cam': [[44.6, 1150, 2100, 1900], [50.2, 1150, 2110, 1800]]},
-    # 끝: 그림 전체로 물러남
-    {'img': IMG, 't0': 50.2, 't1': DUR, 'fade': 0.8,
-     'cam': [[50.2, 1150, 2110, 1800], [53.2, *WHOLE], [DUR, 1920, 2505, 3760]]},
+# (id, 자막, 읽을 말(None = 자막 그대로), 카메라, 뒤 쉼)
+SEGS = [
+    ('title', "This is <i>The Return of the Prodigal Son</i>,<br>one of Rembrandt’s last paintings.", None, FRAME, 0.45),
+    ('story', "It comes from a story Jesus told.", None, [540, 950, 1040], 0.5),
+    ('son1', "A son takes his inheritance early<br>and wastes all of it.", None, close(1060, 3050, 1500, 700), 0.3),
+    ('son2', "He comes home with nothing,<br>hoping only to work as a servant.", None, close(1040, 2600, 1000, 720), 0.35),
+    ('ran', "But his father runs to meet him.", None, close(1120, 2200, 1350, 700), 0.6),
+    ('hands', "Look at the father’s hands.", None, close(1070, 2960, 1100), 0.25),
+    ('broad', "One is broad and strong.", None, close(1290, 2955, 720), 0.2),
+    ('slender', "The other is slender and gentle.", None, close(860, 2985, 720), 0.35),
+    ('nouwen', "Henri Nouwen saw a father’s hand<br>and a mother’s hand.",
+     "[Henri](/ɑnɹˈi/) [Nouwen](/nˈWən/) saw a father's hand, and a mother's hand.", close(1070, 2960, 1150), 0.6),
+    ('feet', "Look at the son’s feet.<br>One is bare, its sandal slipped off.", None, close(800, 4560, 1250, 700), 0.25),
+    ('worn', "The other sandal is worn through.", None, close(1110, 4590, 1000, 560), 0.35),
+    ('robe', "His father calls for the best robe,<br>a ring, and sandals for his feet.", None, close(1100, 3000, 2300, 820), 0.6),
+    ('bro1', "On the right, the older brother.<br>He wouldn’t come in.", None, close(3050, 1500, 1400), 0.25),
+    ('bro2', "So the father went out to him, too.", None, FRAME, 0.7),
+    ('verse', "<div class='v'>“…this, my son, was dead and is alive again.<br>He was lost and is found.”</div><div class='r'>Luke 15:24</div>",
+     "This, my son, was dead, and is alive again. He was lost, and is found.", [540, 930, 1000], 0.7),
+    ('end', "Feeling far from God?<br>In Jesus’ story, the father<br>is the one who runs.", None, FRAME, 2.6),
 ]
+VOICE, SPEED, LEAD = 'af_heart', 0.95, 0.35
 
-texts = [
-    # 첫 문장(훅) — 0초부터. 뒤 자막은 앞 자막이 사라지기 직전에(첫 8초 빈 틈 0)
-    {'t0': 0.0, 't1': 2.45, 'fi': 0, 'fo': 0.3, 'html': "<div class='hook'>The father’s hands<br>in this painting<br>don’t match.</div>"},
-    {'t0': 2.4, 't1': 4.5, 'fi': 0.3, 'fo': 0.3, 'html': "<p class='t'>Jesus’ story of a lost son,<br>painted by Rembrandt.</p>"
-                                                       "<div class='sub'><i>The Return of the Prodigal Son</i>, about 1668</div>"},
-    {'t0': 4.45, 't1': 6.45, 'fi': 0.25, 'fo': 0.3, 'html': "<div class='h1'>4 details<br>most people miss.</div>"},
-    # 1 손
-    {'t0': 6.4, 't1': 9.6, 'fi': 0.3, 'fo': 0.3, 'html': tag(1, 'The hands') + "<p class='t'>One is broad and strong.<br>One is slender and gentle.</p>"},
-    {'t0': 6.9, 't1': 9.65, 'fi': 0.25, 'fo': 0.25, **plbl('broad · strong', 574)},
-    {'t0': 7.9, 't1': 9.65, 'fi': 0.25, 'fo': 0.25, **plbl('slender · gentle', 84)},
-    {'t0': 9.55, 't1': 12.6, 'fi': 0.3, 'fo': 0.3, 'html': "<p class='t'>Henri Nouwen saw<br>a father’s hand<br>and a mother’s hand.</p>"},
-    {'t0': 9.65, 't1': 12.6, 'fi': 0.25, 'fo': 0.3, **plbl('a father’s hand', 574)},
-    {'t0': 10.2, 't1': 12.6, 'fi': 0.25, 'fo': 0.3, **plbl('a mother’s hand', 84)},
-    {'t0': 12.65, 't1': 16.35, 'fi': 0.3, 'fo': 0.35, 'html': "<p class='t'>In the story, the father<br>doesn’t wait.</p>"},
-    {'t0': 13.1, 't1': 16.35, 'fi': 0.35, 'fo': 0.35,
-     **card('Luke 15:20', '“…his father saw him and was moved with compassion, and ran…”', 1130)},
-    # 2 아들
-    {'t0': 16.45, 't1': 19.55, 'pos': 'low', 'fi': 0.3, 'fo': 0.3,
-     'html': tag(2, 'The son') + "<p class='t'>He took his inheritance early<br>and wasted all of it.</p>"},
-    {'t0': 19.5, 't1': 22.75, 'fi': 0.3, 'fo': 0.3, 'html': "<p class='t'>Torn clothes, shaved head.<br>But a sword still hangs<br>at his hip.</p>"},
-    {'t0': 22.7, 't1': 26.55, 'fi': 0.3, 'fo': 0.35, 'html': "<p class='t'>Some see it as the last sign<br>he was still a son.</p>"},
-    {'t0': 23.2, 't1': 26.55, 'fi': 0.35, 'fo': 0.35,
-     **card('Luke 15:19', '“I am no more worthy to be called your son. Make me as one of your hired servants.”', 1150)},
-    # 3 발
-    {'t0': 26.65, 't1': 30.15, 'fi': 0.3, 'fo': 0.3,
-     'html': tag(3, 'The feet') + "<p class='t'>One sandal has slipped off.<br>The other is worn through.</p>"},
-    {'t0': 30.1, 't1': 32.75, 'fi': 0.3, 'fo': 0.3, 'html': "<p class='t'>And the father’s<br>first order?</p>"},
-    {'t0': 30.6, 't1': 35.35, 'fi': 0.35, 'fo': 0.35,
-     **card('Luke 15:22', '“…Put a ring on his hand and sandals on his feet.”', 1240)},
-    {'t0': 32.7, 't1': 35.35, 'fi': 0.3, 'fo': 0.35, 'html': "<div class='h1'>Sandals.<br>A son, not a servant.</div>"},
-    # 4 오른쪽 남자
-    {'t0': 35.45, 't1': 39.1, 'fi': 0.3, 'fo': 0.35,
-     'html': tag(4, 'The man on the right') + "<p class='t'>Most see the older brother.<br>Hands held tight.</p>"},
-    {'t0': 40.0, 't1': 44.55, 'fi': 0.35, 'fo': 0.35,
-     **card('Luke 15:28', '“But he was angry and would not go in. Therefore his father came out and begged him.”', 1150)},
-    {'t0': 41.7, 't1': 44.55, 'fi': 0.3, 'fo': 0.35, 'html': "<div class='h1'>Jesus never says<br>if he went in.</div>"},
-    # 말씀(금색 이탤릭 — 이 편의 위로) · 끝
-    {'t0': 44.8, 't1': 50.1, 'html': "<div class='v'>“…this, my son, was dead<br>and is alive again.<br>He was lost and is found.”</div>"
-                                     "<div class='r'>Luke 15:24</div>"},
-    {'t0': 50.4, 't1': DUR + 0.4, 'pos': 'low', 'html': "<div class='h1'>Feeling far from God?<br>In Jesus’ story, the father<br>is the one who runs.</div>"},
-    {'t0': 51.8, 't1': DUR + 0.4, 'raw': True, 'html': "<div class='hd' style='bottom:400px'>@withgod.app · find your verse, link in bio</div>"},
-]
 
-spec = {'out': str(W / 'reel-silent.mp4'), 'dur': DUR, 'bg': '#0e0b09', 'crf': 23,  # 캔버스 결 — crf 18 이면 33Mbps
-        'snaps': [0.3, 1.0, 2.3, 3.5, 5.6, 7.0, 8.5, 11.0, 14.5, 17.5, 21.0, 24.5, 28.5, 31.5, 34.0, 37.5, 42.5, 47.0, 54.0],
-        'shots': shots, 'texts': texts}
+def plain(html):
+    import re
+    return re.sub(r'<[^>]+>', '', html.replace('<br>', ' ')).replace('’', "'").replace('“', '').replace('”', '').replace('…', '').split()
+
+
+narr = {'voice': VOICE, 'speed': SPEED, 'lead': LEAD,
+        'segments': [{'id': i, 'say': say or ' '.join(plain(text)), 'pause': p} for i, text, say, _, p in SEGS]}
+blob = json.dumps(narr, ensure_ascii=False, indent=1)
+(W / 'narration.json').write_text(blob)
+stamp = hashlib.sha1(blob.encode()).hexdigest()
+old = (W / 'narration.sha1').read_text() if (W / 'narration.sha1').exists() else ''
+if not (W / 'timeline.json').exists() or old != stamp:  # 문장·목소리가 바뀌었을 때만 다시 녹음
+    subprocess.run([str(TTS_PY), str(REELS / 'narrate.py'), str(W)], check=True)
+    (W / 'narration.sha1').write_text(stamp)
+tl = {s['id']: s for s in json.loads((W / 'timeline.json').read_text())['segments']}
+END = json.loads((W / 'timeline.json').read_text())['end']
+DUR = round(END, 2)
+
+# 카메라: 0초 그림이 화면을 채운 채로 시작 → 2.3초에 액자 전체로 물러나며 벽에 걸린다.
+# 그 뒤로는 문장이 시작되기 0.25초 전에 움직여 1초 만에 닿고, 다음 문장까지 아주 천천히 다가간다(4%).
+cam = [[0.0, *close(1500, 2650, 2600, 960)], [2.3, *FRAME]]
+starts = [tl[i]['t0'] for i, *_ in SEGS]
+for n, (i, _, _, target, _) in enumerate(SEGS):
+    t0 = starts[n]
+    nxt = starts[n + 1] if n + 1 < len(SEGS) else DUR
+    if n == 0:
+        hold_from = 2.3
+    else:
+        mv0 = max(cam[-1][0] + 0.05, t0 - 0.25)
+        cam.append([round(mv0, 3), *cam[-1][1:]])
+        hold_from = mv0 + (1.1 if target[2] < 600 else 0.9)
+        cam.append([round(hold_from, 3), *target])
+    end_t = max(hold_from + 0.1, nxt - 0.3)
+    drift = [target[0], target[1], round(target[2] * (0.96 if target[2] < 1000 else 0.985), 2)]
+    cam.append([round(end_t, 3), *drift])
+
+texts = [{'t0': 0.0, 't1': 2.6, 'fi': 0, 'fo': 0.4,
+          'html': "<div class='hook'>The Return of<br>the Prodigal Son</div><div class='sub'>The story behind Rembrandt’s painting</div>"}]
+for n, (i, text, _, _, _) in enumerate(SEGS):
+    t0 = starts[n] - 0.05
+    t1 = (starts[n + 1] - 0.05) if n + 1 < len(SEGS) else DUR + 0.4
+    html = text if text.startswith('<div') else f"<p class='n'>{text}</p>"
+    if i == 'end':
+        html += "<div class='sub' style='margin-top:26px'>@withgod.app · find your verse, link in bio</div>"
+    texts.append({'t0': round(t0, 3), 't1': round(t1, 3), 'pos': 'under', 'fi': 0.2, 'fo': 0.2, 'html': html})
+
+# 벽: 미술관의 짙은 녹색 벽(그림의 붉은색·금색과 맞서지 않게) + 액자 위 따뜻한 조명
+WALL = ("radial-gradient(ellipse 62% 30% at 50% 31%, rgba(255,220,160,.16), rgba(255,220,160,0) 72%), "
+        "radial-gradient(ellipse 120% 78% at 50% 38%, #34423a 0%, #222c26 55%, #0f1411 100%)")
+gallery = {'img': IMG, 'hole': HOLE, 'frame': 40, 'wall': WALL}
+spec = {'out': str(W / 'reel-silent.mp4'), 'dur': DUR, 'bg': '#0e0b09', 'crf': 23, 'voice': 'voice.wav',
+        'snaps': [0.0, 1.2, 2.4] + [round(tl[i]['t0'] + 1.2, 2) for i, *_ in SEGS],
+        'shots': [{'gallery': gallery, 't0': 0.0, 't1': DUR, 'cam': cam}], 'texts': texts}
 (W / 'spec.json').write_text(json.dumps(spec, ensure_ascii=False, indent=1))
 cover = {'out': str(W / 'cover.mp4'), 'dur': 0.2, 'bg': '#0e0b09', 'snaps': [0.0],
-         'shots': [{'img': IMG, 't0': 0, 't1': 0.2, 'cam': [[0, 1070, 2972, 1350]],
-                    'marks': [{'t0': -1, 't1': 9, 'ring': SLENDER}, {'t0': -1, 't1': 9, 'ring': BROAD}]}],
-         'texts': [{'t0': 0, 't1': 1, 'fi': 0, 'html': "<div class='hook'>The father’s hands<br>in this painting<br>don’t match.</div>"
-                                                       "<div class='sub'>4 details most people miss · Rembrandt</div>"}]}
+         'shots': [{'gallery': gallery, 't0': 0, 't1': 0.2, 'cam': [[0, *FRAME]]}],
+         'texts': [{'t0': 0, 't1': 1, 'fi': 0, 'pos': 'under',
+                    'html': "<div class='h1'>The Return of<br>the Prodigal Son</div>"
+                            "<div class='sub'>The story behind Rembrandt’s painting</div>"}]}
 (W / 'cover-spec.json').write_text(json.dumps(cover, ensure_ascii=False, indent=1))
-print('spec ok')
+print('spec ok', DUR, 's')
