@@ -1,6 +1,7 @@
 """릴스 렌더러. spec JSON: 장면(그림 + 카메라 키프레임) + 자막(시간·위치) → 1080×1920 MP4(무음 트랙).
 
     python3 render.py spec.json        # Pillow·ffmpeg·Google Chrome 필요(이 맥 전용)
+    python3 render.py spec.json --only 1.0,7.5   # 그 시각의 스냅 jpg 만(영상 없이) — 자리 잡을 때 빠르게
 
 음악은 music.swift 로 따로 만들어 ffmpeg 로 입힌다. 다 만든 편은 reel_queue.py add 로 월·수·금 예약에 넣는다.
 
@@ -10,12 +11,19 @@
 장면 종류: img(그림 + cam) · video(영상 + cam) · screen(앱 녹화를 둥근 카드로 배경 위에 띄움 — 그림 없는 앱 시연용):
   {"screen": 녹화.mp4, "bgimg": 1080×1920 배경, "rect": [[시각, 카드 중심x, 중심y, 카드 폭(출력 픽셀)]…],
    "scroll": [[시각, 보여 줄 원본 첫 줄]…], "src_h": 보여 줄 원본 높이, "radius": 모서리(카드 폭 820 기준)}
+  · panels(그림 두 곳을 나란히 — 성화 읽기의 비교): {"panels": [{"img", "box": [x, y, 폭, 높이](출력 픽셀),
+   "cam": [[시각, 중심x, 중심y, 폭]…](원본 픽셀), "from": [dx, dy](들어올 때 밀려 들어오는 거리)}…],
+   "under": [중심x, 중심y, 폭](흐리고 어둡게 깔 그림 창), "under_img"}
+img 장면의 "marks"(성화 읽기 표시 — 그림 좌표라 카메라를 따라 움직인다):
+  {"t0", "t1", "ring": [x, y, rx, ry], "draw": 0.45}    금색 동그라미가 draw 초 동안 그려진다
+  {"t0", "t1", "spot": [x, y, rx, ry], "dim": 0.62}     그 타원 밖을 어둡게(조명)
+  {"t0", "t1", "tag": html, "at": [x, y], "off": [dx, dy]}  번호(.num)·이름표(.lbl)를 그 점(+화면 픽셀 off)에 톡 띄운다
 spec 의 "css" 는 자막 HTML 에 덧붙는다(편·시리즈마다 다른 글꼴·상자).
 spec 의 "crf"(기본 18)는 화질 — 큰 PD 성화는 캔버스 결 때문에 18 이면 30Mbps 를 넘는다(인스타 상한 25Mbps), 22~24 로.
 """
 import html, json, subprocess, sys, tempfile
 from pathlib import Path
-from PIL import Image, ImageDraw, ImageFilter
+from PIL import Image, ImageDraw, ImageEnhance, ImageFilter
 
 FONTS = Path(__file__).resolve().parent.parent / 'fonts'
 CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
@@ -49,6 +57,17 @@ p{{margin:0}} p+p{{margin-top:26px}}
   box-shadow:0 10px 40px rgba(0,0,0,.25)}}
 .card.top{{top:250px}} .card.low{{bottom:500px}}
 .card .q{{font-style:italic}}
+/* 성화 읽기(11/19): 디테일 번호 띠 · 그림 위 번호/이름표 · 「성경에서는」 카드(위로의 말씀 금색 이탤릭과 다르게 바로 선 글씨) */
+.tag{{display:inline-block;margin-bottom:20px;padding:9px 18px 10px;border-radius:999px;background:#F4C76A;color:#1A1208;
+  font:700 27px/1 "I";letter-spacing:.09em;text-transform:uppercase;text-shadow:none}}
+.num{{display:inline-block;width:86px;height:86px;border-radius:50%;background:#F4C76A;color:#1A1208;font:700 48px/86px "I";
+  text-align:center;box-shadow:0 0 0 5px rgba(14,11,9,.55),0 6px 22px rgba(0,0,0,.55)}}
+.lbl{{display:inline-block;padding:10px 20px 12px;border-radius:14px;background:rgba(14,11,9,.84);color:#FFF8EC;
+  font:600 32px/1.15 "I";border:2px solid #F4C76A}}
+.vc{{position:absolute;left:70px;right:110px;padding:26px 34px 30px;border-radius:22px;background:rgba(14,11,9,.86);
+  border-left:7px solid #F4C76A;box-shadow:0 10px 40px rgba(0,0,0,.4)}}
+.vc .ref{{font:700 26px "I";letter-spacing:.13em;color:#F4C76A;text-transform:uppercase;margin-bottom:14px}}
+.vc .q{{font-family:"D";font-variation-settings:"SOFT" 50;font-size:46px;line-height:1.24;color:#FFF8EC;text-wrap:pretty}}
 """
 
 def shoot(body: str, out: Path, css: str = '') -> Image.Image:
@@ -166,6 +185,51 @@ def shadow(size):
     k = size[0] / 820
     return SHADOW.resize((int(SHADOW.width * k), int(size[1] / 1292 * SHADOW.height))), int(120 * k), int(120 * size[1] / 1292)
 
+def put(fr, lay, x, y):
+    """RGBA 층을 (x, y)에 얹는다 — 화면 밖으로 나간 부분은 잘라 낸다(alpha_composite 는 음수 위치를 못 받는다)."""
+    x, y = int(round(x)), int(round(y))
+    sx, sy = max(0, -x), max(0, -y)
+    ex, ey = min(lay.width, W - x), min(lay.height, H - y)
+    if ex > sx and ey > sy:
+        fr.alpha_composite(lay, dest=(x + sx, y + sy), source=(sx, sy, ex, ey))
+
+RING = (244, 199, 106)
+def ring(fr, cx, cy, rx, ry, p, al, sw=7):
+    """금색 동그라미(타원) — 위(12시)에서 시계 방향으로 p(0~1)만큼 그린다. 2배로 그려 줄여서 매끈하게."""
+    if p <= 0.003 or al <= 0: return
+    pad, ss = sw + 10, 2
+    bw, bh = int(2 * rx + 2 * pad), int(2 * ry + 2 * pad)
+    if bw > 3 * W or bh > 3 * H: return
+    lay = Image.new('RGBA', (bw * ss, bh * ss), (0, 0, 0, 0)); d = ImageDraw.Draw(lay)
+    box = [pad * ss, pad * ss, (bw - pad) * ss, (bh - pad) * ss]
+    end = -90 + 360 * min(1.0, p)
+    d.arc(box, -90, end, fill=(10, 8, 6, 120), width=(sw + 6) * ss)  # 밝은 옷 위에서도 보이게 어두운 테
+    d.arc(box, -90, end, fill=RING + (255,), width=sw * ss)
+    lay = lay.resize((bw, bh), Image.LANCZOS)
+    if al < 1: lay.putalpha(lay.getchannel('A').point(lambda v: int(v * al)))
+    put(fr, lay, cx - bw / 2, cy - bh / 2)
+
+SPOT = None
+def spot(fr, cx, cy, rx, ry, dim):
+    """조명 — 타원 안은 그대로, 밖은 dim 만큼 어둡게(가장자리는 부드럽게 번진다)."""
+    global SPOT
+    if SPOT is None:
+        n = 256; g = Image.new('L', (n, n))
+        g.putdata([int(255 * ease(min(1.0, max(0.0, ((((x - n / 2 + .5) ** 2 + (y - n / 2 + .5) ** 2) ** .5) / (n / 2) - .6) / .4))))
+                   for y in range(n) for x in range(n)])
+        SPOT = g
+    k = 1 / .6  # 그라데이션 0.6 지점이 타원 가장자리
+    gw, gh = max(2, int(2 * rx * k)), max(2, int(2 * ry * k))
+    m = Image.new('L', (W, H), 255)
+    m.paste(SPOT.resize((gw, gh), Image.BILINEAR), (int(cx - gw / 2), int(cy - gh / 2)))
+    dark = Image.new('RGBA', (W, H), (8, 6, 4, 0))
+    dark.putalpha(m.point(lambda v: int(v * dim)))
+    fr.alpha_composite(dark)
+
+def back(t):  # 톡 튀어나오기(살짝 넘쳤다 돌아옴)
+    c = 1.7; t -= 1
+    return 1 + (c + 1) * t ** 3 + c * t ** 2
+
 def shade(pos):
     im = Image.new('RGBA', (W, H), (0, 0, 0, 0)); d = ImageDraw.Draw(im)
     mid = 560 if pos == 'top' else 1180
@@ -178,7 +242,10 @@ def main():
     spec = json.loads(Path(sys.argv[1]).read_text()); out = Path(spec['out'])
     fps, dur = spec.get('fps', 30), spec['dur']
     bg = tuple(int(spec.get('bg', '#0e0b09')[i:i + 2], 16) for i in (1, 3, 5))
-    imgs = {p: Image.open(p).convert('RGB') for p in {s['img'] for s in spec['shots'] if 'img' in s}}
+    paths = {s['img'] for s in spec['shots'] if 'img' in s}
+    paths |= {p['img'] for s in spec['shots'] for p in s.get('panels', [])}
+    paths |= {s['under_img'] for s in spec['shots'] if 'under_img' in s}
+    imgs = {p: Image.open(p).convert('RGB') for p in paths}
     vids = {}
     for k, s in enumerate(spec['shots']):
         if 'video' in s:
@@ -199,7 +266,19 @@ def main():
         body = t['html'] if t.get('raw') else f'<div class="b {cls}">{t["html"]}</div>'
         texts.append((t['t0'], t['t1'], shoot(body, work / f't{i}.png', spec.get('css', '')), cls if not t.get('raw') else None, t.get('fi', 0.6), t.get('fo', 0.6)))  # fo: 사라지는 시간
     shades = {'top': shade('top'), 'low': shade('low')}
-    ff = subprocess.Popen(['ffmpeg', '-y', '-loglevel', 'error', '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-s', f'{W}x{H}',
+    for si, s in enumerate(spec['shots']):
+        for mi, m in enumerate(s.get('marks', [])):
+            if 'tag' in m:  # 번호·이름표는 한 번 찍어 둔다(테두리만 남기고 잘라서)
+                im = shoot(f"<div style='position:absolute;left:40px;top:40px'>{m['tag']}</div>", work / f'm{si}_{mi}.png',
+                           spec.get('css', ''))
+                m['_lay'] = im.crop(im.getbbox())
+        if 'panels' in s and 'under' in s:  # 나란히 보기 밑에 깔 그림 — 흐리고 어둡게, 한 번만
+            cx, cy, w = s['under']; k = w / W; h = w * H / W
+            u = imgs[s.get('under_img', s['panels'][0]['img'])].transform(
+                (W, H), Image.AFFINE, (k, 0, cx - w / 2, 0, k, cy - h / 2), Image.BICUBIC, fillcolor=bg)
+            s['_under'] = ImageEnhance.Brightness(u.filter(ImageFilter.GaussianBlur(26))).enhance(0.36)
+    only = [float(x) for x in sys.argv[sys.argv.index('--only') + 1].split(',')] if '--only' in sys.argv else None
+    ff = None if only else subprocess.Popen(['ffmpeg', '-y', '-loglevel', 'error', '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-s', f'{W}x{H}',
                            '-r', str(fps), '-i', '-', '-f', 'lavfi', '-i', 'anullsrc=r=44100:cl=stereo', '-shortest',
                            '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-crf', str(spec.get('crf', 18)), '-preset', 'medium',
                            '-c:a', 'aac', '-b:a', '64k', '-movflags', '+faststart', str(out)], stdin=subprocess.PIPE)
@@ -223,17 +302,59 @@ def main():
         out.paste((0, 0, 0), (x - px, y - py), sd)
         out.paste(card, (x, y), rounded(size, int(s.get('radius', 56) * w / 820)))
         return out
+    def render_panels(s, t):
+        out = s['_under'].copy() if '_under' in s else Image.new('RGB', (W, H), bg)
+        d = ImageDraw.Draw(out)
+        q = ease(min(1.0, max(0.0, (t - s['t0']) / 0.45)))
+        for p in s['panels']:
+            bx, by, bw, bh = p['box']
+            dx, dy = p.get('from', [0, 0])
+            bx, by = int(round(bx + dx * (1 - q))), int(round(by + dy * (1 - q)))
+            cx, cy, w = cam_at(p['cam'], t); k = w / bw; h = bh * k
+            crop = imgs[p['img']].transform((bw, bh), Image.AFFINE, (k, 0, cx - w / 2, 0, k, cy - h / 2), Image.BICUBIC,
+                                            fillcolor=bg)
+            r = p.get('radius', 26)
+            out.paste(crop, (bx, by), rounded((bw, bh), r))
+            d.rounded_rectangle([bx, by, bx + bw - 1, by + bh - 1], r, outline=RING, width=3)
+        return out
+    def draw_marks(fr, s, t):
+        """img 장면의 표시를 RGBA 프레임에 그린다 — 자막 그림자 띠 위에 그려야 이름표가 흐려지지 않는다."""
+        live = [m for m in s.get('marks', []) if m['t0'] <= t <= m['t1']]
+        if not live or 'cam' not in s: return
+        cx, cy, w = cam_at(s['cam'], t); k = w / W
+        x0, y0 = cx - w / 2, cy - w * H / W / 2
+        sx, sy = (lambda x: (x - x0) / k), (lambda y: (y - y0) / k)
+        for m in sorted(live, key=lambda m: 0 if 'spot' in m else 1):  # 조명 먼저, 그 위에 동그라미·이름표
+            if 'spot' in m:
+                x, y, rx, ry = m['spot']
+                spot(fr, sx(x), sy(y), rx / k, ry / k, m.get('dim', 0.62) * fade(t, m['t0'], m['t1'], m.get('fo', 0.4), m.get('fi', 0.4)))
+            elif 'ring' in m:
+                x, y, rx, ry = m['ring']
+                ring(fr, sx(x), sy(y), rx / k, ry / k, ease(min(1.0, (t - m['t0']) / m.get('draw', 0.45))),
+                     fade(t, m['t0'], m['t1'], m.get('fo', 0.3), 0))
+            else:
+                lay, q = m['_lay'], min(1.0, (t - m['t0']) / 0.3)
+                if q < 1:
+                    sc = 0.55 + 0.45 * back(q)
+                    lay = lay.resize((max(1, int(lay.width * sc)), max(1, int(lay.height * sc))), Image.BICUBIC)
+                al = fade(t, m['t0'], m['t1'], m.get('fo', 0.3), 0.15)
+                if al < 1:
+                    lay = lay.copy(); lay.putalpha(lay.getchannel('A').point(lambda v: int(v * al)))
+                dx, dy = m.get('off', [0, 0])
+                put(fr, lay, sx(m['at'][0]) + dx - lay.width / 2, sy(m['at'][1]) + dy - lay.height / 2)
     def render_shot(s, t):
         if 'screen' in s:
             return render_screen(s, t)
+        if 'panels' in s:
+            return render_panels(s, t)
         cx, cy, w = cam_at(s['cam'], t); h = w * H / W
         x0, y0 = cx - w / 2, cy - h / 2; k = w / W
         return source(s, t).transform((W, H), Image.AFFINE, (k, 0, x0, 0, k, y0), Image.BICUBIC, fillcolor=bg)
     def fade(t, a, b, f=0.6, fi=0.6):
         if t < a or t > b: return 0.0
         return min(1.0, (t - a) / fi if fi > 0 else 1.0, (b - t) / f if f > 0 else 1.0)
-    snaps = set(spec.get('snaps', []))
-    for i in range(int(dur * fps)):
+    snaps = set(only or spec.get('snaps', []))
+    for i in (sorted({round(x * fps) for x in only}) if only else range(int(dur * fps))):
         t = i / fps
         cur = [s for s in spec['shots'] if s['t0'] <= t < s['t1']] or [spec['shots'][-1]]
         s = cur[-1]
@@ -246,6 +367,7 @@ def main():
         for pos in ('top', 'low'):
             a = max([fade(t, a0, b0, fo, fi) for a0, b0, _, c, fi, fo in texts if c == pos] or [0])
             if a: fr.alpha_composite(Image.blend(Image.new('RGBA', (W, H), (0, 0, 0, 0)), shades[pos], a))
+        draw_marks(fr, s, t)
         for a0, b0, lay, _, fi, fo in texts:
             al = fade(t, a0, b0, fo, fi)
             if al > 0:
@@ -253,10 +375,11 @@ def main():
                 rising = fi > 0 and t < a0 + fi  # 들어올 때만 아래에서 살짝 올라온다
                 dy = int(round((1 - ease(min(1.0, (t - a0) / fi))) * 28)) if rising else 0
                 fr.alpha_composite(l, dest=(0, dy), source=(0, 0, W, H - dy))
-        rgb = fr.convert('RGB'); ff.stdin.write(rgb.tobytes())
+        rgb = fr.convert('RGB')
+        if ff: ff.stdin.write(rgb.tobytes())
         if any(i == round(x * fps) for x in snaps):
             rgb.save(out.parent / f'{out.stem}-at{t:.1f}.jpg', quality=82)
-    ff.stdin.close(); ff.wait()
+    if ff: ff.stdin.close(); ff.wait()
     for v in vids.values():
         v.close()
     print('done', out)

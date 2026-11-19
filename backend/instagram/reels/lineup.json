@@ -2,7 +2,7 @@
  "_doc": "릴스 편성표 — 키는 미국 동부(ET) 게시 날짜. reel_queue.py 가 빈 슬롯 알림·status 에 주제를 띄우고 add 때 형식을 맞춘다. 2026-11-17 사용자 확정(12/30 까지). 수요일은 시리즈 Mia — 한 사람의 연말 이야기로 잇는다(11/17). 주제는 바꿔도 되고, 사실은 만들 때마다 원래 기록으로 확인한다.",
  "2026-11-16": {"format": "character", "topic": "한나 — 아무도 몰라주는 간절함 (사무엘상 1장)", "note": "11/17 10:39 KST 늦게 게시 — instagram.com/reel/Df0wnpLByPt"},
  "2026-11-18": {"format": "demo", "topic": "Mia 1화 「3:07 a.m.」 — 잠 못 드는 밤", "note": "시리즈 Mia(3D 애니, mia.py). 머리가 안 꺼지는 새벽 → WithGod 앱에 적음 → 조용해짐"},
- "2026-11-20": {"format": "painting", "topic": "렘브란트 「탕자의 귀환」 — 아버지의 두 손", "note": "11/19 큐 등록(episodes/prodigal, 52.6초) — 훅 \"The father’s hands in this painting don’t match.\". 눅 15:24"},
+ "2026-11-20": {"format": "painting", "topic": "렘브란트 「탕자의 귀환」 — 아버지의 두 손", "note": "11/19 큐 등록(episodes/prodigal, 57초) — 그림풀이 「디테일 4개」(손·칼·발·오른쪽 남자 + 성경 카드), 훅 \"The father’s hands in this painting don’t match.\". 눅 15:24"},
  "2026-11-23": {"format": "character", "topic": "마르다 — 할 일에 치일 때 (누가복음 10:38–42)", "note": "추수감사절(11/26) 주간"},
  "2026-11-25": {"format": "demo", "topic": "Mia 2화 — 추수감사절 가족 식사가 두렵다", "note": "추수감사절 전날"},
  "2026-11-27": {"format": "hymn", "topic": "「Now Thank We All Our God」 — 30년 전쟁·역병 속 목사 마르틴 링카르트", "note": "추수감사절 다음 날. 장례 수·작사 연도는 원래 기록 확인"},
