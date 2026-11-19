@@ -35,6 +35,7 @@ import hashlib
 import json
 import os
 import plistlib
+import re
 import shutil
 import subprocess
 import sys
@@ -75,6 +76,7 @@ URL_TTL = timedelta(days=6)           # 서명 주소는 7일 — 하루 여유
 REMIND_AT = (timedelta(hours=72), timedelta(hours=24))
 FAIL_NOTIFY_EVERY = timedelta(hours=1)
 REQUIRED = ("reel.mp4", "cover.jpg", "caption.txt")
+HASHTAG_MAX = 5
 MAKE_HINT = "세션(텔레그램도 됨)에 「다음 릴스 만들어줘」라고 하면 backend/instagram/reels/README.md 대로 만들어 큐에 넣습니다."
 
 
@@ -213,8 +215,11 @@ def check_folder(src: Path) -> list[str]:
     cap = (src / "caption.txt").read_text().strip()
     if len(cap) > 2200:
         problems.append(f"캡션 {len(cap)}자(최대 2200)")
-    if cap.count("#") > 30:
-        problems.append("해시태그 30개 초과")
+    tags = [t.lower() for t in re.findall(r"(?<!\w)#\w+", cap)]
+    if len(tags) > HASHTAG_MAX:  # 2025-12 부터 인스타 상한 5개(예전 30) — 넘으면 게시가 막힐 수 있다
+        problems.append(f"해시태그 {len(tags)}개(최대 {HASHTAG_MAX})")
+    if "#bibleverse" not in tags:
+        problems.append("#bibleverse 없음(README 「캡션」)")
     probe = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "stream=codec_type,codec_name,width,height:"
                             "format=duration,size", "-of", "json", str(src / "reel.mp4")],
                            capture_output=True, text=True)

@@ -6,11 +6,13 @@
 
     “{WEB 본문 그대로}” {참조}
 
+    A Bible verse about {주제}, for when …   ← 검색어 줄(카드 라벨에서, 11/19)
+
     Swipe for the scene behind it and the WithGod app’s note … (written with AI).
 
     {요청 한 줄 — 저장·보내기·댓글}
 
-    #bibleverse #dailybibleverse #{주제}
+    #bibleverse #dailybibleverse #{주제} #{주제 짝} #christianencouragement   ← 5개(인스타 상한)
 
 앱 풀이는 캐러셀 마지막 카드에 싣는다(11/12 사용자 — 게시물 하나로 읽히게). 캡션은 넘겨 보라는 한 줄만
 둔다. 한 장짜리로 올릴 때만 캡션에 풀이를 싣는다. AI 로 쓴 풀이라 어디서든 그렇게 밝힌다(사람·목회자가 쓴 척
@@ -21,7 +23,8 @@ from __future__ import annotations
 
 import re
 
-# 인스타 캡션 상한(공식 문서: 2,200자, 해시태그 30, @ 20). 피드는 첫 줄 약 125자 뒤를 접는다.
+# 인스타 캡션 상한(2,200자, @ 20). 해시태그는 2025-12 부터 게시물·릴스당 5개(인스타 크리에이터 공지, 순차 적용 —
+# 예전 상한 30). 피드는 첫 줄 약 125자 뒤를 접는다.
 CAPTION_MAX = 2200
 HOOK_MAX = 125
 KICKER_MAX = 40  # 런칭 라벨 최장 38자(「When it’s taking longer than you hoped」)
@@ -34,13 +37,20 @@ SCENE_LABELS = ("the scene", "the picture")
 
 NOTE_INTRO = "From the WithGod app’s note on this verse (written with AI):"
 SWIPE_LINE = "Swipe for the scene behind it and the WithGod app’s note on what it can mean today (written with AI)."
+# 해시태그 5개 = 기본 2 + 주제 + 주제 짝(그 감정·상황으로 찾는 사람이 쓰는 태그) + 공동체 태그.
+# 11/19 점검: 태그 개수(3·5)는 도달과 무관했다 — 태그는 분류용이고 비팔로워 도달은 거의 릴스에서 온다.
+# 그래도 상한까지 채우되(사용자 결정) 내용과 맞는 것만. 관계없는 인기 태그(#fyp·#viral)는 스팸 신호라 쓰지 않는다.
+HASHTAG_MAX = 5
 BASE_HASHTAGS = ("#bibleverse", "#dailybibleverse")
-# 주제 해시태그 — 생성기가 이 안에서만 고른다(새 태그는 여기 더하고 테스트를 고친다).
-TOPIC_HASHTAGS = (
-    "#hope", "#peace", "#strength", "#comfort", "#encouragement", "#gratitude", "#rest",
-    "#courage", "#wisdom", "#love", "#grace", "#forgiveness", "#joy", "#trust", "#patience",
-    "#kindness",
-)
+COMMUNITY_HASHTAG = "#christianencouragement"  # 릴스 캡션과 같은 공동체 태그
+# 주제 해시태그 → 짝 태그. 카피(copy_en.json 의 topic)는 이 안에서만 고른다(새 주제는 여기 더하고 테스트를 고친다).
+TOPIC_PAIRS = {
+    "#hope": "#hardtimes", "#peace": "#innerpeace", "#strength": "#faithoverfear", "#comfort": "#healing",
+    "#encouragement": "#keepgoing", "#gratitude": "#thankful", "#rest": "#burnout", "#courage": "#bebrave",
+    "#wisdom": "#biblewisdom", "#love": "#relationships", "#grace": "#godsgrace", "#forgiveness": "#lettinggo",
+    "#joy": "#contentment", "#trust": "#trustgod", "#patience": "#waiting", "#kindness": "#bekind",
+}
+TOPIC_HASHTAGS = tuple(TOPIC_PAIRS)
 # 앱 안내 줄 — 매일 붙이면 광고 계정처럼 보여서 요일을 정해 붙인다(daily_post.app_line_for).
 APP_LINE = "Tell the free WithGod app how you feel. It finds a verse for that. Link in bio."
 
@@ -122,16 +132,41 @@ def find_caption_problems(caption: str) -> list[str]:
         m = rx.search(caption)
         if m:
             problems.append(f"{name}「{m.group(0)}」")
-    tags = re.findall(r"(?<!\w)#\w+", caption)
-    if len(tags) != 3:
-        problems.append(f"해시태그 {len(tags)}개")
+    tags = [t.lower() for t in re.findall(r"(?<!\w)#\w+", caption)]
+    if len(tags) != HASHTAG_MAX:
+        problems.append(f"해시태그 {len(tags)}개(정확히 {HASHTAG_MAX}개)")
+    if len(set(tags)) != len(tags):
+        problems.append("해시태그 중복")
+    if "#bibleverse" not in tags:
+        problems.append("#bibleverse 없음")
     return problems
 
 
 def hashtags(topic: str) -> str:
-    if topic not in TOPIC_HASHTAGS:
+    if topic not in TOPIC_PAIRS:
         raise ValueError(f"모르는 주제 해시태그: {topic}")
-    return " ".join((*BASE_HASHTAGS, topic))
+    return " ".join((*BASE_HASHTAGS, topic, TOPIC_PAIRS[topic], COMMUNITY_HASHTAG))
+
+
+def search_line(kicker: str, topic: str) -> str:
+    """검색어 줄 — 인스타 검색은 캡션 글을 읽는다(사람들은 「bible verse for anxiety」처럼 찾는다).
+    카드 라벨(「When everything feels shaky」「For a busy week」「Before you hit send」)을 이어
+    「A Bible verse about strength, for when everything feels shaky.」 — 모르는 모양의 라벨이면 주제만 쓴다."""
+    word = topic.lstrip("#")
+    k = " ".join((kicker or "").split()).rstrip(".")
+    first, _, rest = k.partition(" ")
+    lead = first.lower()
+    if lead == "when" and rest:
+        tail = f"for when {rest}"
+    elif lead == "for" and rest:
+        tail = f"for {rest}"
+    elif lead in ("before", "after") and rest:
+        tail = f"to read {lead} {rest}"
+    elif lead == "with" and rest:
+        tail = f"for dealing with {rest}"
+    else:
+        return f"A Bible verse about {word}."
+    return f"A Bible verse about {word}, {tail}."
 
 
 def display_ref(ref: str) -> str:
@@ -144,12 +179,13 @@ def display_ref(ref: str) -> str:
 
 
 def build_caption(*, hook: str, verse_text: str, ref: str, cta: str, topic: str, app_line: str = "",
-                  note: str = "") -> str:
+                  note: str = "", kicker: str = "") -> str:
     """캡션 조립. ref 는 표시용(display_ref) 참조. note(앱 풀이)를 주면 한 장짜리 게시물이라 캡션에
-    풀이를 싣고, 안 주면 캐러셀이라 풀이 카드로 넘겨 보라는 줄을 둔다."""
+    풀이를 싣고, 안 주면 캐러셀이라 풀이 카드로 넘겨 보라는 줄을 둔다. kicker(카드 라벨)로 검색어 줄을 만든다."""
     blocks = [
         hook.strip(),
         f"“{verse_text.strip()}” {ref} (WEB)",
+        search_line(kicker, topic),
         f"{NOTE_INTRO}\n{note.strip()}" if note else SWIPE_LINE,
         cta.strip(),
     ]
@@ -195,7 +231,8 @@ def find_post_problems(entry: dict) -> list[str]:
     for app_line in ("", APP_LINE):
         for note in ("", entry["note"]):  # 캐러셀(풀이 카드)과 한 장짜리(캡션에 풀이) 둘 다
             caption = build_caption(hook=entry["hook"], verse_text=entry["text"], ref=entry["display_ref"],
-                                    cta=entry["cta"], topic=entry["topic"], app_line=app_line, note=note)
+                                    cta=entry["cta"], topic=entry["topic"], app_line=app_line, note=note,
+                                    kicker=entry["kicker"])
             problems += find_caption_problems(caption)
     if len(entry.get("alt_text", "")) > ALT_TEXT_MAX:
         problems.append("대체 텍스트 길이")

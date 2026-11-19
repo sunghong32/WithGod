@@ -28,6 +28,7 @@ SIZE = (1088, 1936)  # 세로 그대로(9:16, 16의 배수) — 가로 그림을
 CSS = """
 .m{font:500 54px/1.28 "I";letter-spacing:-.005em;color:#FFFFFF;text-wrap:pretty}
 .m.big{font-weight:600;font-size:64px;line-height:1.16;text-wrap:balance}
+.m.hook{font-weight:700;font-size:74px;line-height:1.1;letter-spacing:-.015em;text-wrap:balance}  /* 첫 문장 — 0초부터 크게 */
 .m .dim{color:rgba(255,255,255,.72)}
 .stamp{position:absolute;left:90px;top:250px;font:600 34px "I";letter-spacing:.14em;color:rgba(255,255,255,.86);
   text-shadow:0 1px 10px rgba(0,0,0,.5)}

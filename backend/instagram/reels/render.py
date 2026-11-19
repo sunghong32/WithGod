@@ -32,6 +32,8 @@ body{{position:relative}}  /* low·hd(bottom 기준)를 창(H+200)이 아니라 
   text-shadow:0 2px 24px rgba(0,0,0,.55),0 1px 3px rgba(0,0,0,.45)}}
 .top{{top:300px}} .low{{bottom:520px}}
 .h1{{font-size:70px;line-height:1.14;font-weight:500;letter-spacing:-.01em;text-wrap:balance}}
+/* 첫 문장(훅) — 0초에 바로, 피드에서 넘기기 전에 읽히게 크고 굵게(11/19: 평균 시청 7~10초, 첫 화면 글씨가 작았다) */
+.hook{{font-size:88px;line-height:1.06;font-weight:600;letter-spacing:-.018em;text-wrap:balance}}
 .t{{font-size:60px;line-height:1.24;text-wrap:pretty}}
 .it{{font-style:italic}}
 .sub{{margin-top:22px;font:500 30px/1.35 "S";letter-spacing:.02em;color:rgba(255,248,236,.86)}}
@@ -59,6 +61,51 @@ def shoot(body: str, out: Path, css: str = '') -> Image.Image:
     return Image.open(out).convert('RGBA').crop((0, 0, W, H))
 
 def ease(t): return t * t * (3 - 2 * t)
+
+# ── 첫 장면 검사 (11/19) ─────────────────────────────────────────
+# 올린 세 편의 평균 시청이 6.9~10.5초(42~60초 영상)였다. 첫 3~4초가 거의 멈춘 그림 + 작은 글씨였고, 3초 무렵
+# 첫 문장이 사라진 뒤 다음 자막까지 빈 틈이 있었다. 릴스는 첫 몇 초에 넘기면 더 퍼지지 않으니 그 구간을 기계로 막는다.
+OPEN_CHANGE_BY = 2.5   # 이 시각까지 컷이 있거나 카메라가 눈에 띄게(줌 1.2배·이동 폭의 20%) 움직여야 한다
+OPEN_MIN_ZOOM, OPEN_MIN_PAN = 1.2, 0.2
+OPEN_TEXT_UNTIL = 8.0  # 이 시각까지는 자막 사이 빈 틈을 OPEN_MAX_GAP 초 넘게 두지 않는다
+OPEN_MAX_GAP = 0.2
+HOOK_MAX_WORDS = 12
+
+def opening_problems(spec) -> list[str]:
+    """spec 의 첫 장면 규칙 위반(없으면 빈 목록). 표지 spec 은 검사하지 않는다."""
+    import re
+    problems = []
+    texts = sorted(spec.get('texts', []), key=lambda t: t['t0'])
+    hooks = [t for t in texts if t['t0'] <= 0.05 and re.search(r"class=['\"][^'\"]*\bhook\b", t['html'])]
+    if not hooks:
+        problems.append("0초에 hook 클래스 첫 문장이 없다(<div class='hook'>…, Mia 는 <p class='m hook'>…)")
+    for h in hooks:
+        if h.get('fi', 0.6) > 0:
+            problems.append("첫 문장은 fi: 0 — 0초 첫 프레임부터 보여야 한다")
+        words = len(re.sub(r'<[^>]+>', ' ', h['html']).split())
+        if words > HOOK_MAX_WORDS:
+            problems.append(f"첫 문장 {words}단어(최대 {HOOK_MAX_WORDS})")
+        if h['t1'] < 2.0:
+            problems.append(f"첫 문장이 {h['t1']}초에 사라진다(2초 이상 머물게)")
+    shots = sorted(spec['shots'], key=lambda s: s['t0'])
+    s0 = shots[0]
+    if s0['t1'] > OPEN_CHANGE_BY and 'cam' in s0:
+        cams = [cam_at(s0['cam'], OPEN_CHANGE_BY * i / 25) for i in range(26)]
+        ws = [c[2] for c in cams]
+        zoom = max(ws) / min(ws)
+        pan = max(((c[0] - cams[0][0]) ** 2 + (c[1] - cams[0][1]) ** 2) ** .5 for c in cams) / min(ws)
+        if zoom < OPEN_MIN_ZOOM and pan < OPEN_MIN_PAN:
+            problems.append(f"첫 {OPEN_CHANGE_BY}초에 컷이 없고 카메라도 거의 안 움직인다(줌 {zoom:.2f}배·이동 {pan:.0%}) — "
+                            f"{OPEN_CHANGE_BY}초 안에 컷하거나 {OPEN_MIN_ZOOM}배 이상 밀고 들어가기")
+    end, until = 0.0, min(OPEN_TEXT_UNTIL, spec['dur'])
+    for t in texts + [{'t0': until, 't1': until}]:  # 끝 표지 — 마지막 자막 뒤 빈 틈도 본다
+        start = min(t['t0'], until)
+        if start - end > OPEN_MAX_GAP + 1e-6:
+            problems.append(f"{end:.1f}~{start:.1f}초 자막 빈 틈({start - end:.1f}초) — 첫 {until:.0f}초는 이어 붙인다")
+        if t['t0'] >= until:
+            break
+        end = max(end, t['t1'])
+    return problems
 
 class Video:
     """영상 장면의 프레임을 앞에서부터 차례로 읽는다(통째로 올리면 휴대폰 녹화 1206×2622 는 30초에 수 GB).
@@ -214,4 +261,8 @@ def main():
     print('done', out)
 
 if __name__ == '__main__':
+    if sys.argv[1] == '--check':  # python3 render.py --check spec.json — 첫 장면 규칙만 본다
+        found = opening_problems(json.loads(Path(sys.argv[2]).read_text()))
+        print('\n'.join(f'⚠ 첫 장면: {p}' for p in found) or '첫 장면 OK')
+        sys.exit(1 if found else 0)
     main()

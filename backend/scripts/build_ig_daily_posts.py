@@ -189,7 +189,7 @@ def main() -> int:
         for vid, e in entries.items():
             print(f"\n===== {vid} · {e['display_ref']} · {len(e['images'])}장")
             print(build_caption(hook=e["hook"], verse_text=e["text"], ref=e["display_ref"],
-                                cta=e["cta"], topic=e["topic"]))
+                                cta=e["cta"], topic=e["topic"], kicker=e["kicker"]))
         return 0
 
     MANIFEST.write_text(json.dumps({

@@ -13,7 +13,7 @@ from unittest.mock import patch
 
 from instagram import daily_post
 from instagram.caption import (
-    APP_LINE, CAPTION_MAX, build_caption, display_ref, find_caption_problems, find_copy_problems,
+    APP_LINE, CAPTION_MAX, build_caption, display_ref, find_caption_problems, find_copy_problems, search_line,
     find_post_problems, find_slide_problems,
 )
 from instagram.graph import INSTAGRAM_HOST, GraphError, InstagramClient, TokenStore
@@ -56,10 +56,37 @@ class CopyRulesTest(unittest.TestCase):
         self.assertEqual(find_caption_problems(caption), [])
         self.assertTrue(caption.startswith("For the days fear gets the first word.\n\n“Don’t be afraid.” Isaiah 41:10 (WEB)"))
         self.assertIn("(written with AI)", caption)
-        self.assertTrue(caption.endswith("#bibleverse #dailybibleverse #courage"))
+        self.assertTrue(caption.endswith("#bibleverse #dailybibleverse #courage #bebrave #christianencouragement"))
         self.assertTrue(find_caption_problems(caption + "x" * CAPTION_MAX))
         with self.assertRaises(ValueError):
             build_caption(hook="h", verse_text="t", ref="r", note="n", cta="c", topic="#nope")
+
+    def test_hashtags_five_with_bibleverse(self):
+        caption = build_caption(hook="Hook.", verse_text="Rest.", ref="Psalm 4:8", cta="Save this.", topic="#rest",
+                                kicker="When you’re running on empty")
+        tags = caption.rsplit("\n", 1)[1].split()
+        self.assertEqual(len(tags), 5)
+        self.assertEqual(tags[0], "#bibleverse")
+        three = caption.rsplit("\n", 1)[0] + "\n#bibleverse #dailybibleverse #rest"
+        self.assertTrue(any("해시태그 3개" in p for p in find_caption_problems(three)))
+        six = caption + " #faith"
+        self.assertTrue(any("해시태그 6개" in p for p in find_caption_problems(six)))
+        no_bv = caption.replace("#bibleverse", "#scripture")
+        self.assertIn("#bibleverse 없음", find_caption_problems(no_bv))
+
+    def test_search_line_from_card_label(self):
+        self.assertEqual(search_line("When everything feels shaky", "#strength"),
+                         "A Bible verse about strength, for when everything feels shaky.")
+        self.assertEqual(search_line("For a busy week", "#kindness"), "A Bible verse about kindness, for a busy week.")
+        self.assertEqual(search_line("Before you hit send", "#wisdom"),
+                         "A Bible verse about wisdom, to read before you hit send.")
+        self.assertEqual(search_line("With someone difficult", "#peace"),
+                         "A Bible verse about peace, for dealing with someone difficult.")
+        self.assertEqual(search_line("Some other label", "#hope"), "A Bible verse about hope.")
+        self.assertEqual(search_line("", "#hope"), "A Bible verse about hope.")
+        caption = build_caption(hook="Hook.", verse_text="Rest.", ref="Psalm 4:8", cta="Save this.", topic="#rest",
+                                kicker="For a long week")
+        self.assertIn("\n\nA Bible verse about rest, for a long week.\n\n", caption)
 
     def test_slide_copy_rules(self):
         good = {"scene": {"label": "the scene", "body": "A hillside in Galilee.", "art": "x.jpg",
