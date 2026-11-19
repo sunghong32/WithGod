@@ -39,6 +39,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
@@ -105,19 +106,30 @@ def tg_env() -> tuple[str, list[str]]:
     return env.get("TELEGRAM_BOT_TOKEN", ""), [i.strip() for i in ids.split(",") if i.strip()]
 
 
+TG_VIDEO_MAX = 49 * 1024 * 1024  # 텔레그램 봇 sendVideo 상한 50MB
+
+
 def send_video(video: Path, caption: str) -> bool:
-    """텔레그램 sendVideo(50MB 까지). 토큰이 프로세스 목록에 보이지 않게 curl 설정을 표준 입력으로 준다."""
+    """텔레그램 sendVideo(50MB 까지). 토큰이 프로세스 목록에 보이지 않게 curl 설정을 표준 입력으로 준다.
+    더 크면(성화 편은 캔버스 결 때문에 100MB 안팎) 720p 미리보기로 줄여 보낸다 — 게시하는 원본은 그대로."""
     try:
         token, chats = tg_env()
         if not token or not chats:
             return False
-        ok = True
-        for chat in chats:
-            cfg = f'url = "https://api.telegram.org/bot{token}/sendVideo"\n'
-            r = subprocess.run(["curl", "-sS", "-K", "-", "-F", f"chat_id={chat}", "-F", f"video=@{video}",
-                                "-F", "supports_streaming=true", "-F", f"caption={caption[:1000]}"],
-                               input=cfg, capture_output=True, text=True, timeout=300)
-            ok = ok and '"ok":true' in r.stdout
+        with tempfile.TemporaryDirectory() as tmp:
+            if video.stat().st_size > TG_VIDEO_MAX:
+                small = Path(tmp) / "preview.mp4"
+                subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", str(video), "-vf", "scale=720:-2",
+                                "-c:v", "libx264", "-crf", "26", "-preset", "veryfast", "-c:a", "aac", "-b:a", "128k",
+                                "-movflags", "+faststart", str(small)], check=True, timeout=600)
+                video = small
+            ok = True
+            for chat in chats:
+                cfg = f'url = "https://api.telegram.org/bot{token}/sendVideo"\n'
+                r = subprocess.run(["curl", "-sS", "-K", "-", "-F", f"chat_id={chat}", "-F", f"video=@{video}",
+                                    "-F", "supports_streaming=true", "-F", f"caption={caption[:1000]}"],
+                                   input=cfg, capture_output=True, text=True, timeout=300)
+                ok = ok and '"ok":true' in r.stdout
         return ok
     except Exception as exc:
         log(f"send_video failed: {type(exc).__name__}")

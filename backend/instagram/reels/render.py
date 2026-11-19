@@ -11,6 +11,7 @@
   {"screen": 녹화.mp4, "bgimg": 1080×1920 배경, "rect": [[시각, 카드 중심x, 중심y, 카드 폭(출력 픽셀)]…],
    "scroll": [[시각, 보여 줄 원본 첫 줄]…], "src_h": 보여 줄 원본 높이, "radius": 모서리(카드 폭 820 기준)}
 spec 의 "css" 는 자막 HTML 에 덧붙는다(편·시리즈마다 다른 글꼴·상자).
+spec 의 "crf"(기본 18)는 화질 — 큰 PD 성화는 캔버스 결 때문에 18 이면 30Mbps 를 넘는다(인스타 상한 25Mbps), 22~24 로.
 """
 import html, json, subprocess, sys, tempfile
 from pathlib import Path
@@ -200,7 +201,7 @@ def main():
     shades = {'top': shade('top'), 'low': shade('low')}
     ff = subprocess.Popen(['ffmpeg', '-y', '-loglevel', 'error', '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-s', f'{W}x{H}',
                            '-r', str(fps), '-i', '-', '-f', 'lavfi', '-i', 'anullsrc=r=44100:cl=stereo', '-shortest',
-                           '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-crf', '18', '-preset', 'medium',
+                           '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-crf', str(spec.get('crf', 18)), '-preset', 'medium',
                            '-c:a', 'aac', '-b:a', '64k', '-movflags', '+faststart', str(out)], stdin=subprocess.PIPE)
     def source(s, t):
         if 'img' in s:
