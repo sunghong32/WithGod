@@ -8,7 +8,7 @@
 
     A Bible verse about {주제}, for when …   ← 검색어 줄(카드 라벨에서, 11/19)
 
-    Swipe for the scene behind it and the WithGod app’s note … (written with AI).
+    Swipe for the WithGod app’s note … (written with AI).
 
     {요청 한 줄 — 저장·보내기·댓글}
 
@@ -17,7 +17,7 @@
 앱 풀이는 캐러셀 마지막 카드에 싣는다(11/12 사용자 — 게시물 하나로 읽히게). 캡션은 넘겨 보라는 한 줄만
 둔다. 한 장짜리로 올릴 때만 캡션에 풀이를 싣는다. AI 로 쓴 풀이라 어디서든 그렇게 밝힌다(사람·목회자가 쓴 척
 금지 규칙). 훅·카드 라벨·요청 줄과
-캐러셀 안쪽 장 글은 `instagram/copy_en.json` 에 손으로 쓰고(API 로 만들지 않는다) 여기 규칙으로 검사한다.
+표지의 「오늘의 한 단어」는 `instagram/copy_en.json` 에 손으로 쓰고(API 로 만들지 않는다) 여기 규칙으로 검사한다.
 """
 from __future__ import annotations
 
@@ -30,13 +30,13 @@ HOOK_MAX = 125
 KICKER_MAX = 40  # 런칭 라벨 최장 38자(「When it’s taking longer than you hoped」)
 CTA_MAX = 100
 ALT_TEXT_MAX = 1000
-# 캐러셀 장면 장 글(card.py 의 scene 장)
-SCENE_MAX = 240
-CREDIT_MAX = 80
-SCENE_LABELS = ("the scene", "the picture")
+# 표지 「오늘의 한 단어」 — 말씀에 실제로 있는 낱말 한두 개 + 마침표(예 「Near.」「Be still.」). 길면 표지에서
+# 글자가 줄어 한 단어의 힘이 빠진다.
+WORD_MAX = 13
+_RE_WORD = re.compile(r"^[A-Z][A-Za-z’']*(?: [A-Za-z’']+)?\.$")
 
 NOTE_INTRO = "From the WithGod app’s note on this verse (written with AI):"
-SWIPE_LINE = "Swipe for the scene behind it and the WithGod app’s note on what it can mean today (written with AI)."
+SWIPE_LINE = "Swipe for the WithGod app’s note on what it can mean today (written with AI)."
 # 해시태그 5개 = 기본 2 + 주제 + 주제 짝(그 감정·상황으로 찾는 사람이 쓰는 태그) + 공동체 태그.
 # 11/19 점검: 태그 개수(3·5)는 도달과 무관했다 — 태그는 분류용이고 비팔로워 도달은 거의 릴스에서 온다.
 # 그래도 상한까지 채우되(사용자 결정) 내용과 맞는 것만. 관계없는 인기 태그(#fyp·#viral)는 스팸 신호라 쓰지 않는다.
@@ -51,6 +51,15 @@ TOPIC_PAIRS = {
     "#joy": "#contentment", "#trust": "#trustgod", "#patience": "#waiting", "#kindness": "#bekind",
 }
 TOPIC_HASHTAGS = tuple(TOPIC_PAIRS)
+# 분위기(card.py 의 표지·안쪽 장 디자인) — 주제 태그로 정한다. 카피에 `mood` 를 쓰면 그게 우선이다.
+MOODS = ("comfort", "hope", "peace", "wisdom", "joy")
+TOPIC_MOOD = {
+    "#comfort": "comfort", "#grace": "comfort",
+    "#hope": "hope", "#patience": "hope", "#strength": "hope", "#courage": "hope", "#encouragement": "hope",
+    "#peace": "peace", "#trust": "peace", "#rest": "peace", "#forgiveness": "peace",
+    "#wisdom": "wisdom",
+    "#joy": "joy", "#love": "joy", "#kindness": "joy", "#gratitude": "joy",
+}
 # 앱 안내 줄 — 매일 붙이면 광고 계정처럼 보여서 요일을 정해 붙인다(daily_post.app_line_for).
 APP_LINE = "Tell the free WithGod app how you feel. It finds a verse for that. Link in bio."
 
@@ -203,21 +212,26 @@ def build_alt_text(*, kicker: str, verse_text: str, ref: str) -> str:
     return alt
 
 
-def find_slide_problems(copy: dict) -> list[str]:
-    """copy_en.json 한 말씀의 캐러셀 안쪽 장 글 검사(장면·오늘의 한마디). 강조 구절은 본문에 그대로 있어야 한다."""
-    problems = []
-    scene = copy.get("scene")
-    if scene:
-        if scene.get("label") not in SCENE_LABELS:
-            problems.append(f"scene.label: {scene.get('label')!r} (허용: {', '.join(SCENE_LABELS)})")
-        problems += find_copy_problems(scene.get("body", ""), limit=SCENE_MAX, field="scene.body")
-        if not (scene.get("credit") or "").strip() or len(scene["credit"]) > CREDIT_MAX:
-            problems.append("scene.credit: 비었거나 김")
-        if not (scene.get("alt") or "").strip() or len(scene["alt"]) > ALT_TEXT_MAX:
-            problems.append("scene.alt: 비었거나 김")
-        if not scene.get("art"):
-            problems.append("scene.art: 그림 파일 없음")
+def mood_for(copy: dict) -> str:
+    """카피 한 말씀의 분위기 — `mood` 가 있으면 그것, 없으면 주제 태그로."""
+    return copy.get("mood") or TOPIC_MOOD[copy["topic"]]
 
+
+def find_slide_problems(copy: dict, verse_text: str = "") -> list[str]:
+    """copy_en.json 한 말씀의 표지 검사 — 한 단어 모양·길이, 분위기. verse_text 를 주면 그 낱말이 본문에
+    있는지도 본다(표지 단어가 둘째 장 본문에 그대로 보여야 이어진다)."""
+    problems = []
+    word = (copy.get("word") or "").strip()
+    if not _RE_WORD.match(word):
+        problems.append(f"word: {word!r} (낱말 한두 개 + 마침표)")
+    elif len(word) > WORD_MAX:
+        problems.append(f"word: {len(word)}자 > {WORD_MAX}")
+    elif verse_text and word[:-1].replace("’", "'").lower() not in verse_text.replace("’", "'").lower():
+        problems.append(f"word: {word!r} 이 본문에 없음")
+    if copy.get("mood") and copy["mood"] not in MOODS:
+        problems.append(f"mood: {copy['mood']!r} (허용: {', '.join(MOODS)})")
+    elif not copy.get("mood") and copy.get("topic") not in TOPIC_MOOD:
+        problems.append(f"topic {copy.get('topic')!r} 의 분위기가 없음(TOPIC_MOOD)")
     return problems
 
 

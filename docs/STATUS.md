@@ -4,7 +4,7 @@
 > **작업을 완료하면 「지금 상태」와 「최근 변경 이력」을 갱신할 것.** 낡으면 신뢰가 무너진다.
 > ⚠️ 이 파일은 세션 시작 시 통째로 주입된다. **20KB 아래로 유지할 것** —
 > 완료 이력은 `CHANGELOG.md` 나 git history 로 넘긴다.
-> 최종 갱신: 2026-11-18 · 브랜치: `app-develop`
+> 최종 갱신: 2026-11-19 · 브랜치: `app-develop`
 
 ## 한 줄
 
@@ -71,12 +71,12 @@ Play vc28 production·alpha·internal `completed`. **1.6.1(#69 iOS 위젯 현지
 - [x] **앱 받기 링크(/get) 클릭 집계 — 운영 배포 완료(11/16, PR #83 `9dd92b4`).** 웹이 리다이렉트 뒤(`after()`) 백엔드
       `POST /admin/analytics/link-clicks`(관리 키)로 src·기기·하루짜리 방문자 해시(IP 원문 안 보냄)를 남기고, 어드민 「앱 받기 링크 클릭」
       카드가 출처별 클릭·방문자·최근 20건을 보여 준다(미리보기 봇 제외). 외부에 거는 링크는 `/get?src=<출처>`(예: 인스타 DM `ig-dm`)
-- [ ] **인스타 Daily Verse 자동 게시(#62) — 11/12 07:00 ET(21:00 KST) 시편 34:18 부터 live, 하루 하나.** 앱 오늘의 말씀과 같은 말씀(겹쳐도 그대로)을
-      캐러셀로: 그림 표지(그림 꽉 채움 + 감정 라벨, 11/13~) · 말씀 카드 · 그림 배경 설명 · 앱 영어 풀이 카드(AI 표기), 수·일요일엔 앱 안내 장. 운영 서버
+- [ ] **인스타 Daily Verse 자동 게시(#62) — 11/12 07:00 ET(21:00 KST)부터 live, 하루 하나.** 앱 오늘의 말씀과 같은 말씀을 캐러셀로:
+      표지 「오늘의 한 단어」(말씀 속 낱말 + 감정 스티커, 11/19~) · 말씀 · 앱 영어 풀이(AI 표기), 수·일요일엔 앱 안내 장. 세 장은 분위기
+      (주제 태그 → 위로·소망·평안·지혜·기쁨)대로 색·배경 요소를 맞춘다. 그림·사진은 안 쓴다(성경 시대 그림은 월요일 릴스 몫). 운영 서버
       `with-god-ig-post.timer`(07:00 America/New_York) → `python -m instagram.daily_post`, 설정 `/etc/with-god-ig.env`, 기록 `/var/lib/with-god-ig/`,
-      결과는 텔레그램. 지난 날 다시 올리기는 `--date YYYY-MM-DD --force`(11/13 에 11/12 몫을 그림 표지로 다시 올림). 카피·그림은 **이 맥에서 2주치씩** 앞서 만든다 — 지금 11/12~27 준비, 알림의 「준비된 날」이 7일 아래면 다음 묶음.
-      카피는 `backend/instagram/copy_en.json` 에 세션에서 직접 쓴다(API 금지), 그림은 `scripts/gen_ig_art.py`(로컬 Z-Image-Turbo,
-      서양 2D 애니메이션풍; 예수님 장면은 퍼블릭 도메인 성화), 렌더·업로드 `scripts/build_ig_daily_posts.py --upload`. 캡션은 해시태그 5개(`#bibleverse` 포함, 주제 짝 태그는 `caption.TOPIC_PAIRS`) + 카드 라벨로 만든 검색어 줄(11/19). 요령은 메모리 `instagram-account`
+      결과는 텔레그램. 지난 날 다시 올리기는 `--date YYYY-MM-DD --force`. 카피는 **이 맥에서 2주치씩** 앞서 쓴다 — 지금 11/12~27 준비, 알림의 「준비된 날」이 7일 아래면 다음 묶음.
+      카피 `backend/instagram/copy_en.json`(`word` 포함)은 세션에서 직접 쓴다(API 금지), 렌더 `scripts/build_ig_daily_posts.py`, 업로드는 `--upload`(boto3) 또는 aws cli. 캡션은 해시태그 5개(`#bibleverse` 포함, 주제 짝 태그는 `caption.TOPIC_PAIRS`) + 카드 라벨로 만든 검색어 줄(11/19). 요령은 메모리 `instagram-account`
 - [ ] **인스타 릴스 월·수·금 19:00 ET(한국 다음 날 09:00, 서머타임엔 08:00) — 큐 + 이 맥 launchd(11/17~).** 월 성경 인물 이야기 · 수 앱 시연(시리즈 「Mia」, `mia.py`) ·
       금 번갈아(그 시절 생활 → 성화 읽기 → 찬송가 이야기 → 오래된 기도문), 대림절(11/29~12/24) 특집 · 오늘의 말씀 재탕 없음(사용자 결정 11/13).
       도구 `backend/instagram/reels/`(render.py 영상 · music.swift 음악 · finish.py 합치기·표지 · reel_queue.py 예약), 편마다 원본은 `episodes/<slug>/`,
@@ -143,6 +143,7 @@ Play vc28 production·alpha·internal `completed`. **1.6.1(#69 iOS 위젯 현지
 
 ## 최근 변경 이력
 
+- 2026-11-19 feat(instagram): Daily Verse 표지를 「오늘의 한 단어」로(그림·사진 없이) — 성경 시대 그림이 월요일 릴스와 겹친다는 사용자 지적, 사진풍·액자 시안은 "대충·굳이"로 거절. 분위기 5개로 세 장 색·배경을 맞추고 배경 설명 장을 뺌, 16일치 다시 렌더(틀 4)
 - 2026-11-19 feat(instagram): 조회수 점검 — 태그 개수(3·5)는 도달과 무관, 비팔로워 도달 213/222 는 릴스, 릴스 평균 시청 7~10초. 릴스 첫 3초 규칙 + 자동 검사(`render.opening_problems`, finish.py 가 막음, 한나·Mia 전후 시안) · 해시태그 5개(인스타 상한, `#bibleverse` 포함, 사용자 요청) + Daily Verse 캡션 검색어 줄 · 운영 서버 git pull(API 재시작 없음 — instagram 은 타이머가 매번 새로 실행)
 - 2026-11-18 fix/release: #92 iOS 안내 모달이 겹치면 홈 먹통 — 차례표 `useModalTurn`(PR #93, 시뮬레이터 4조합·에뮬레이터 확인). OTA 1.6.1·1.6.0 iOS·Android(수정만) + min_supported 1.6.0(1.5.0 은 11/11 뒤 실행 0대라 OTA 대신 강제 업데이트, 사용자 결정)
 - 2026-11-17 feat(instagram): 수요일 앱 시연을 시리즈 「Mia」로 — 첫 편이 인물 이야기와 똑같아 보이고 다시 만든 시안은 광고 같다는 사용자 피드백으로, 3D 애니 인물 Mia 가 고민을 안고 WithGod 앱을 쓰는 이야기(실제 앱 녹화, 로파이 음악, 속마음 자막). 1화 「3:07 a.m.」 11/18 큐(2차: 실제로 한 글자씩 치는 장면·자막 여유 있게, 60초, 시편 4:8). render.py 앱 화면 장면·자막별 CSS, music.swift GM 128 악기·드럼
