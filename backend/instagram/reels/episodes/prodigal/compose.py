@@ -4,7 +4,7 @@
 
 말 밑에 까는 음악이라 선율은 말 사이 쉼에만 짧게 두고, 화음은 펼쳐(아르페지오 + 현악 지속음) 찬송가처럼 들리지 않게.
 젊은 렘브란트(E♭, 조금 들뜨게) → 30년의 상실(C단조, 느리게) → 이 그림·아들 이야기(G단조) → 발·종(A♭→D, 낮아짐)
-→ 아버지가 안음(E♭, 풀림) → 두 손(F·B♭·E♭, 따뜻하게) → 이사야(B♭, 현악 크게) → "놓지 않을 만큼"(E♭)
+→ 아버지가 안음(E♭, 풀림) → 옷·반지·신(A♭) → 아들로(B♭) → 두 손(F·B♭·E♭, 따뜻하게) → 이사야(B♭, 현악 크게) → "놓지 않을 만큼"(E♭)
 → 눅 15:20(B♭, 한숨 선율이 위로) → 끝 B♭·E♭·F·B♭ 로 맺음.
 """
 import json
@@ -72,6 +72,10 @@ chord(*span('feet'), *Ab, step=0.6)
 chord(*span('servant'), *D, step=0.6)
 chord(*span('embrace'), *Eb, step=0.4, va=34, vp=34)
 gap_melody('embrace', [(74, 0.25), (75, 0.25), (77, 0.4)], 44)
+# 옷·반지·신 → 종이 아니라 아들로: A♭ 에서 B♭ 으로 올라 풀림
+chord(*span('robe'), *Ab, step=0.45, va=32)
+chord(*span('son'), *Bb, step=0.4, vb=46, va=34, vp=36)
+gap_melody('son', [(70, 0.3), (74, 0.3), (77, 0.6)], 44)
 chord(*span('hands'), *F, step=0.45)
 chord(*span('broad'), *Bb, step=0.5, vb=46)
 chord(*span('slender'), *Eb, step=0.5, va=26)

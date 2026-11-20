@@ -7,6 +7,9 @@
 젊은 렘브란트가 자신을 탕자로 그린 1635년 그림 → 30년의 상실 → 이 그림 → 발(얼마나 낮아져 돌아왔나) → 종이 되려던 아들을
 말도 꺼내기 전에 안는 아버지 → 두 손(붙잡는 손·위로하는 손, 나우웬) → 이사야 66:13(어머니처럼 위로하시는 하나님)
 → 눅 15:20(아직 먼데 보고 달려감) → "하나님은 아직 길을 바라보고 계신다". 큰아들은 메시지가 갈라져 캡션으로만 뺐다.
+사용자 11/20(다섯 번째 안): 그림에 보이는 벗겨진 신을 "gone" 이라 한 것을 고치고, "아버지가 하인들에게 제일 좋은 옷을 입히고
+신을 신겨라 했다는 걸 말해 주자 — 거덜난 아들을 감싸 안는 게 메시지와 일맥상통" → 안은 뒤 눅 15:22(옷·반지·신)와
+"종이 아니라 아들로"를 더했다(신 = 아들, 해진 신 클로즈업과 이어지게).
 
     python3 get_art.py <작업폴더> && python3 make_spec.py <작업폴더>
     # 문장이 바뀌면 TTS venv 로 narrate.py 를 다시 돌려 timeline.json(문장마다 시작·끝)을 만들고 그 시각에 자막·카메라를 맞춘다.
@@ -57,9 +60,12 @@ SEGS = [
     ('this', B, "Near the end of his life,<br>he painted this.", None, FRAME, 0.55),
     ('story', B, "In Jesus’ story, a son wastes everything<br>and comes home with nothing.", None,
      close(B, 1060, 3050, 1500, 700), 0.3),
-    ('feet', B, "One sandal is gone.<br>The other is worn through.", None, close(B, 810, 4570, 1400, 640), 0.35),
+    ('feet', B, "One sandal has slipped off.<br>The other is worn through.", None, close(B, 810, 4570, 1400, 640), 0.35),
     ('servant', B, "He only hoped to be taken back<br>as a servant.", None, close(B, 1040, 2600, 1000, 720), 0.3),
-    ('embrace', B, "But before he could ask,<br>his father held him.", None, close(B, 1120, 2200, 1350, 700), 0.6),
+    ('embrace', B, "But before he could ask,<br>his father held him.", None, close(B, 1120, 2200, 1350, 700), 0.5),
+    ('robe', B, "Then the father told his servants<br>to bring the best robe, a ring,<br>and sandals for those feet.", None,
+     close(B, 700, 4540, 1200, 660), 0.35),
+    ('son', B, "Not as a servant.<br>As his son.", None, close(B, 1040, 2600, 1000, 720), 0.7),
     ('hands', B, "Look at the father’s hands.", None, close(B, 1070, 2960, 1100), 0.25),
     ('broad', B, "One is broad and strong.<br>It holds.", None, close(B, 1290, 2955, 720), 0.25),
     ('slender', B, "The other is slender and gentle.<br>It comforts.", None, close(B, 860, 2985, 720), 0.35),
