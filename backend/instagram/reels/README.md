@@ -22,6 +22,9 @@ AI 영상 모델(로컬 Wan 2.2 는 3.4초에 48분 — 사용자가 중단), �
 1. `python3 reel_queue.py status` 로 다음 빈 슬롯과 편성표 주제를 본다. 텔레그램 요청이면 시작 전에 `scripts/tg-notify.sh` 로 알린다(15~30분).
 2. 작업 폴더 `~/.local/share/withgod-ig-reels/work/<slug>/` (그림·중간 파일은 레포에 넣지 않는다).
 3. **대본** — 사실은 원래 기록으로 확인한다. 성경 본문은 WEB(`backend/data/langs/en/verses.csv`), 찬송가·인물 일화는 부풀려진 판이 많으니 출처 확인.
+   **메시지 한 줄부터** 쓰고 `episodes/<slug>/story.md`(메시지 · 한국어 줄거리 · 대본)를 [REVIEW.md](REVIEW.md) 틀대로 쓴다.
+   **렌더링 전에 새 서브에이전트가 REVIEW.md 체크리스트로 검토**하고, 통과해야 story.md 에 `검토: 통과 — <날짜> <몇 회째>` 를 적는다
+   (11/20 사용자 "완전 자동으로, 피드백 없이" — 이 줄이 없으면 `reel_queue.py add` 가 거절). Claude Code 는 스킬 `withgod-reel` 이 이 순서를 싣는다.
 4. **그림** — `episodes/<slug>/gen_art.py` 에 장면별 프롬프트(로컬 Z-Image-Turbo, `scripts/gen_ig_art.py` 의 화풍 고정·서양 2D 애니메이션풍,
    수요일 Mia 는 `mia.py` 의 3D 화풍). negative 프롬프트는 이 모델(가이던스 증류)에서 무시되니 피할 것은 본 프롬프트에 적는다.
    장면마다 시드 2개를 뽑아 직접 보고 고른다(시대 착오 — 유리병·아스팔트·촛불 — 와 이상한 물체를 거른다). 1600×1200 이면 장당 약 2분.
@@ -31,9 +34,9 @@ AI 영상 모델(로컬 Wan 2.2 는 3.4초에 48분 — 사용자가 중단), �
 6. **spec** — 장면(그림 + 카메라 키프레임 `[시각, 중심x, 중심y, 폭]`) + 자막 시간표 → `spec.json`, 표지 `cover-spec.json`.
 7. `python3 finish.py <작업폴더>` → `reel.mp4`(1080×1920, 소리 크기 엘리야 편과 같게) + `cover.jpg`. 스냅 jpg(`snaps`)를 열어 자막 겹침·자르기를 확인한다.
    finish.py 는 먼저 **첫 장면 검사**(아래 「첫 3초」)를 하고 어기면 멈춘다 — spec 을 고친다(따로 보기 `python3 render.py --check spec.json`).
-8. `caption.txt` — 아래 「캡션」대로.
-9. `python3 reel_queue.py add <작업폴더> --title <이름>` → 다음 빈 슬롯에 들어가고 **텔레그램으로 미리보기 영상**이 간다.
-10. `episodes/<slug>/` 에 gen_art.py·compose.py·make_spec.py(또는 spec.json)·caption.txt 를 커밋하고 STATUS 의 「올린 편」을 고친다.
+8. `caption.txt` — 아래 「캡션」대로. 작업 폴더에 story.md 도 둔다.
+9. `python3 reel_queue.py add <작업폴더> --title <이름>` → 다음 빈 슬롯에 들어가고 **텔레그램으로 미리보기 영상 + 한국어 줄거리**(story.md 「## 대본」 앞까지)가 간다.
+10. `episodes/<slug>/` 에 gen_art.py·compose.py·make_spec.py(또는 spec.json)·caption.txt·story.md 를 커밋하고 STATUS 의 「올린 편」을 고친다.
 
 ## 첫 3초 (11/19 — 올린 편의 평균 시청이 6.9~10.5초였다)
 
@@ -53,6 +56,8 @@ AI 영상 모델(로컬 Wan 2.2 는 3.4초에 48분 — 사용자가 중단), �
 - 시안(11/19): 한나·Mia 1화 첫 9초를 이 규칙으로 다시 렌더해 전후 비교를 사용자에게 보냈다.
 
 ## 사용자 피드백으로 정한 규칙 (엘리야 v1→v5, 한나)
+
+새 지적은 고치기 전에 [REVIEW.md](REVIEW.md) 체크리스트와 「사용자가 지적한 것」 표에 먼저 더한다 — 검토자가 다음 편부터 잡도록.
 
 - **처음 보는 사람 기준** — 첫 화면(0초)부터 그림과 끌리는 첫 문장(위 「첫 3초」). 인물이 누구고 왜 대단한지 먼저.
 - **장면을 건너뛰지 않는다** — 위협 → 도망 → 광야처럼 이어지게. 말씀은 그 말을 실제로 한 순간의 그림 위에.
