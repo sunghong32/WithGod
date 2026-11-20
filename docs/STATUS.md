@@ -82,7 +82,7 @@ Play vc28 production·alpha·internal `completed`. **1.6.1(#69 iOS 위젯 현지
       도구 `backend/instagram/reels/`(render.py 영상 · music.swift 음악 · finish.py 합치기·표지 · reel_queue.py 예약), 편마다 원본은 `episodes/<slug>/`,
       그림·중간 파일은 `~/.local/share/withgod-ig-reels/work/<slug>/`. 다 만든 편은 `reel_queue.py add <폴더>` → launchd `com.minsunghong.withgod-ig-reels`
       (10분마다: 3시간 전 S3 업로드·컨테이너 → 게시 → 텔레그램 링크). **다음 편이 비면 72·24시간 전에 텔레그램이 알린다**(11/16 월요일 편이 아무도 모르게 빔).
-      `reel_queue.py status` 로 슬롯·차례 확인. 올린 편: 엘리야(11/14) · 한나(11/17, 월요일 몫) · Mia 1화 「3:07 a.m.」(11/18). 큐: 금 11/20 성화 읽기 「탕자의 귀환 그림 이야기」(`episodes/prodigal`, 액자 + 내레이션 첫 편). **월 11/23 마르다부터 비어 있다.**
+      `reel_queue.py status` 로 슬롯·차례 확인. 올린 편: 엘리야(11/14) · 한나(11/17, 월요일 몫) · Mia 1화 「3:07 a.m.」(11/18). 큐: 금 11/20 성화 읽기 「탕자의 귀환」(`episodes/prodigal`, 액자 + 내레이션, 네 번째 안). **월 11/23 마르다부터 비어 있다.**
       **첫 3초 규칙(11/19)**: 평균 시청 6.9~10.5초라 0초 큰 첫 문장(`hook`)·2.5초 안 컷 또는 밀기·첫 8초 자막 빈 틈 없음 — finish.py 가 검사해 막는다. 캡션 해시태그 5개(`#bibleverse` 포함, add 가 검사). README 「첫 3초」「캡션」. 요령은 메모리 `instagram-account`
 - [x] **인스타 런칭 게시물 — 끝(11/12, 7개).** 오늘의 말씀과 겹치는 말씀 카드 2개(06·04)는 사용자 결정으로 뺐고, 남은 4개는 11/12 오전에 바로 게시.
       결과물·생성기 `docs/instagram/launch/`·`tools/make_launch_posts.py`, 게시 기록 `launch/posted.json`. 상단 고정(소개·사용법·잠 못 드는 밤) 완료(11/12, 앱에서 사용자가). launchd plist 는 지워도 된다
@@ -143,7 +143,7 @@ Play vc28 production·alpha·internal `completed`. **1.6.1(#69 iOS 위젯 현지
 
 ## 최근 변경 이력
 
-- 2026-11-19 feat(instagram): 금 11/20 릴스 「탕자의 귀환」 세 번째 안 — 확대+자막(1안)·원·번호 표시(2안)를 사용자가 거절, 액자에 건 그림 + Mia 목소리 내레이션(narrate.py, 로컬 Kokoro)·디테일 클로즈업(render.py `gallery`). 성화 crf 23, 50MB 넘는 미리보기는 720p
+- 2026-11-20 feat(instagram): 금 11/20 「탕자의 귀환」 네 번째 안 — 1~3안 거절 뒤 액자 + Mia 내레이션(narrate.py·Kokoro)·클로즈업(render.py `gallery`), 메시지 하나(「돌아오면 하나님은 이렇게 안아 주신다」)
 - 2026-11-19 feat(instagram): Daily Verse 표지를 「오늘의 한 단어」로(그림·사진 없이) — 성경 시대 그림이 월요일 릴스와 겹친다는 사용자 지적, 사진풍·액자 시안은 "대충·굳이"로 거절. 분위기 5개로 세 장 색·배경을 맞추고 배경 설명 장을 뺌, 16일치 다시 렌더(틀 4)
 - 2026-11-19 feat(instagram): 조회수 점검 — 태그 개수(3·5)는 도달과 무관, 비팔로워 도달 213/222 는 릴스, 릴스 평균 시청 7~10초. 릴스 첫 3초 규칙 + 자동 검사(`render.opening_problems`, finish.py 가 막음, 한나·Mia 전후 시안) · 해시태그 5개(인스타 상한, `#bibleverse` 포함, 사용자 요청) + Daily Verse 캡션 검색어 줄 · 운영 서버 git pull(API 재시작 없음 — instagram 은 타이머가 매번 새로 실행)
 - 2026-11-18 fix/release: #92 iOS 안내 모달이 겹치면 홈 먹통 — 차례표 `useModalTurn`(PR #93, 시뮬레이터 4조합·에뮬레이터 확인). OTA 1.6.1·1.6.0 iOS·Android(수정만) + min_supported 1.6.0(1.5.0 은 11/11 뒤 실행 0대라 OTA 대신 강제 업데이트, 사용자 결정)

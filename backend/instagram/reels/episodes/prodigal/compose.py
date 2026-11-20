@@ -2,9 +2,10 @@
 같은 폴더의 timeline.json(narrate.py — 문장마다 시작 시각)에 맞춰 화음을 바꾼다. finish.py 가 목소리 아래(-30 LUFS)로 낮추고
 목소리가 나올 때 더 누른다(sidechain).
 
-말 밑에 까는 음악이라 선율은 말 사이 쉼에만 짧게 두고, 화음은 펼쳐(아르페지오 0.5초 + 현악 지속음) 찬송가처럼 들리지 않게.
-G단조(그림 소개·아들) → E♭·F(아버지가 달려감) → B♭·E♭(두 손, 따뜻하게) → A♭→D(발) → E♭(예복·반지·신)
-→ D/E♭ 부딪힘(큰아들) → E♭ 로 풀림(아버지가 그에게도 나감) → B♭장조(말씀) → B♭·E♭·F·B♭ 로 맺음.
+말 밑에 까는 음악이라 선율은 말 사이 쉼에만 짧게 두고, 화음은 펼쳐(아르페지오 + 현악 지속음) 찬송가처럼 들리지 않게.
+젊은 렘브란트(E♭, 조금 들뜨게) → 30년의 상실(C단조, 느리게) → 이 그림·아들 이야기(G단조) → 발·종(A♭→D, 낮아짐)
+→ 아버지가 안음(E♭, 풀림) → 두 손(F·B♭·E♭, 따뜻하게) → 이사야(B♭, 현악 크게) → "놓지 않을 만큼"(E♭)
+→ 눅 15:20(B♭, 한숨 선율이 위로) → 끝 B♭·E♭·F·B♭ 로 맺음.
 """
 import json
 import sys
@@ -57,38 +58,32 @@ Cm = ([36, 48], [55, 60, 63, 67, 63, 60], [55, 60, 63])
 Ab = ([44, 56], [60, 63, 68, 72, 68, 63], [60, 63, 68])
 D = ([38, 50], [54, 57, 62, 66, 62, 57], [54, 57, 62])
 
-# 0초 — 그림이 화면을 채운 첫 화면: 낮은 G 위 한숨 선율(레–미♭–레–시♭)
-for n in [43, 55, 62]:
-    note(0.0, 2.8, n, 40)
-for n in [67, 70]:
-    note(0.0, 3.0, n, 30, 'strings')
-for t, n, d in [(0.3, 74, 0.45), (0.75, 75, 0.4), (1.15, 74, 0.5), (1.65, 70, 0.9)]:
-    note(t, d + 0.3, n, 46)
-
-chord(2.6, span('title')[1], *Gm)
-chord(*span('story'), *Eb)
-gap_melody('story', [(70, 0.3), (72, 0.3)])
-chord(*span('son1'), *Cm, step=0.6)
-chord(*span('son2'), *Gm, step=0.6)
-chord(*span('ran'), *Eb, step=0.35, va=34)
-gap_melody('ran', [(74, 0.25), (75, 0.25), (77, 0.35)], 44)
+# 0초 — 젊은 렘브란트가 술잔을 든 첫 화면: E♭ 위로 가볍게 튀는 선율
+for n in [39, 51, 58]:
+    note(0.0, 2.6, n, 40)
+for t, n, d in [(0.25, 70, 0.3), (0.55, 72, 0.3), (0.85, 75, 0.45), (1.3, 74, 0.3), (1.6, 70, 0.8)]:
+    note(t, d + 0.3, n, 44)
+chord(2.4, span('young')[1], *Eb, step=0.35, va=32)
+chord(*span('later'), *Cm, step=0.7, va=26)
+gap_melody('later', [(67, 0.4), (63, 0.4), (62, 0.7)], 38)
+chord(*span('this'), *Gm, step=0.6, vp=34)
+chord(*span('story'), *Gm, step=0.6)
+chord(*span('feet'), *Ab, step=0.6)
+chord(*span('servant'), *D, step=0.6)
+chord(*span('embrace'), *Eb, step=0.4, va=34, vp=34)
+gap_melody('embrace', [(74, 0.25), (75, 0.25), (77, 0.4)], 44)
 chord(*span('hands'), *F, step=0.45)
 chord(*span('broad'), *Bb, step=0.5, vb=46)
 chord(*span('slender'), *Eb, step=0.5, va=26)
 chord(*span('nouwen'), *Gm, step=0.5)
-gap_melody('nouwen', [(74, 0.3), (72, 0.3), (70, 0.5)])
-chord(*span('feet'), *Ab, step=0.6)
-chord(*span('worn'), *D, step=0.6)
-chord(*span('robe'), *Eb, step=0.45, va=34, vp=34)
-gap_melody('robe', [(75, 0.25), (77, 0.25), (79, 0.4)], 44)
-# 큰아들: 낮은 현악 레·미♭ 반음 부딪힘
-b0, b1 = span('bro1')
-note(b0, b1 - b0 + 0.3, 38, 38, 'strings')
-note(b0, b1 - b0 + 0.3, 39, 32, 'strings')
-for t in [b0 + 0.2, b0 + 1.4]:
-    for n in [50, 51, 58]:
-        note(t, 1.1, n, 30)
-chord(*span('bro2'), *Eb, step=0.55)
+chord(*span('bible'), *Cm, step=0.5)
+# 이사야: B♭ 현악을 크게 — 어머니처럼 위로하시는 하나님
+i0, i1 = span('isaiah')
+chord(i0, i1, *Bb, step=0.5, vb=46, va=30, vp=40)
+for n in [70, 74]:
+    note(i0, i1 - i0, n, 26, 'strings')
+gap_melody('isaiah', [(74, 0.3), (72, 0.3), (70, 0.5)])
+chord(*span('hold'), *Eb, step=0.5, va=32, vp=36)
 # 말씀: B♭장조, 한숨 선율이 위로(레–미♭–파)
 v0, v1 = span('verse')
 chord(v0, v1, *Bb, step=0.5, vb=48, va=32, vp=40)
