@@ -39,6 +39,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
@@ -76,6 +77,9 @@ URL_TTL = timedelta(days=6)           # 서명 주소는 7일 — 하루 여유
 REMIND_AT = (timedelta(hours=72), timedelta(hours=24))
 FAIL_NOTIFY_EVERY = timedelta(hours=1)
 REQUIRED = ("reel.mp4", "cover.jpg", "caption.txt")
+# 메시지 한 줄 + 한국어 줄거리 + 대본(REVIEW.md 틀). 새 서브에이전트 검토를 통과해야 「검토: 통과 …」 줄을 적고 큐에 넣는다.
+# 텔레그램 미리보기 뒤에 「## 대본」 앞까지를 보낸다 — 사용자가 스토리를 알고 보도록(11/20).
+STORY = "story.md"
 HASHTAG_MAX = 5
 MAKE_HINT = "세션(텔레그램도 됨)에 「다음 릴스 만들어줘」라고 하면 backend/instagram/reels/README.md 대로 만들어 큐에 넣습니다."
 
@@ -105,23 +109,49 @@ def tg_env() -> tuple[str, list[str]]:
     return env.get("TELEGRAM_BOT_TOKEN", ""), [i.strip() for i in ids.split(",") if i.strip()]
 
 
+TG_VIDEO_MAX = 49 * 1024 * 1024  # 텔레그램 봇 sendVideo 상한 50MB
+
+
 def send_video(video: Path, caption: str) -> bool:
-    """텔레그램 sendVideo(50MB 까지). 토큰이 프로세스 목록에 보이지 않게 curl 설정을 표준 입력으로 준다."""
+    """텔레그램 sendVideo(50MB 까지). 토큰이 프로세스 목록에 보이지 않게 curl 설정을 표준 입력으로 준다.
+    더 크면(성화 편은 캔버스 결 때문에 100MB 안팎) 720p 미리보기로 줄여 보낸다 — 게시하는 원본은 그대로."""
     try:
         token, chats = tg_env()
         if not token or not chats:
             return False
-        ok = True
-        for chat in chats:
-            cfg = f'url = "https://api.telegram.org/bot{token}/sendVideo"\n'
-            r = subprocess.run(["curl", "-sS", "-K", "-", "-F", f"chat_id={chat}", "-F", f"video=@{video}",
-                                "-F", "supports_streaming=true", "-F", f"caption={caption[:1000]}"],
-                               input=cfg, capture_output=True, text=True, timeout=300)
-            ok = ok and '"ok":true' in r.stdout
+        with tempfile.TemporaryDirectory() as tmp:
+            if video.stat().st_size > TG_VIDEO_MAX:
+                small = Path(tmp) / "preview.mp4"
+                subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", str(video), "-vf", "scale=720:-2",
+                                "-c:v", "libx264", "-crf", "26", "-preset", "veryfast", "-c:a", "aac", "-b:a", "128k",
+                                "-movflags", "+faststart", str(small)], check=True, timeout=600)
+                video = small
+            ok = True
+            for chat in chats:
+                cfg = f'url = "https://api.telegram.org/bot{token}/sendVideo"\n'
+                r = subprocess.run(["curl", "-sS", "-K", "-", "-F", f"chat_id={chat}", "-F", f"video=@{video}",
+                                    "-F", "supports_streaming=true", "-F", f"caption={caption[:1000]}"],
+                                   input=cfg, capture_output=True, text=True, timeout=300)
+                ok = ok and '"ok":true' in r.stdout
         return ok
     except Exception as exc:
         log(f"send_video failed: {type(exc).__name__}")
         return False
+
+
+def story_summary(src: Path) -> str:
+    """story.md 의 「## 대본」 앞까지(메시지 한 줄 + 한국어 줄거리) — 텔레그램 한 통(4,096자)에 들어가게."""
+    p = src / STORY
+    if not p.exists():
+        return ""
+    head = p.read_text().split("\n## 대본", 1)[0].replace("## 한국어 줄거리\n", "").strip()
+    return head[:3900]
+
+
+def send_story(src: Path) -> None:
+    text = story_summary(src)
+    if text:
+        notify("📖 " + text.removeprefix("# "))
 
 
 def kst(dt: datetime) -> str:
@@ -232,6 +262,11 @@ def check_folder(src: Path) -> list[str]:
         problems.append(f"영상은 1080×1920 H.264 여야 함: {v[:1]}")
     if not a:
         problems.append("오디오 트랙 없음(무음이라도 트랙은 있어야 함)")
+    story = src / STORY
+    if not story.exists():
+        problems.append("story.md 없음 — 메시지 한 줄·한국어 줄거리·대본을 쓰고 검토를 거친다(REVIEW.md)")
+    elif not re.search(r"^검토: 통과", story.read_text(), re.M):
+        problems.append("story.md 에 「검토: 통과 …」 줄이 없다 — 새 서브에이전트 검토(REVIEW.md)를 통과한 뒤 적는다")
     if not 3 <= dur <= 90:
         problems.append(f"길이 {dur:.1f}초(3~90초)")
     if size > 300 * 1024 * 1024:
@@ -267,7 +302,7 @@ def cmd_add(args) -> int:
         print(f"이미 있음: {dst}")
         return 1
     dst.mkdir(parents=True)
-    for n in REQUIRED:
+    for n in REQUIRED + (STORY,):
         shutil.copy2(src / n, dst / n)
     fmt = args.format or (expected_format(due) if due.astimezone(ET).weekday() in KINDS else "other")
     if args.format and due.astimezone(ET).weekday() in KINDS and args.format != expected_format(due):
@@ -280,12 +315,15 @@ def cmd_add(args) -> int:
         sent = send_video(dst / "reel.mp4", f"📼 릴스 큐에 들어감: {args.title or slug} ({kind})\n"
                                             f"게시 {et(due)} = 한국 {kst(due)}\n고칠 점이 있으면 그 전에 알려 주세요.")
         print("텔레그램 미리보기 " + ("보냄" if sent else "못 보냄"))
+        send_story(dst)
     return 0
 
 
 def cmd_preview(args) -> int:
     src = Path(args.folder).expanduser().resolve()
     ok = send_video(src / "reel.mp4", args.caption or f"📼 릴스 미리보기: {src.name}")
+    if ok:
+        send_story(src)
     print("보냄" if ok else "못 보냄")
     return 0 if ok else 1
 

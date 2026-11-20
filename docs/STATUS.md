@@ -82,8 +82,9 @@ Play vc28 production·alpha·internal `completed`. **1.6.1(#69 iOS 위젯 현지
       도구 `backend/instagram/reels/`(render.py 영상 · music.swift 음악 · finish.py 합치기·표지 · reel_queue.py 예약), 편마다 원본은 `episodes/<slug>/`,
       그림·중간 파일은 `~/.local/share/withgod-ig-reels/work/<slug>/`. 다 만든 편은 `reel_queue.py add <폴더>` → launchd `com.minsunghong.withgod-ig-reels`
       (10분마다: 3시간 전 S3 업로드·컨테이너 → 게시 → 텔레그램 링크). **다음 편이 비면 72·24시간 전에 텔레그램이 알린다**(11/16 월요일 편이 아무도 모르게 빔).
-      `reel_queue.py status` 로 슬롯·차례 확인. 올린 편: 엘리야(11/14) · 한나(11/17, 월요일 몫) · Mia 1화 「3:07 a.m.」(11/18). **11/19 기준 큐가 비어 있다 — 금 11/20 편 없음.**
+      `reel_queue.py status` 로 슬롯·차례 확인. 올린 편: 엘리야(11/14) · 한나(11/17, 월요일 몫) · Mia 1화 「3:07 a.m.」(11/18). 큐: 금 11/20 성화 읽기 「탕자의 귀환」(`episodes/prodigal`, 액자 + 내레이션, 네 번째 안 + 신발 줄 고침·눅 15:22 「종이 아니라 아들로」). **월 11/23 마르다부터 비어 있다.**
       **첫 3초 규칙(11/19)**: 평균 시청 6.9~10.5초라 0초 큰 첫 문장(`hook`)·2.5초 안 컷 또는 밀기·첫 8초 자막 빈 틈 없음 — finish.py 가 검사해 막는다. 캡션 해시태그 5개(`#bibleverse` 포함, add 가 검사). README 「첫 3초」「캡션」. 요령은 메모리 `instagram-account`
+      **대본 검토(11/20, 사용자 "피드백 없이 완전 자동")**: 메시지 한 줄 → `story.md` → 새 서브에이전트가 `REVIEW.md` 로 검토 → 통과해야 렌더링·큐(`검토: 통과` 줄 없으면 add 거절). 미리보기에 한국어 줄거리. 스킬 `withgod-reel`.
 - [x] **인스타 런칭 게시물 — 끝(11/12, 7개).** 오늘의 말씀과 겹치는 말씀 카드 2개(06·04)는 사용자 결정으로 뺐고, 남은 4개는 11/12 오전에 바로 게시.
       결과물·생성기 `docs/instagram/launch/`·`tools/make_launch_posts.py`, 게시 기록 `launch/posted.json`. 상단 고정(소개·사용법·잠 못 드는 밤) 완료(11/12, 앱에서 사용자가). launchd plist 는 지워도 된다
 - [ ] `data/langs/unsuitable_refs.json`(이슈 #11 분류)이 명작을 오탐한다 —
@@ -143,11 +144,9 @@ Play vc28 production·alpha·internal `completed`. **1.6.1(#69 iOS 위젯 현지
 
 ## 최근 변경 이력
 
+- 2026-11-20 feat(instagram): 릴스 대본 검토 단계(REVIEW.md 체크리스트·새 서브에이전트 검토·story.md 게이트)·스킬 `withgod-reel`·미리보기 한국어 줄거리 — 편마다 3~5번 고치던 피드백을 렌더링 전에 거름
+- 2026-11-20 feat(instagram): 금 11/20 「탕자의 귀환」 네 번째 안(올린 것은 5안) — 1~3안 거절 뒤 액자 + Mia 내레이션(narrate.py·Kokoro)·클로즈업(render.py `gallery`), 메시지 하나(「돌아오면 하나님은 이렇게 안아 주신다」). 사용자 요청으로 그림에 보이는 신을 "gone" → "slipped off", 안은 뒤 옷·반지·신(눅 15:22) + "Not as a servant. As his son." 을 더함(64.3초)
 - 2026-11-19 feat(instagram): Daily Verse 표지를 「오늘의 한 단어」로(그림·사진 없이) — 성경 시대 그림이 월요일 릴스와 겹친다는 사용자 지적, 사진풍·액자 시안은 "대충·굳이"로 거절. 분위기 5개로 세 장 색·배경을 맞추고 배경 설명 장을 뺌, 16일치 다시 렌더(틀 4)
 - 2026-11-19 feat(instagram): 조회수 점검 — 태그 개수(3·5)는 도달과 무관, 비팔로워 도달 213/222 는 릴스, 릴스 평균 시청 7~10초. 릴스 첫 3초 규칙 + 자동 검사(`render.opening_problems`, finish.py 가 막음, 한나·Mia 전후 시안) · 해시태그 5개(인스타 상한, `#bibleverse` 포함, 사용자 요청) + Daily Verse 캡션 검색어 줄 · 운영 서버 git pull(API 재시작 없음 — instagram 은 타이머가 매번 새로 실행)
 - 2026-11-18 fix/release: #92 iOS 안내 모달이 겹치면 홈 먹통 — 차례표 `useModalTurn`(PR #93, 시뮬레이터 4조합·에뮬레이터 확인). OTA 1.6.1·1.6.0 iOS·Android(수정만) + min_supported 1.6.0(1.5.0 은 11/11 뒤 실행 0대라 OTA 대신 강제 업데이트, 사용자 결정)
-- 2026-11-17 feat(instagram): 수요일 앱 시연을 시리즈 「Mia」로 — 첫 편이 인물 이야기와 똑같아 보이고 다시 만든 시안은 광고 같다는 사용자 피드백으로, 3D 애니 인물 Mia 가 고민을 안고 WithGod 앱을 쓰는 이야기(실제 앱 녹화, 로파이 음악, 속마음 자막). 1화 「3:07 a.m.」 11/18 큐(2차: 실제로 한 글자씩 치는 장면·자막 여유 있게, 60초, 시편 4:8). render.py 앱 화면 장면·자막별 CSS, music.swift GM 128 악기·드럼
-- 2026-11-17 chore(instagram): 릴스 게시 시각을 다시 따져 봄(사용자 질문 「아침 7시가 낫지 않나」) — 아침 7시 ET 는 서부 새벽 4시라 뺌. 20:00 으로 옮겼다가(PR #87) 사용자 결정으로 19:00 유지
-- 2026-11-17 feat(instagram): 릴스 월·수·금 예약 큐(`backend/instagram/reels/reel_queue.py` + launchd) — 주기만 정하고 예약·미리 만든 편이 없어 11/16 월요일 편이 비었다. 빈 슬롯 텔레그램 알림 · 금요일 형식 순번 기록 · 렌더러를 워크트리 임시 폴더에서 레포로. 한나 편(사무엘상 1장) 제작·게시
-- 2026-11-16 feat(web,backend): /get 링크 클릭을 src 별로 집계 — 인스타 DM 에 `?src=ig-dm` 링크를 보냈는데 스토어 통계는 늦고 작은 숫자를 숨겨 한 건을 볼 수 없어서. PR #83, 운영 배포 `9dd92b4`(서버 테스트 256개, 재시작 6초) + Vercel 자동, 운영 `deploy-check` 클릭 1건 기록·봇 제외 확인 후 그 행은 지움
-- 그 이전 이력은 git history 로 넘김(`git log --until=2026-11-14`)
+- 그 이전 이력은 git history 로 넘김(`git log --until=2026-11-18`)
