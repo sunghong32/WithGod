@@ -2,8 +2,9 @@
 
 - 영어 본문은 앱 `/daily-verse?lang=en` 과 같은 `languages.localize_ko_ref` 로 만든다(합본·하반절·절 경계
   차이·따옴표·첫 글자 정리가 거기 있다). 스토어는 git 의 CSV 로 만든다(서버의 parquet 와 같은 행).
-- 카피는 `copy_en.json` — 말씀별 카드 라벨·강조 구절·훅·요청 줄·주제 해시태그·팔레트·표지의 한 단어
-  (`word`, 분위기는 주제 태그로 정하고 `mood` 로 바꿀 수 있다). 앱 풀이 카드는 풀이 검토본을 그대로 싣는다. 세션에서 손으로 쓴다(API 로 만들지 않는다). 아직 없는 말씀은 게시하지 않고
+- 카피는 `copy_en.json` — 말씀별 카드 라벨·강조 구절·훅·요청 줄·주제 해시태그·팔레트·오늘의 한 단어
+  (`word`, 표지 배경)·표지 말씀 한 줄(`line`, 본문 그대로 — caption.find_line_problems). 분위기는 주제 태그로
+  정하고 `mood` 로 바꿀 수 있다. 앱 풀이 카드는 풀이 검토본을 그대로 싣는다. 세션에서 손으로 쓴다(API 로 만들지 않는다). 아직 없는 말씀은 게시하지 않고
   실행기가 준비된 다른 말씀을 고른다(dry-run 알림에 남은 준비 일수가 나온다).
 - 매니페스트 `daily_posts_en.json` 은 말씀별 완성 재료(본문·캡션 조각·대체 텍스트·S3 키)다. 운영 서버는
   이 파일과 S3 이미지만 보고 게시한다 — 렌더도 임베딩도 하지 않는다.
@@ -26,7 +27,7 @@ DAILY_VERSES = BACKEND / "notifications" / "daily_verses.json"
 KO_CSV = BACKEND / "data" / "verses.csv"
 EN_CSV = BACKEND / "data" / "langs" / "en" / "verses.csv"
 EN_INTL_TSV = BACKEND / "docs" / "verse_picks" / "interpretations_intl" / "en.tsv"
-COPY_FIELDS = ("label", "emph", "hook", "cta", "topic", "pal", "word")
+COPY_FIELDS = ("label", "emph", "hook", "cta", "topic", "pal", "word", "line")
 
 _RE_REF = re.compile(r"^(.+?)\s+(\d+):(\d+)(?:-(\d+))?b?$")
 
@@ -110,7 +111,7 @@ def localize_all(items: list[dict]) -> dict[str, dict]:
 # ── 카피 파일 ─────────────────────────────────────────────────────
 
 def load_copy(path: Path = COPY_JSON) -> dict[str, dict]:
-    """copy_en.json — {verse_id: {label, emph, hook, cta, topic, pal, word, mood?}}."""
+    """copy_en.json — {verse_id: {label, emph, hook, cta, topic, pal, word, line, mood?}}."""
     if not path.exists():
         return {}
     data = json.loads(path.read_text(encoding="utf-8"))

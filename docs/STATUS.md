@@ -4,7 +4,7 @@
 > **작업을 완료하면 「지금 상태」와 「최근 변경 이력」을 갱신할 것.** 낡으면 신뢰가 무너진다.
 > ⚠️ 이 파일은 세션 시작 시 통째로 주입된다. **20KB 아래로 유지할 것** —
 > 완료 이력은 `CHANGELOG.md` 나 git history 로 넘긴다.
-> 최종 갱신: 2026-11-19 · 브랜치: `app-develop`
+> 최종 갱신: 2026-11-23 · 브랜치: `app-develop`
 
 ## 한 줄
 
@@ -72,11 +72,11 @@ Play vc28 production·alpha·internal `completed`. **1.6.1(#69 iOS 위젯 현지
       `POST /admin/analytics/link-clicks`(관리 키)로 src·기기·하루짜리 방문자 해시(IP 원문 안 보냄)를 남기고, 어드민 「앱 받기 링크 클릭」
       카드가 출처별 클릭·방문자·최근 20건을 보여 준다(미리보기 봇 제외). 외부에 거는 링크는 `/get?src=<출처>`(예: 인스타 DM `ig-dm`)
 - [ ] **인스타 Daily Verse 자동 게시(#62) — 11/12 07:00 ET(21:00 KST)부터 live, 하루 하나.** 앱 오늘의 말씀과 같은 말씀을 캐러셀로:
-      표지 「오늘의 한 단어」(말씀 속 낱말 + 감정 스티커, 11/19~) · 말씀 · 앱 영어 풀이(AI 표기), 수·일요일엔 앱 안내 장. 세 장은 분위기
+      표지(위에서부터 「Daily Bible Verse」·감정 스티커·말씀 한 줄·장절, 오늘의 한 단어는 아래에 옅게, 11/23~) · 말씀 전문(표지가 절 전체면 뺌) · 앱 영어 풀이(AI 표기), 수·일요일엔 앱 안내 장. 모든 장은 분위기
       (주제 태그 → 위로·소망·평안·지혜·기쁨)대로 색·배경 요소를 맞춘다. 그림·사진은 안 쓴다(성경 시대 그림은 월요일 릴스 몫). 운영 서버
       `with-god-ig-post.timer`(07:00 America/New_York) → `python -m instagram.daily_post`, 설정 `/etc/with-god-ig.env`, 기록 `/var/lib/with-god-ig/`,
       결과는 텔레그램. 지난 날 다시 올리기는 `--date YYYY-MM-DD --force`. 카피는 **이 맥에서 2주치씩** 앞서 쓴다 — 지금 12/11 까지 준비(11/19), 알림의 「준비된 날」이 7일 아래면 다음 묶음.
-      카피 `backend/instagram/copy_en.json`(`word` 포함)은 세션에서 직접 쓴다(API 금지), 렌더 `scripts/build_ig_daily_posts.py`, 업로드는 `--upload`(boto3) 또는 aws cli. 캡션은 해시태그 5개(`#bibleverse` 포함, 주제 짝 태그는 `caption.TOPIC_PAIRS`) + 카드 라벨로 만든 검색어 줄(11/19). 요령은 메모리 `instagram-account`
+      카피 `backend/instagram/copy_en.json`(`word`·표지 한 줄 `line` 포함 — 본문 그대로, 자르면 …)은 세션에서 직접 쓴다(API 금지), 렌더 `scripts/build_ig_daily_posts.py`, 업로드는 `--upload`(boto3) 또는 aws cli. 캡션은 해시태그 5개(`#bibleverse` 포함, 주제 짝 태그는 `caption.TOPIC_PAIRS`) + 카드 라벨로 만든 검색어 줄(11/19). 요령은 메모리 `instagram-account`
 - [ ] **인스타 릴스 월·수·금 19:00 ET(한국 다음 날 09:00, 서머타임엔 08:00) — 큐 + 이 맥 launchd(11/17~).** 월 성경 인물 이야기 · 수 앱 시연(시리즈 「Mia」, `mia.py`) ·
       금 번갈아(그 시절 생활 → 성화 읽기 → 찬송가 이야기 → 오래된 기도문), 대림절(11/29~12/24) 특집 · 오늘의 말씀 재탕 없음(사용자 결정 11/13).
       도구 `backend/instagram/reels/`(render.py 영상 · music.swift 음악 · finish.py 합치기·표지 · reel_queue.py 예약), 편마다 원본은 `episodes/<slug>/`,
@@ -143,11 +143,10 @@ Play vc28 production·alpha·internal `completed`. **1.6.1(#69 iOS 위젯 현지
 
 ## 최근 변경 이력
 
+- 2026-11-23 feat(instagram): Daily Verse 표지를 말씀 중심으로 — 큰 한 단어 때문에 대충 넘기면 성경 게시글인지 안 보인다는 사용자 지적. 「Daily Bible Verse」+수평 감정 스티커+말씀 한 줄(카피 `line`, 검사 `find_line_problems`)+굵은 장절, 한 단어는 아래 배경으로, 말씀은 늘 위쪽(아래는 배경 단어와 겹침). 표지가 절 전체면 말씀 장을 뺌. 시안 6차(스티커·단어 위·말씀 카드 등), 틀 5 로 30개 다시 렌더
 - 2026-11-19 feat(instagram): Daily Verse 표지를 「오늘의 한 단어」로(그림·사진 없이) — 성경 시대 그림이 월요일 릴스와 겹친다는 사용자 지적, 사진풍·액자 시안은 "대충·굳이"로 거절. 분위기 5개로 세 장 색·배경을 맞추고 배경 설명 장을 뺌, 16일치 다시 렌더(틀 4)
 - 2026-11-19 feat(instagram): 조회수 점검 — 태그 개수(3·5)는 도달과 무관, 비팔로워 도달 213/222 는 릴스, 릴스 평균 시청 7~10초. 릴스 첫 3초 규칙 + 자동 검사(`render.opening_problems`, finish.py 가 막음, 한나·Mia 전후 시안) · 해시태그 5개(인스타 상한, `#bibleverse` 포함, 사용자 요청) + Daily Verse 캡션 검색어 줄 · 운영 서버 git pull(API 재시작 없음 — instagram 은 타이머가 매번 새로 실행)
 - 2026-11-18 fix/release: #92 iOS 안내 모달이 겹치면 홈 먹통 — 차례표 `useModalTurn`(PR #93, 시뮬레이터 4조합·에뮬레이터 확인). OTA 1.6.1·1.6.0 iOS·Android(수정만) + min_supported 1.6.0(1.5.0 은 11/11 뒤 실행 0대라 OTA 대신 강제 업데이트, 사용자 결정)
 - 2026-11-17 feat(instagram): 수요일 앱 시연을 시리즈 「Mia」로 — 첫 편이 인물 이야기와 똑같아 보이고 다시 만든 시안은 광고 같다는 사용자 피드백으로, 3D 애니 인물 Mia 가 고민을 안고 WithGod 앱을 쓰는 이야기(실제 앱 녹화, 로파이 음악, 속마음 자막). 1화 「3:07 a.m.」 11/18 큐(2차: 실제로 한 글자씩 치는 장면·자막 여유 있게, 60초, 시편 4:8). render.py 앱 화면 장면·자막별 CSS, music.swift GM 128 악기·드럼
-- 2026-11-17 chore(instagram): 릴스 게시 시각을 다시 따져 봄(사용자 질문 「아침 7시가 낫지 않나」) — 아침 7시 ET 는 서부 새벽 4시라 뺌. 20:00 으로 옮겼다가(PR #87) 사용자 결정으로 19:00 유지
 - 2026-11-17 feat(instagram): 릴스 월·수·금 예약 큐(`backend/instagram/reels/reel_queue.py` + launchd) — 주기만 정하고 예약·미리 만든 편이 없어 11/16 월요일 편이 비었다. 빈 슬롯 텔레그램 알림 · 금요일 형식 순번 기록 · 렌더러를 워크트리 임시 폴더에서 레포로. 한나 편(사무엘상 1장) 제작·게시
-- 2026-11-16 feat(web,backend): /get 링크 클릭을 src 별로 집계 — 인스타 DM 에 `?src=ig-dm` 링크를 보냈는데 스토어 통계는 늦고 작은 숫자를 숨겨 한 건을 볼 수 없어서. PR #83, 운영 배포 `9dd92b4`(서버 테스트 256개, 재시작 6초) + Vercel 자동, 운영 `deploy-check` 클릭 1건 기록·봇 제외 확인 후 그 행은 지움
-- 그 이전 이력은 git history 로 넘김(`git log --until=2026-11-14`)
+- 그 이전 이력은 git history 로 넘김(`git log --until=2026-11-17`)

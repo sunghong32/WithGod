@@ -7,8 +7,8 @@
     python scripts/build_ig_daily_posts.py                              # 카피가 있는 말씀 전부 + 매니페스트
     python scripts/build_ig_daily_posts.py --upload                     # + S3 에 없는 슬라이드 올리기
 
-한 게시물 = 표지(오늘의 한 단어) + 말씀 + 앱 풀이 카드. 세 장 모두 그 말씀의 분위기(주제 태그 →
-caption.mood_for)로 색·배경 요소를 맞춘다. 수·일요일에 붙는 앱 안내 장은
+한 게시물 = 표지(Daily Bible Verse + 말씀 한 줄) + 말씀 전문(표지가 절 전체면 뺀다) + 앱 풀이 카드.
+모든 장이 그 말씀의 분위기(주제 태그 → caption.mood_for)로 색·배경 요소를 맞춘다. 수·일요일에 붙는 앱 안내 장은
 한 장만 만들어 매니페스트 `app_slide` 에 두고 실행기가 그날 끝에 붙인다.
 
 재료: 목록(daily_verses.json) · 영어 본문(앱과 같은 변환) · 영어 풀이 검토본 · 카피(instagram/copy_en.json).
@@ -36,7 +36,7 @@ INSTAGRAM = Path(__file__).resolve().parent.parent / "instagram"
 BUILD_DIR = INSTAGRAM / "build"
 SLIDES_DIR = BUILD_DIR / "slides"
 # 슬라이드 틀(card.py 의 CSS·HTML)을 바꾸면 올린다 — 지문이 바뀌어 모든 장을 다시 올린다.
-TEMPLATE_VERSION = "4"
+TEMPLATE_VERSION = "5"
 DEFAULT_BUCKET = "with-god-ig-cards"
 S3_REGION = "ap-northeast-2"
 NOTE_LABEL = "what it can mean today"
@@ -52,19 +52,26 @@ APP_ALT = ("Tell it how you feel. It finds the verse. WithGod searches the whole
 
 
 def slides_for(entry: dict, copy: dict) -> list[tuple[dict, str]]:
-    """(슬라이드, 대체 텍스트) 목록 — 표지(오늘의 한 단어) + 말씀 + 앱 풀이 카드. 세 장이 같은 분위기."""
+    """(슬라이드, 대체 텍스트) 목록 — 표지(말씀 한 줄) + 말씀 전문 + 앱 풀이 카드. 모든 장이 같은 분위기.
+
+    표지 한 줄(`line`)이 절 전체면 말씀 장은 뺀다(같은 말씀을 두 번 보여 주지 않는다, 11/23).
+    """
     pal, mood = copy["pal"], mood_for(copy)
     label = tidy_copy(copy["label"])
     word = tidy_copy(copy["word"])
+    line = copy["line"].strip()
+    ref = entry["display_ref"]
     out = [
-        ({"kind": "word", "pal": pal, "mood": mood, "label": label, "word": word, "ref": entry["display_ref"]},
-         f"Daily verse cover. {label}: {word} {entry['display_ref']}."),
-        ({"kind": "verse", "pal": pal, "mood": mood, "label": copy["label"], "text": entry["text"],
-          "emph": copy["emph"], "ref": entry["display_ref"]}, entry["alt_text"]),
-        ({"kind": "note", "pal": pal, "mood": mood, "label": NOTE_LABEL, "body": tidy_copy(entry["note"]),
-          "source": NOTE_SOURCE},
-         f"What it can mean today, from the WithGod app’s note on this verse (written with AI): {entry['note']}"),
+        ({"kind": "cover", "pal": pal, "mood": mood, "label": label, "word": word, "line": line,
+          "emph": copy["emph"], "ref": ref},
+         f"Daily Bible Verse. {label}: “{line}” {ref} (World English Bible)."),
     ]
+    if line != entry["text"]:
+        out.append(({"kind": "verse", "pal": pal, "mood": mood, "label": copy["label"], "text": entry["text"],
+                     "emph": copy["emph"], "ref": ref}, entry["alt_text"]))
+    out.append(({"kind": "note", "pal": pal, "mood": mood, "label": NOTE_LABEL, "body": tidy_copy(entry["note"]),
+                 "source": NOTE_SOURCE},
+                f"What it can mean today, from the WithGod app’s note on this verse (written with AI): {entry['note']}"))
     for i, (slide, _) in enumerate(out):
         slide["arrow"] = i < len(out) - 1
     return out
