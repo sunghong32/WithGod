@@ -17,7 +17,8 @@
 앱 풀이는 캐러셀 마지막 카드에 싣는다(11/12 사용자 — 게시물 하나로 읽히게). 캡션은 넘겨 보라는 한 줄만
 둔다. 한 장짜리로 올릴 때만 캡션에 풀이를 싣는다. AI 로 쓴 풀이라 어디서든 그렇게 밝힌다(사람·목회자가 쓴 척
 금지 규칙). 훅·카드 라벨·요청 줄과
-표지의 「오늘의 한 단어」는 `instagram/copy_en.json` 에 손으로 쓰고(API 로 만들지 않는다) 여기 규칙으로 검사한다.
+표지의 말씀 한 줄·「오늘의 한 단어」는 `instagram/copy_en.json` 에 손으로 쓰고(API 로 만들지 않는다) 여기 규칙으로
+검사한다.
 """
 from __future__ import annotations
 
@@ -30,10 +31,13 @@ HOOK_MAX = 125
 KICKER_MAX = 40  # 런칭 라벨 최장 38자(「When it’s taking longer than you hoped」)
 CTA_MAX = 100
 ALT_TEXT_MAX = 1000
-# 표지 「오늘의 한 단어」 — 말씀에 실제로 있는 낱말 한두 개 + 마침표(예 「Near.」「Be still.」). 길면 표지에서
-# 글자가 줄어 한 단어의 힘이 빠진다.
+# 「오늘의 한 단어」 — 말씀에 실제로 있는 낱말 한두 개 + 마침표(예 「Near.」「Be still.」). 표지 아래에 옅게
+# 깔리는 배경 단어라(11/23) 길면 폭에 맞춰 줄어 힘이 빠진다.
 WORD_MAX = 13
 _RE_WORD = re.compile(r"^[A-Z][A-Za-z’']*(?: [A-Za-z’']+)?\.$")
+# 표지 말씀 한 줄(`line`) — 본문 그대로. 짧으면 절 전체, 길면 혼자 읽혀도 뜻이 통하는 한 문장을 잘라 쓴다.
+# 문장 중간에서 시작하면 앞에, 문장 중간에서 끝나면 뒤에 말줄임표(…). 길면 표지 글자가 작아진다.
+LINE_MAX = 140
 
 NOTE_INTRO = "From the WithGod app’s note on this verse (written with AI):"
 SWIPE_LINE = "Swipe for the WithGod app’s note on what it can mean today (written with AI)."
@@ -218,8 +222,8 @@ def mood_for(copy: dict) -> str:
 
 
 def find_slide_problems(copy: dict, verse_text: str = "") -> list[str]:
-    """copy_en.json 한 말씀의 표지 검사 — 한 단어 모양·길이, 분위기. verse_text 를 주면 그 낱말이 본문에
-    있는지도 본다(표지 단어가 둘째 장 본문에 그대로 보여야 이어진다)."""
+    """copy_en.json 한 말씀의 표지 검사 — 한 단어 모양·길이, 말씀 한 줄, 분위기. verse_text 를 주면 그 낱말과
+    한 줄이 본문에 그대로 있는지도 본다."""
     problems = []
     word = (copy.get("word") or "").strip()
     if not _RE_WORD.match(word):
@@ -228,10 +232,31 @@ def find_slide_problems(copy: dict, verse_text: str = "") -> list[str]:
         problems.append(f"word: {len(word)}자 > {WORD_MAX}")
     elif verse_text and word[:-1].replace("’", "'").lower() not in verse_text.replace("’", "'").lower():
         problems.append(f"word: {word!r} 이 본문에 없음")
+    problems += find_line_problems(copy.get("line") or "", verse_text)
     if copy.get("mood") and copy["mood"] not in MOODS:
         problems.append(f"mood: {copy['mood']!r} (허용: {', '.join(MOODS)})")
     elif not copy.get("mood") and copy.get("topic") not in TOPIC_MOOD:
         problems.append(f"topic {copy.get('topic')!r} 의 분위기가 없음(TOPIC_MOOD)")
+    return problems
+
+
+def find_line_problems(line: str, verse_text: str = "") -> list[str]:
+    """표지 말씀 한 줄 검사 — 길이, 말줄임표 자리. verse_text 를 주면 본문 그대로인지도 본다."""
+    line = line.strip()
+    if not line:
+        return ["line: 비어 있음"]
+    problems = []
+    if len(line) > LINE_MAX:
+        problems.append(f"line: {len(line)}자 > {LINE_MAX}")
+    body = line.strip("…").strip()
+    if "…" in body:
+        problems.append("line: 말줄임표는 맨 앞·맨 뒤에만")
+    if body[:1].islower() and not line.startswith("…"):
+        problems.append("line: 문장 중간에서 시작하면 앞에 …")
+    if not re.search(r"[.?!][”’]?$", body) and not line.endswith("…"):
+        problems.append("line: 문장 중간에서 끝나면 뒤에 …")
+    if verse_text and body not in verse_text:
+        problems.append(f"line: 본문에 없는 구절 {body[:40]!r}")
     return problems
 
 

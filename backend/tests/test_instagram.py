@@ -14,7 +14,7 @@ from unittest.mock import patch
 from instagram import daily_post
 from instagram.caption import (
     APP_LINE, CAPTION_MAX, build_caption, display_ref, find_caption_problems, find_copy_problems, search_line,
-    find_post_problems, find_slide_problems,
+    find_line_problems, find_post_problems, find_slide_problems,
 )
 from instagram.graph import INSTAGRAM_HOST, GraphError, InstagramClient, TokenStore
 from instagram.posts import COPY_JSON, MANIFEST, card_text, load_copy, load_daily_verses
@@ -89,13 +89,25 @@ class CopyRulesTest(unittest.TestCase):
         self.assertIn("\n\nA Bible verse about rest, for a long week.\n\n", caption)
 
     def test_slide_copy_rules(self):
-        good = {"word": "Near.", "topic": "#comfort"}
+        good = {"word": "Near.", "topic": "#comfort", "line": "The LORD is near to those who have a broken heart."}
         self.assertEqual(find_slide_problems(good, "The LORD is near to those who have a broken heart."), [])
-        self.assertEqual(find_slide_problems({"word": "Be still.", "topic": "#peace"}, "Be still, and know."), [])
+        self.assertEqual(find_slide_problems({"word": "Be still.", "topic": "#peace", "line": "Be still…"},
+                                             "Be still, and know."), [])
         for word in ("near", "Near", "Three whole words.", "Extraordinarily.", ""):
             self.assertTrue(find_slide_problems({"word": word, "topic": "#comfort"}), word)
         self.assertIn("본문에 없음", " ".join(find_slide_problems({"word": "Glory.", "topic": "#hope"}, "Be still.")))
         self.assertIn("mood", " ".join(find_slide_problems({"word": "Near.", "topic": "#comfort", "mood": "sad"})))
+
+    def test_cover_line_rules(self):
+        """표지 말씀 한 줄 — 본문 그대로, 문장 중간에서 자르면 그쪽에 말줄임표(11/23)."""
+        text = "Also delight yourself in the LORD, and he will give you the desires of your heart."
+        self.assertEqual(find_line_problems(text, text), [])
+        self.assertEqual(find_line_problems("…delight yourself in the LORD…", text), [])
+        self.assertEqual(find_line_problems("Also delight yourself in the LORD…", text), [])
+        for bad in ("", "delight yourself in the LORD…", "…delight yourself in the LORD",
+                    "Also delight… the LORD.", "Delight yourself in the LORD.", "x" * 141 + "."):
+            self.assertTrue(find_line_problems(bad, text), bad)
+        self.assertEqual(find_line_problems("He said, “I will not leave you.”"), [])  # 닫는 따옴표 앞 마침표
 
     def test_every_topic_has_a_mood(self):
         from instagram.caption import MOODS, TOPIC_HASHTAGS, TOPIC_MOOD, mood_for
@@ -555,7 +567,8 @@ class CopyDataTest(unittest.TestCase):
 
 
 class SlideOrderTest(unittest.TestCase):
-    """캐러셀 순서 — 표지(오늘의 한 단어) → 말씀 → 앱 풀이, 세 장이 같은 분위기(11/19 결정)."""
+    """캐러셀 순서 — 표지(말씀 한 줄) → 말씀 전문(표지가 절 전체면 뺌) → 앱 풀이, 모든 장이 같은 분위기
+    (11/19 분위기 결정, 11/23 표지를 말씀 중심으로)."""
 
     def load(self):
         import importlib.util
@@ -566,29 +579,45 @@ class SlideOrderTest(unittest.TestCase):
         spec.loader.exec_module(mod)
         return mod
 
-    def test_word_cover_first(self):
+    def test_cover_first(self):
         mod = self.load()
-        entry = {"text": "Be still.", "display_ref": "Psalm 46:10", "alt_text": "Verse alt.", "note": "A note."}
-        copy = {"label": "When it’s loud", "emph": "Be still.", "pal": "mist", "topic": "#peace", "word": "Be still."}
+        entry = {"text": "Be still, and know that I am God.", "display_ref": "Psalm 46:10", "alt_text": "Verse alt.",
+                 "note": "A note."}
+        copy = {"label": "When it’s loud", "emph": "Be still,", "pal": "mist", "topic": "#peace", "word": "Be still.",
+                "line": "Be still…"}
         slides = mod.slides_for(entry, copy)
-        self.assertEqual([s["kind"] for s, _ in slides], ["word", "verse", "note"])
+        self.assertEqual([s["kind"] for s, _ in slides], ["cover", "verse", "note"])
         self.assertEqual({s["mood"] for s, _ in slides}, {"peace"})
         self.assertEqual({s["pal"] for s, _ in slides}, {"mist"})
         cover, alt = slides[0]
-        self.assertEqual((cover["word"], cover["ref"]), ("Be still.", "Psalm 46:10"))
-        self.assertIn("When it’s loud: Be still. Psalm 46:10", alt)
+        self.assertEqual((cover["word"], cover["line"], cover["ref"]), ("Be still.", "Be still…", "Psalm 46:10"))
+        self.assertIn("Daily Bible Verse. When it’s loud: “Be still…” Psalm 46:10", alt)
         self.assertEqual([s["arrow"] for s, _ in slides], [True, True, False])
         copy["mood"] = "comfort"
         self.assertEqual({s["mood"] for s, _ in mod.slides_for(entry, copy)}, {"comfort"})
 
+    def test_whole_verse_on_cover_drops_the_verse_slide(self):
+        mod = self.load()
+        entry = {"text": "Be still, and know that I am God.", "display_ref": "Psalm 46:10", "alt_text": "Verse alt.",
+                 "note": "A note."}
+        copy = {"label": "When it’s loud", "emph": "Be still,", "pal": "mist", "topic": "#peace", "word": "Be still.",
+                "line": "Be still, and know that I am God."}
+        slides = mod.slides_for(entry, copy)
+        self.assertEqual([s["kind"] for s, _ in slides], ["cover", "note"])
+        self.assertEqual([s["arrow"] for s, _ in slides], [True, False])
+
     def test_card_html_carries_the_mood(self):
         from instagram.card import slide_html
 
-        doc = slide_html({"kind": "word", "pal": "twilight", "mood": "comfort", "label": "When it hurts",
-                          "word": "Near.", "ref": "Psalm 34:18"})
+        doc = slide_html({"kind": "cover", "pal": "twilight", "mood": "comfort", "label": "When it hurts",
+                          "word": "Near.", "line": "The LORD is near to those who have a broken heart, and saves "
+                          "those who have a crushed spirit.", "emph": "The LORD is near to those who have a broken heart,",
+                          "ref": "Psalm 34:18"})
         self.assertIn("m-comfort", doc)
         self.assertIn('class="fx stars"', doc)  # 어두운 팔레트의 위로 = 별
-        self.assertIn("Near<i>.</i>", doc)
+        self.assertIn("Daily Bible Verse", doc)
+        self.assertIn('<div class="ghost">Near</div>', doc)  # 오늘의 한 단어는 배경으로
+        self.assertIn("“<mark>The LORD is near to those who have a broken heart</mark>, and saves", doc)
         verse = slide_html({"kind": "verse", "pal": "paper", "mood": "wisdom", "label": "L", "text": "Be wise.",
                             "emph": "wise", "ref": "Proverbs 1:1"})
         self.assertIn('class="fx wrule"', verse)

@@ -4,21 +4,23 @@
 필름 질감, Fraunces 본문, 핵심 구절 형광펜, 왼쪽 정렬, 아래 @withgod.app. 프로필 그리드가 런칭 9개와
 한 계정으로 보여야 해서 팔레트·글꼴·여백 값을 그대로 옮겼다.
 
-슬라이드 종류(한 게시물 = 표지 → 말씀 → 앱 풀이, 수·일요일엔 + 앱 안내):
-- word: 표지(그리드에 보이는 장) — 「오늘의 한 단어」. 말씀에서 고른 낱말 하나(카피의 `word`, 예 「Near.」)를
-  아주 크게, 마침표만 강조색, 왼쪽 위에 감정 라벨 스티커, 아래 참조. 그림·사진은 쓰지 않는다(11/19 사용자:
-  "사진을 안 쓰는 방향으로 우리만의 디자인"). 성경 시대 그림은 월요일 릴스(인물 이야기)의 몫이다.
-- verse: 말씀 + 라벨 + 참조.
+슬라이드 종류(한 게시물 = 표지 → [말씀] → 앱 풀이, 수·일요일엔 + 앱 안내):
+- cover: 표지(그리드·피드에 보이는 장). 위에서부터 「Daily Bible Verse」 → 감정 라벨 스티커(수평) → 말씀 한 줄
+  (카피의 `line`, 가장 큰 글씨) → 장절. 오늘의 한 단어(`word`)는 아래 빈 곳에 아주 크고 옅게 깐다.
+  11/23 사용자: "대충 넘기면 성경 게시글인지 안 보인다" — 그 전 표지는 한 단어를 300px 로 크게 둔 것이었다.
+  말씀은 분위기와 상관없이 늘 위쪽에서 시작한다(아래에 두면 배경 단어와 겹쳐 읽기 어렵다).
+  그림·사진은 쓰지 않는다(11/19 사용자: "사진을 안 쓰는 방향으로 우리만의 디자인").
+- verse: 말씀 전문 + 라벨 + 참조. 표지 한 줄이 절 전체면 빠진다(같은 말씀을 두 번 보여 주지 않는다).
 - note: 앱의 영어 풀이 전문(AI 로 쓴 것이라 그렇게 밝힌다). 캡션 대신 카드에 실어 게시물 하나로 읽히게 한다.
 - app: 앱 안내(수·일요일만).
 
 분위기(`mood`, 카피의 주제 태그에서 정한다 — caption.mood_for): 표지·말씀·풀이 장이 같은 배경 요소를 써서
 넘겨도 한 장처럼 이어진다. 오늘의 말씀이 늘 밝지는 않아서(11/19 사용자) 말씀 성격에 따라 바꾼다.
-- comfort 위로: 가운데, 부드러운 기울임 단어, 둥근 달빛(어두운 팔레트면 옅은 별)
+- comfort 위로: 둥근 달빛(어두운 팔레트면 옅은 별), 표지 배경 단어는 기울임
 - hope 소망: 아래에서 빛이 올라옴(어두운 팔레트면 별 — 밤에서 시작하는 소망)
-- peace 평안: 왼쪽 위 둥근 빛, 부드러운 글씨
-- wisdom 지혜: 위쪽에 얇은 기울임 단어 + 강조색 선
-- joy 기쁨: 아주 굵게, 오른쪽 위 해
+- peace 평안: 왼쪽 위 둥근 빛
+- wisdom 지혜: 말씀·풀이 장 위쪽에 강조색 선, 표지 배경 단어는 기울임
+- joy 기쁨: 오른쪽 위 해
 
 HTML 을 Chrome 헤드리스로 찍고 Pillow 로 JPEG 로 바꾼다(API 는 JPEG 만 받는다). 운영 서버(1GB)는 렌더하지
 않는다 — 미리 찍어 S3 에 올려 두고 서버는 게시만 한다.
@@ -114,15 +116,21 @@ mark{color:inherit;background:linear-gradient(transparent 56%,var(--mark) 56%,va
 .vref{margin-top:46px;font:500 30px "WGSans";letter-spacing:.03em;color:var(--muted)}
 .vref .tr{margin-left:12px;font-size:22px;letter-spacing:.12em;opacity:.8}
 
-/* 표지 — 오늘의 한 단어 */
-.tag{position:absolute;left:100px;top:116px;font:600 30px/1 "WGSans";letter-spacing:.01em;background:var(--tag-bg,var(--ink));
-  color:var(--tag-ink,#FBF4E6);padding:16px 30px;border-radius:999px;transform:rotate(-3deg);transform-origin:left center;
-  box-shadow:0 8px 20px rgba(0,0,0,.10);max-width:860px}
-.wbox{position:absolute;left:92px;right:92px;top:240px;bottom:200px;display:flex;flex-direction:column;justify-content:flex-end}
-.word{font-weight:600;font-size:300px;line-height:.95;letter-spacing:-.045em;white-space:nowrap;color:var(--ink);
-  font-variation-settings:"SOFT" 100,"WONK" 1}
-.word i{font-style:normal;color:var(--accent)}
-.wref{margin-top:34px;margin-left:8px;font:500 30px "WGSans";letter-spacing:.03em;color:var(--muted)}
+/* 표지 — 위에서부터 「Daily Bible Verse」 → 감정 스티커 → 말씀 → 장절, 아래에 오늘의 한 단어를 옅게 */
+.head{position:absolute;left:100px;top:104px;font-style:italic;font-weight:500;font-size:60px;line-height:1;
+  letter-spacing:-.012em;color:var(--accent);font-variation-settings:"SOFT" 100,"WONK" 0}
+.tag{position:absolute;left:100px;top:196px;font:600 30px/1 "WGSans";letter-spacing:.01em;background:var(--tag-bg,var(--ink));
+  color:var(--tag-ink,#FBF4E6);padding:16px 30px;border-radius:999px;box-shadow:0 8px 20px rgba(0,0,0,.10);max-width:860px}
+.cvbox{position:absolute;left:100px;right:96px;top:318px;bottom:470px;display:flex;flex-direction:column;
+  justify-content:flex-start}
+.ctext{font-weight:400;line-height:1.28;letter-spacing:-.008em;color:var(--ink);text-wrap:pretty;max-width:884px;
+  font-variation-settings:"SOFT" 60,"WONK" 0}
+.cref{margin-top:40px;font:600 38px "WGSans";letter-spacing:.015em;color:var(--ink)}
+.cref .tr{margin-left:14px;font:500 24px "WGSans";letter-spacing:.12em;color:var(--muted)}
+.ghost{position:absolute;left:-30px;bottom:150px;font-weight:700;font-size:420px;line-height:.8;white-space:nowrap;
+  letter-spacing:-.05em;color:var(--ink);opacity:.07;font-variation-settings:"SOFT" 100,"WONK" 1;pointer-events:none}
+.dark .ghost{opacity:.09}
+.m-comfort .ghost,.m-wisdom .ghost{font-style:italic;font-weight:400}
 
 /* 분위기별 배경 요소(표지·말씀·풀이 장 공통) */
 .fx{position:absolute;pointer-events:none}
@@ -142,17 +150,6 @@ mark{color:inherit;background:linear-gradient(transparent 56%,var(--mark) 56%,va
 .sunr{right:-240px;top:-240px;width:860px;height:860px;border-radius:50%;
   background:radial-gradient(circle,rgba(255,252,236,1) 0%,rgba(255,241,200,.9) 36%,rgba(255,226,170,0) 70%)}
 .wrule{left:100px;top:118px;width:150px;height:5px;background:var(--accent)}
-.rule{width:150px;height:5px;background:var(--accent);margin:46px 0 0 10px}
-
-/* 분위기별 한 단어 */
-.m-comfort .wbox{justify-content:center;top:200px;bottom:240px}
-.m-comfort .word{font-style:italic;font-weight:400;font-size:270px;letter-spacing:-.03em;font-variation-settings:"SOFT" 100,"WONK" 0}
-.m-comfort .word i{font-style:italic}
-.m-peace .word{font-weight:500;letter-spacing:-.035em}
-.m-wisdom .wbox{justify-content:flex-start;top:320px}
-.m-wisdom .word{font-style:italic;font-weight:300;font-size:290px;letter-spacing:-.035em;font-variation-settings:"SOFT" 0,"WONK" 1}
-.m-wisdom .word i{font-style:italic}
-.m-joy .word{font-weight:800;font-size:330px;letter-spacing:-.05em}
 
 /* 앱 풀이 */
 .nbox{position:absolute;left:100px;right:100px;top:130px;bottom:205px;display:flex;flex-direction:column;
@@ -216,9 +213,19 @@ function noOrphan(sel){
     el.style.maxWidth = base + 'px';
   });
 }
+function fitGhost(){
+  // 배경 단어가 오른쪽 밖으로 잘려 「Humilit」처럼 끊기지 않게 폭에 맞춘다(왼쪽만 살짝 넘친다).
+  document.querySelectorAll('.ghost').forEach(function(el){
+    var size = parseFloat(getComputedStyle(el).fontSize), guard = 0;
+    while (el.getBoundingClientRect().right > 1080 - 24 && size > 200 && guard++ < 80) {
+      size -= 6; el.style.fontSize = size + 'px';
+    }
+  });
+}
 document.fonts.ready.then(function(){
   fit('.vtext', '.vbox', 38); noOrphan('.vtext'); fit('.vtext', '.vbox', 38);
-  fit('.word', '.wbox', 120);
+  fit('.ctext', '.cvbox', 46); noOrphan('.ctext'); fit('.ctext', '.cvbox', 46);
+  fitGhost();
   fit('.nbox p', '.nbox', 32); noOrphan('.nbox p'); fit('.nbox p', '.nbox', 32);
   fit('.cbox h2', '.cbox', 56);
   document.body.setAttribute('data-ready', '1');
@@ -240,6 +247,25 @@ def verse_size(text: str) -> int:
     if n <= 190:
         return 62
     return 56
+
+
+def cover_size(text: str) -> int:
+    """표지 말씀 길이별 시작 글자 크기. 표지 말씀은 둘째 장보다 크게 — 피드에서 첫눈에 읽히는 게 표지의 일이다."""
+    n = len(text)
+    if n <= 60:
+        return 86
+    if n <= 90:
+        return 78
+    if n <= 120:
+        return 70
+    return 62
+
+
+def cover_emph(line: str, emph: str) -> str:
+    """표지 말씀의 형광펜 구절 — 한 줄의 일부일 때만(한 줄이 거의 다 강조 구절이면 칠하지 않는다).
+    강조 구절 끝의 쉼표·세미콜론은 뗀다(표지 한 줄이 그 앞에서 끝날 수 있다)."""
+    emph = (emph or "").rstrip(",;")
+    return emph if emph and emph in line and len(emph) < 0.8 * len(line) else ""
 
 
 def note_size(text: str) -> int:
@@ -277,14 +303,14 @@ def lower_first(text: str) -> str:
 
 def _fx(mood: str, dark: bool, kind: str) -> str:
     """분위기 배경 요소. 표지·말씀·풀이 장에만(앱 안내 장은 브랜드 장이라 그대로)."""
-    if not mood or kind not in ("word", "verse", "note"):
+    if not mood or kind not in ("cover", "verse", "note"):
         return ""
     stars = '<div class="fx stars"></div>' if dark else ""
     return {
         "comfort": stars + '<div class="fx moon"></div>',
         "hope": stars + '<div class="fx rise"></div>',
         "peace": '<div class="fx halo"></div>',
-        "wisdom": "" if kind == "word" else '<div class="fx wrule"></div>',  # 표지는 단어 아래 선
+        "wisdom": "" if kind == "cover" else '<div class="fx wrule"></div>',  # 표지는 그 자리에 Daily Bible Verse
         "joy": '<div class="fx sunr"></div>',
     }[mood]
 
@@ -302,12 +328,14 @@ def slide_html(s: dict) -> str:
     if s.get("mood"):
         cls += f" m-{s['mood']}"
     fx = _fx(s.get("mood", ""), pal in DARK, k)
-    if k == "word":
-        w = e(s["word"])
-        w = w[:-1] + "<i>.</i>" if w.endswith(".") else w
-        rule = '<div class="rule"></div>' if s.get("mood") == "wisdom" else ""
-        body = (f'<div class="tag">{e(lower_first(s["label"]))}</div>'
-                f'<div class="wbox"><div class="word">{w}</div>{rule}<div class="wref">{e(s["ref"])}</div></div>')
+    if k == "cover":
+        line = s["line"]
+        body = (f'<div class="ghost">{e(s["word"].rstrip("."))}</div>'
+                '<div class="head">Daily Bible Verse</div>'
+                f'<div class="tag">{e(lower_first(s["label"]))}</div>'
+                f'<div class="cvbox"><div class="ctext" style="font-size:{cover_size(line)}px">'
+                f'“{marked(line, cover_emph(line, s.get("emph", "")))}”</div>'
+                f'<div class="cref">{e(s["ref"])}<span class="tr">WEB</span></div></div>')
     elif k == "verse":
         body = (f'<div class="vbox"><div class="lab">{e(lower_first(s["label"]))}</div>'
                 f'<div class="vtext" style="font-size:{verse_size(s["text"])}px">{marked(s["text"], s.get("emph", ""))}</div>'
