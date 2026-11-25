@@ -6,7 +6,8 @@
   "cta": "Save this for a morning when nothing feels like enough.",
   "topic": "#trust",
   "pal": "sagelight",
-  "word": "Lilies."
+  "word": "Lilies.",
+  "line": "Consider the lilies of the field, how they grow."
  },
  "pro-10-25": {
   "label": "When everything feels shaky",
@@ -15,7 +16,8 @@
   "cta": "Save this for a shaky week.",
   "topic": "#strength",
   "pal": "mist",
-  "word": "Firm."
+  "word": "Firm.",
+  "line": "When the whirlwind passes, the wicked is no more; but the righteous stand firm forever."
  },
  "heb-13-16": {
   "label": "For a busy week",
@@ -24,7 +26,8 @@
   "cta": "Send this to someone who always shares.",
   "topic": "#kindness",
   "pal": "sand",
-  "word": "Sharing."
+  "word": "Sharing.",
+  "line": "But don’t forget to be doing good and sharing, for with such sacrifices God is well pleased."
  },
  "rom-12-17": {
   "label": "When you want to get even",
@@ -33,7 +36,8 @@
   "cta": "Save this for the next time someone gets under your skin.",
   "topic": "#peace",
   "pal": "lilac",
-  "word": "Honorable."
+  "word": "Honorable.",
+  "line": "Repay no one evil for evil. Respect what is honorable in the sight of all men."
  },
  "pro-10-12": {
   "label": "When an old hurt comes back up",
@@ -42,7 +46,8 @@
   "cta": "Send this to someone you’ve made up with.",
   "topic": "#love",
   "pal": "rose",
-  "word": "Love."
+  "word": "Love.",
+  "line": "Hatred stirs up strife, but love covers all wrongs."
  },
  "pro-10-19": {
   "label": "Before you hit send",
@@ -51,7 +56,8 @@
   "cta": "Send this to the group chat that needs it.",
   "topic": "#wisdom",
   "pal": "paper",
-  "word": "Wisely."
+  "word": "Wisely.",
+  "line": "In the multitude of words there is no lack of disobedience, but he who restrains his lips does wisely."
  },
  "mat-5-16": {
   "label": "For an ordinary workday",
@@ -60,7 +66,8 @@
   "cta": "Send this to someone whose kindness you noticed.",
   "topic": "#kindness",
   "pal": "sunrise",
-  "word": "Shine."
+  "word": "Shine.",
+  "line": "Even so, let your light shine before men, that they may see your good works and glorify your Father who is in heaven."
  },
  "psa-34-19": {
   "label": "When the hard things keep coming",
@@ -69,7 +76,8 @@
   "cta": "Send this to someone who’s had a long run of hard days.",
   "topic": "#hope",
   "pal": "twilight",
-  "word": "Delivers."
+  "word": "Delivers.",
+  "line": "Many are the afflictions of the righteous, but the LORD delivers him out of them all."
  },
  "isa-30-18": {
   "label": "When the answer is slow",
@@ -78,7 +86,8 @@
   "cta": "Save this for a day the answer feels far away.",
   "topic": "#patience",
   "pal": "dawn",
-  "word": "Blessed."
+  "word": "Blessed.",
+  "line": "Blessed are all those who wait for him."
  },
  "pro-11-2": {
   "label": "When you’re sure you’re right",
@@ -87,7 +96,8 @@
   "cta": "Share in the comments: who taught you the most?",
   "topic": "#wisdom",
   "pal": "sand",
-  "word": "Humility."
+  "word": "Humility.",
+  "line": "When pride comes, then comes shame, but with humility comes wisdom."
  },
  "rom-12-18": {
   "label": "With someone difficult",
@@ -96,7 +106,8 @@
   "cta": "Send this to someone working on a hard relationship.",
   "topic": "#peace",
   "pal": "sagelight",
-  "word": "Peace."
+  "word": "Peace.",
+  "line": "If it is possible, as much as it is up to you, be at peace with all men."
  },
  "psa-37-4": {
   "label": "When you want what others have",
@@ -105,7 +116,8 @@
   "cta": "Share in the comments: what brought you joy this week?",
   "topic": "#joy",
   "pal": "sunrise",
-  "word": "Delight."
+  "word": "Delight.",
+  "line": "Also delight yourself in the LORD, and he will give you the desires of your heart."
  },
  "rom-8-18": {
   "label": "When today feels heavy",
@@ -114,7 +126,8 @@
   "cta": "Send this to someone carrying a lot right now.",
   "topic": "#hope",
   "pal": "night",
-  "word": "Glory."
+  "word": "Glory.",
+  "line": "For I consider that the sufferings of this present time are not worthy to be compared with the glory which will be revealed toward us."
  },
  "psa-32-8": {
   "label": "When you don’t know which way to go",
@@ -123,7 +136,8 @@
   "cta": "Save this for a decision you’re stuck on.",
   "topic": "#trust",
   "pal": "mist",
-  "word": "The way."
+  "word": "The way.",
+  "line": "I will instruct you and teach you in the way which you shall go. I will counsel you with my eye on you."
  },
  "pro-11-13": {
   "label": "When someone tells you something",
@@ -132,7 +146,8 @@
   "cta": "Send this to the friend you trust most.",
   "topic": "#trust",
   "pal": "twilight",
-  "word": "Trustworthy."
+  "word": "Trustworthy.",
+  "line": "One who brings gossip betrays a confidence, but one who is of a trustworthy spirit is one who keeps a secret."
  },
  "psa-34-18": {
   "label": "When you’re falling apart inside",
@@ -141,6 +156,147 @@
   "cta": "Send this to someone who is quietly holding a lot together.",
   "topic": "#comfort",
   "pal": "twilight",
-  "word": "Near."
+  "word": "Near.",
+  "line": "The LORD is near to those who have a broken heart, and saves those who have a crushed spirit."
+ },
+ "pro-14-10": {
+  "label": "When no one quite gets it",
+  "emph": "The heart knows its own bitterness and joy;",
+  "hook": "Some things you feel can’t be fully explained to anyone, and that’s allowed.",
+  "cta": "Send this to a friend who keeps a lot to themselves.",
+  "topic": "#comfort",
+  "pal": "lilac",
+  "word": "Heart.",
+  "line": "The heart knows its own bitterness and joy; he will not share these with a stranger."
+ },
+ "mat-5-41": {
+  "label": "When someone asks too much",
+  "emph": "go with him two.",
+  "hook": "The second mile is the one nobody can make you walk.",
+  "cta": "Save this for the next request that feels like a lot.",
+  "topic": "#kindness",
+  "pal": "sunrise",
+  "word": "Give.",
+  "line": "Whoever compels you to go one mile, go with him two. Give to him who asks you, and don’t turn away him who desires to borrow from you."
+ },
+ "pro-11-17": {
+  "label": "Before you say the sharp thing",
+  "emph": "The merciful man does good to his own soul,",
+  "hook": "Kindness lands on two people: the one who gets it and the one who gives it.",
+  "cta": "Save this for the next time a sharp reply is ready to go.",
+  "topic": "#wisdom",
+  "pal": "sand",
+  "word": "Merciful.",
+  "line": "The merciful man does good to his own soul, but he who is cruel troubles his own flesh."
+ },
+ "psa-37-23": {
+  "label": "When you’ve stumbled again",
+  "emph": "Though he stumble, he shall not fall,",
+  "hook": "A stumble and a fall can start out looking exactly the same.",
+  "cta": "Send this to someone getting back up today.",
+  "topic": "#encouragement",
+  "pal": "dawn",
+  "word": "Holds.",
+  "line": "Though he stumble, he shall not fall, for the LORD holds him up with his hand."
+ },
+ "pro-11-24": {
+  "label": "When holding on feels safer",
+  "emph": "There is one who scatters, and increases yet more.",
+  "hook": "Some things only grow once you stop gripping them.",
+  "cta": "Save this for a week when everything feels tight.",
+  "topic": "#trust",
+  "pal": "sagelight",
+  "word": "Scatters.",
+  "line": "There is one who scatters, and increases yet more. There is one who withholds more than is appropriate, but gains poverty."
+ },
+ "rom-12-21": {
+  "label": "When someone was unkind first",
+  "emph": "overcome evil with good.",
+  "hook": "You get to choose what the unkindness turns into.",
+  "cta": "Save this for the next message that stings.",
+  "topic": "#courage",
+  "pal": "mist",
+  "word": "Overcome.",
+  "line": "Don’t be overcome by evil, but overcome evil with good."
+ },
+ "heb-13-5": {
+  "label": "When money is on your mind",
+  "emph": "I will in no way leave you,",
+  "hook": "Bank balances go up and down. This promise stays the same size.",
+  "cta": "Save this for the end of a tight month.",
+  "topic": "#trust",
+  "pal": "sage",
+  "word": "Content.",
+  "line": "I will in no way leave you, neither will I in any way forsake you."
+ },
+ "isa-58-6": {
+  "label": "When someone near you is weighed down",
+  "emph": "to let the oppressed go free,",
+  "hook": "The most meaningful thing you do this week might be lifting someone else’s load.",
+  "cta": "Send this to someone who carries more than their share.",
+  "topic": "#kindness",
+  "pal": "rose",
+  "word": "Free.",
+  "line": "…to let the oppressed go free, and that you break every yoke?"
+ },
+ "jas-1-5": {
+  "label": "When you don’t know what to do",
+  "emph": "who gives to all liberally and without reproach,",
+  "hook": "Asking for help is allowed to be the first step instead of the last resort.",
+  "cta": "Save this for the next decision you can’t figure out alone.",
+  "topic": "#wisdom",
+  "pal": "paper",
+  "word": "Ask.",
+  "line": "But if any of you lacks wisdom, let him ask of God, who gives to all liberally and without reproach, and it will be given to him."
+ },
+ "isa-33-6": {
+  "label": "When everything keeps shifting",
+  "emph": "There will be stability in your times,",
+  "hook": "When the ground keeps moving, it helps to know what doesn’t.",
+  "cta": "Save this for a season of too many changes.",
+  "topic": "#strength",
+  "pal": "night",
+  "word": "Stability.",
+  "line": "There will be stability in your times, abundance of salvation, wisdom, and knowledge."
+ },
+ "pro-11-25": {
+  "label": "For a friend running on empty",
+  "emph": "He who waters shall be watered also himself.",
+  "hook": "Watering someone else’s garden has a way of reaching your own.",
+  "cta": "Send this to the friend who always shows up for everyone.",
+  "topic": "#kindness",
+  "pal": "sand",
+  "word": "Watered.",
+  "line": "He who waters shall be watered also himself."
+ },
+ "mat-5-44": {
+  "label": "With someone who hurt you",
+  "emph": "love your enemies, bless those who curse you,",
+  "hook": "Love can start as a decision, long before the feeling catches up.",
+  "cta": "Save this for a name that still stings.",
+  "topic": "#forgiveness",
+  "pal": "twilight",
+  "word": "Bless.",
+  "line": "…love your enemies, bless those who curse you, do good to those who hate you…"
+ },
+ "mat-6-34": {
+  "label": "When tomorrow is already loud",
+  "emph": "don’t be anxious for tomorrow,",
+  "hook": "Today has enough in it. Tomorrow can wait its turn.",
+  "cta": "Save this for a night when tomorrow won’t stop talking.",
+  "topic": "#peace",
+  "pal": "lilac",
+  "word": "Each day.",
+  "line": "Therefore don’t be anxious for tomorrow, for tomorrow will be anxious for itself. Each day’s own evil is sufficient."
+ },
+ "psa-40-1": {
+  "label": "When the waiting feels endless",
+  "emph": "He set my feet on a rock,",
+  "hook": "Long waits can still end on solid ground.",
+  "cta": "Send this to someone who has been waiting a long time.",
+  "topic": "#patience",
+  "pal": "dawn",
+  "word": "Rock.",
+  "line": "He set my feet on a rock, and gave me a firm place to stand."
  }
 }

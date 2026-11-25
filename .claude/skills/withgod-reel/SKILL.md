@@ -12,7 +12,7 @@ description: "@withgod.app 인스타 릴스 한 편을 만들어 예약 큐에 �
 
 1. `backend/instagram/reels/README.md` 를 처음부터 끝까지 읽는다(형식·첫 3초·사용자 피드백 규칙·형식별 메모·캡션).
    `python3 backend/instagram/reels/reel_queue.py status` 로 슬롯과 편성표 주제를 본다.
-   텔레그램 요청이면 시작 전에 `scripts/tg-notify.sh` 로 알린다(30~60분).
+   만드는 중 진행 상황은 텔레그램으로 알리지 않는다(문제·예약 알림만 — CLAUDE.md).
 2. **메시지 한 줄부터.** 「그래서 하나님은 어떤 분인가」에 답하는 한 문장을 못 쓰면 대본을 쓰지 않는다.
    `episodes/<slug>/story.md` 를 [REVIEW.md](../../../backend/instagram/reels/REVIEW.md) 의 틀대로 쓴다
    (메시지 · 누구에게 · 한국어 줄거리 · 대본[화면 + 영어 + 우리말]). 사실은 원래 기록, 성경은 WEB(`backend/data/langs/en/verses.csv`).

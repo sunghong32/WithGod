@@ -19,7 +19,7 @@ AI 영상 모델(로컬 Wan 2.2 는 3.4초에 48분 — 사용자가 중단), �
 
 ## 만드는 순서
 
-1. `python3 reel_queue.py status` 로 다음 빈 슬롯과 편성표 주제를 본다. 텔레그램 요청이면 시작 전에 `scripts/tg-notify.sh` 로 알린다(15~30분).
+1. `python3 reel_queue.py status` 로 다음 빈 슬롯과 편성표 주제를 본다. (만드는 중 진행 상황은 텔레그램으로 알리지 않는다 — 문제·예약 알림만, CLAUDE.md)
 2. 작업 폴더 `~/.local/share/withgod-ig-reels/work/<slug>/` (그림·중간 파일은 레포에 넣지 않는다).
 3. **대본** — 사실은 원래 기록으로 확인한다. 성경 본문은 WEB(`backend/data/langs/en/verses.csv`), 찬송가·인물 일화는 부풀려진 판이 많으니 출처 확인.
    **메시지 한 줄부터** 쓰고 `episodes/<slug>/story.md`(메시지 · 한국어 줄거리 · 대본)를 [REVIEW.md](REVIEW.md) 틀대로 쓴다.
