@@ -144,9 +144,7 @@ Play vc28 production·alpha·internal `completed`. **1.6.1(#69 iOS 위젯 현지
 
 ## 최근 변경 이력
 
-- 2026-11-25 feat(instagram): 릴스 마르다(월 11/23 몫, 누가복음 10:38–42 · 금색 요 11:5)·Mia 2화 「Thanksgiving eve」(실제 앱 녹화) — 검토 3회·2회째 통과. 앱 추천이 '추수감사절 가족이 두렵다'에 에스겔 21:17·욥기 31:34 를 고르고 욥기를 '고백'으로 잘못 풀이(같은 입력도 부를 때마다 결과가 다름) — 녹화를 다시 해 풀이가 안 보이게 잘라 씀, 앱 쪽은 별건. 마르다 음악은 찬송가 「Sweet Hour of Prayer」(1861, PD) 편곡으로 바꿈 — 사용자 "성경 이야기 쪽 음악이 늘 엇박·휙휙" → 월 인물 이야기는 PD 찬송가 한 곡·같은 빠르기(README 5·REVIEW F-음악), Mia 로파이는 유지
+- 2026-11-25 feat(instagram): 릴스 마르다(월 11/23 몫, 누가복음 10:38–42 · 금색 요 11:5)·Mia 2화 「Thanksgiving eve」(실제 앱 녹화) — 검토 3회·2회째 통과. 앱 추천이 '추수감사절 가족이 두렵다'에 에스겔 21:17·욥기 31:34 를 고르고 욥기를 '고백'으로 잘못 풀이(같은 입력도 부를 때마다 결과가 다름) — 녹화를 다시 해 풀이가 안 보이게 잘라 씀, 앱 쪽은 별건. 마르다 음악은 찬송가 「Sweet Hour of Prayer」(1861, PD) 편곡으로 바꿈 — 사용자 "성경 이야기 쪽 음악이 늘 엇박·휙휙" → 월 인물 이야기는 PD 찬송가 한 곡·같은 빠르기·장면 따라 편성(README 5·REVIEW F-음악), 0초에 「The story of …」 제목(REVIEW H3), Mia 로파이는 유지
 - 2026-11-25 chore: 텔레그램엔 개발 내용 대신 문제·예약 작업 알림만 — 사용자 결정(브릿지 붙은 5개 프로젝트 공통). CLAUDE.md·AGENTS.md 의 「긴 작업은 시작 전에 알린다」 규칙 삭제, 전역 Stop 훅(`~/.local/share/tg-claude-bridge/notify_hook.py`)은 데스크 대화 미러링을 끄고 예약 작업 결과만 보냄, 전역 `~/.claude/CLAUDE.md`·`~/.codex/AGENTS.md` 에도 같은 규칙
 - 2026-11-23 feat(instagram): Daily Verse 표지를 말씀 중심으로 — 큰 한 단어 때문에 대충 넘기면 성경 게시글인지 안 보인다는 사용자 지적. 「Daily Bible Verse」+수평 감정 스티커+말씀 한 줄(카피 `line`, 검사 `find_line_problems`)+굵은 장절, 한 단어는 아래 배경으로, 말씀은 늘 위쪽(아래는 배경 단어와 겹침). 표지가 절 전체면 말씀 장을 뺌. 시안 6차(스티커·단어 위·말씀 카드 등), 틀 5 로 30개 다시 렌더
-- 2026-11-20 feat(instagram): 릴스 대본 검토 단계(REVIEW.md 체크리스트·새 서브에이전트 검토·story.md 게이트)·스킬 `withgod-reel`·미리보기 한국어 줄거리 — 편마다 3~5번 고치던 피드백을 렌더링 전에 거름
-- 2026-11-20 feat(instagram): 금 11/20 「탕자의 귀환」 네 번째 안(올린 것은 5안) — 1~3안 거절 뒤 액자 + Mia 내레이션(narrate.py·Kokoro)·클로즈업(render.py `gallery`), 메시지 하나(「돌아오면 하나님은 이렇게 안아 주신다」). 사용자 요청으로 그림에 보이는 신을 "gone" → "slipped off", 안은 뒤 옷·반지·신(눅 15:22) + "Not as a servant. As his son." 을 더함(64.3초)
-- 그 이전 이력은 git history 로 넘김(`git log --until=2026-11-20`)
+- 그 이전 이력은 git history 로 넘김(`git log --until=2026-11-21`)
