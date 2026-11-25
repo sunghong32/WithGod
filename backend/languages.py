@@ -561,6 +561,17 @@ _CURATED_UNSUITABLE = {
     "PHP 1:23",    # '떠나는 것이 더 낫다' — 우울·고립 사용자에게 위험
 }
 
+# 자동 분류(gpt-4o-mini)가 부적합으로 잘못 건 명작. 오늘의 말씀·인기 말씀에 든 절이라
+# 사람이 이미 위로 카드로 괜찮다고 본 것이다. 분류기를 다시 돌려도 살아남게 코드에 둔다.
+# 오늘의 말씀 376개와 app.py 인기 말씀이 모두 추천 가능한지는 데이터 테스트가 지킨다.
+_CURATED_SUITABLE = {
+    "MAT 6:34",    # 내일 일을 위하여 염려하지 말라
+    "PSA 71:20",   # 우리를 다시 살리시며 땅 깊은 곳에서 다시 이끌어 올리시리이다
+    "PRO 18:21",   # 죽고 사는 것이 혀의 권세에 달렸나니
+    "GAL 6:7",     # 사람이 무엇으로 심든지 그대로 거두리라
+    "ISA 40:28",   # 영존하시는 하나님…피곤치 아니하시며 곤비치 아니하시며(11/25 재분류가 오탐)
+}
+
 _unsuitable_refs: set[str] | None = None
 
 
@@ -572,7 +583,9 @@ def _load_unsuitable() -> set[str]:
             data = json.loads(
                 (LANG_DIR / "unsuitable_refs.json").read_text(encoding="utf-8")
             )
-            _unsuitable_refs = set(data.get("unsuitable", [])) | _CURATED_UNSUITABLE
+            _unsuitable_refs = (
+                set(data.get("unsuitable", [])) | _CURATED_UNSUITABLE
+            ) - _CURATED_SUITABLE
             log.info("추천 부적합 절 %d개 로드", len(_unsuitable_refs))
         except FileNotFoundError:
             _unsuitable_refs = set(_CURATED_UNSUITABLE)
@@ -604,21 +617,59 @@ def is_placeholder_text(text) -> bool:
     return bool(_PLACEHOLDER.fullmatch(str(text).strip()))
 
 
+def _neighbor_text(df, pos: int, step: int) -> str:
+    """같은 장의 바로 앞(step=-1)·뒤(+1) 절 본문. 장이 바뀌거나 자리표시 절이면 ""."""
+    j = pos + step
+    if not 0 <= j < len(df):
+        return ""
+    here, there = df.iloc[pos], df.iloc[j]
+    if str(there["book"]) != str(here["book"]) or int(there["chapter"]) != int(here["chapter"]):
+        return ""
+    text = str(there["text"])
+    return "" if is_placeholder_text(text) else text
+
+
+def _continues_sentence(raw: str, lang: str) -> bool:
+    """앞 절에서 이어지는 문장인지 — 외국어 본문이 소문자로 시작하면 그렇다.
+
+    카드 본문은 tidy_verse_text 가 첫 글자를 대문자로 올려서(#52) 「because I feared…」의
+    이음새가 가려진다. 선별 단계에 따로 알려 준다. 한국어는 대소문자가 없어 앞 절로만 본다."""
+    if lang == "ko":
+        return False
+    for ch in raw:
+        if ch in _LEADING_PUNCT:
+            continue
+        return ch.islower()
+    return False
+
+
 def collect_candidates(store: VerseStore, scores, ids, top_k: int) -> list[dict]:
     """FAISS 결과에서 위로 부적합 절(심판 신탁·족보·악인의 대사 등)을 걸러
     상위 top_k 후보를 만든다. 전부 걸러지는 극단엔 부적합 필터 없이 폴백한다.
-    본문이 없는 자리표시 절은 폴백에서도 뺀다. 외국어 본문은 표시용으로 정리한다(#51·#52)."""
-    def card(s, r) -> dict:
+    본문이 없는 자리표시 절은 폴백에서도 뺀다. 외국어 본문은 표시용으로 정리한다(#51·#52).
+
+    후보마다 같은 장의 앞뒤 절(context)을 붙인다. 카드는 한 절만 떼어 보여 주므로
+    선별(recommend.select_verses)이 조건절(욥 31:33-34 「내가 숨겼다면」)이나 심판 신탁 안의
+    한 절을 문맥 없이 읽고 위로로 오해하지 않게 하려는 것이다."""
+    df = store.df
+
+    def card(s, pos: int, r) -> dict:
+        raw = str(r["text"])
         return {
             "ref": f"{r['book']} {int(r['chapter'])}:{int(r['verse'])}",
-            "text": tidy_verse_text(str(r["text"]), store.lang),
+            "text": tidy_verse_text(raw, store.lang),
             "score": float(s),
+            "context": {
+                "before": _neighbor_text(df, pos, -1),
+                "after": _neighbor_text(df, pos, 1),
+                "continues": _continues_sentence(raw, store.lang),
+            },
         }
 
     cands: list[dict] = []
     dropped = 0
     for s, i in zip(scores, ids):
-        r = store.df.iloc[int(i)]
+        r = df.iloc[int(i)]
         if is_placeholder_text(r["text"]):
             dropped += 1
             continue
@@ -629,17 +680,17 @@ def collect_candidates(store: VerseStore, scores, ids, top_k: int) -> list[dict]
         if not is_recommendable(code, r["chapter"], r["verse"]):
             dropped += 1
             continue
-        cands.append(card(s, r))
+        cands.append(card(s, int(i), r))
         if len(cands) >= top_k:
             break
     if dropped:
         log.info("추천 후보에서 부적합 절 %d개 제외", dropped)
     if not cands:
         for s, i in zip(scores, ids):
-            r = store.df.iloc[int(i)]
+            r = df.iloc[int(i)]
             if is_placeholder_text(r["text"]):
                 continue
-            cands.append(card(s, r))
+            cands.append(card(s, int(i), r))
             if len(cands) >= top_k:
                 break
     return cands

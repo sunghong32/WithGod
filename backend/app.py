@@ -112,6 +112,10 @@ languages_set_encoder(model.encode)
 # LLM (생성) — Anthropic Claude. 호출 방식과 모델 규칙은 llm.py 참고.
 # =========================================================
 import llm
+from recommend import (
+    build_single_comment_prompt as _build_single_comment_prompt,
+    select_verses as _select_verses,
+)
 
 LLM_MODEL = llm.LLM_MODEL
 
@@ -400,13 +404,6 @@ def _recommend_system(lang: str) -> str:
     )
 
 
-# 비한국어 프롬프트의 tag 예시(대상 언어로 줘야 tag 도 그 언어로 나온다).
-_TAG_EXAMPLES = {
-    "en": "Fear", "es": "Miedo", "pt": "Medo", "de": "Angst",
-    "fr": "Peur", "it": "Paura", "pl": "Lęk",
-}
-
-
 def _build_user_prompt(mood: str, candidates: List[dict], picks: int, style_limits: dict) -> str:
     verses_block = "\n".join([f"- {c['ref']} :: {_clip(c['text'])}" for c in candidates])
     return f"""
@@ -440,59 +437,6 @@ def _build_user_prompt(mood: str, candidates: List[dict], picks: int, style_limi
 """.strip()
 
 
-def _build_single_comment_prompt(
-    mood: str, verse: dict, style_limits: dict, lang: str = "ko"
-) -> str:
-    """스트리밍용: 구절 1개에 대해 tag + comment(말씀 풀이+적용)를 생성하는 프롬프트"""
-    if lang != "ko":
-        name = LANGUAGE_NAMES_EN.get(lang, lang)
-        tag_ex = _TAG_EXAMPLES.get(lang, "Comfort")
-        return f"""
-Role: You are a warm, wise pastor. Write ONLY in {name}.
-
-Bible verse (already in {name} — quote it as-is, do not re-translate):
-{verse['ref']} :: {verse['text']}
-The believer's heart: "{mood}"
-
-Task: Write a short pastoral reflection as 'comment'.
-- Length: {style_limits['comment_limit_intl']}.
-- Weave these into ONE smooth paragraph, without numbering or headings:
-  (1) what this verse originally means, explained simply;
-  (2) how it gently comforts and applies to this person's situation.
-- Be honest about the verse: if it is a rebuke, judgment oracle, or warning,
-  do not twist it into unrelated comfort — explain its real meaning and find
-  the honest hope in or around it.
-- Vary your phrasing naturally; do not open with a formula like "In [ref], ...".
-- 'tag': 1–2 emotion themes, in {name} (e.g. "{tag_ex}").
-- Output exactly ONE JSON object, nothing else (keep key order):
-{{
-  "tag": "{tag_ex}",
-  "comment": "a pastoral comment in {name}"
-}}
-""".strip()
-    return f"""
-역할: 당신은 따뜻한 한국인 목사님입니다. (반드시 한국어만 사용)
-
-성경 구절: {verse['ref']} :: {verse['text']}
-성도의 마음: "{mood}"
-
-요청: 이 구절을 성도에게 건네는 짧은 '말씀 나눔'을 comment 로 작성하세요.
-- comment 분량: {style_limits['comment_limit']}.
-- 반드시 아래 두 가지를 자연스러운 한 단락에 함께 담으세요:
-  (1) 이 구절이 본래 무슨 뜻인지 쉽게 풀어 설명 (성경 풀이)
-  (2) 그 말씀이 지금 성도의 상황에 어떤 위로·의미가 되는지 다정한 적용
-- (1)(2) 같은 번호·표시나 소제목은 넣지 말고 매끄럽게 이어 쓰세요.
-- 'tag'는 감정 주제 1~2개. 예: "두려움", "위로", "소망", "회복" 등
-- 출력은 JSON 객체 1개만. 다른 설명/서문/주석 금지.
-
-정확한 JSON 객체 1개로만 출력 (아래 키 순서 유지):
-{{
-  "tag": "두려움",
-  "comment": "말씀 풀이와 적용이 함께 담긴 목회적 코멘트"
-}}
-""".strip()
-
-
 # 응답 JSON 스키마. 키 순서가 출력 순서다 — 앱은 tag 다음에 comment 가 흘러온다고 본다.
 _COMMENT_SCHEMA = {
     "type": "object",
@@ -519,12 +463,6 @@ _RESULTS_SCHEMA = {
         }
     },
     "required": ["results"],
-    "additionalProperties": False,
-}
-_PICKS_SCHEMA = {
-    "type": "object",
-    "properties": {"picks": {"type": "array", "items": {"type": "integer"}}},
-    "required": ["picks"],
     "additionalProperties": False,
 }
 
@@ -1122,58 +1060,6 @@ def _make_history_title(mood: str, lang: str = "ko") -> str:
     except Exception:
         log.exception("history title generation failed")
         return ""
-
-
-def _select_verses(mood: str, candidates: List[dict], picks: int) -> List[dict]:
-    """후보 구절 중 사용자 입력의 '의미·정서'에 가장 맞는 picks개를 LLM이 재순위.
-
-    유사도 상위를 그대로 확정하지 않고, 넓게 뽑은 후보를 LLM이 다시 평가해
-    입력 맥락에 맞는 것만 고르게 한다. 실패 시 유사도 상위 picks개로 폴백.
-    """
-    fallback = candidates[:picks]
-    if not llm.configured() or len(candidates) <= picks:
-        return fallback
-    listed = "\n".join(
-        f"{n + 1}. {c['ref']} :: {_clip(str(c['text']), 80)}"
-        for n, c in enumerate(candidates)
-    )
-    system = (
-        "너는 사용자의 감정/상황에 가장 잘 맞는 성경 구절을 고르는 목회적 도우미다. "
-        "표면 단어의 일치가 아니라 '의미와 정서'가 통하는 구절을 우선한다. "
-        # 저지 검증(이슈 #11)에서 확인된 실패 유형 — 임베딩 검색이 물어와도 걸러낸다.
-        "위로에 부적절한 구절은 다른 후보가 있는 한 피한다: 심판·진멸 신탁, "
-        "족보·명단·율법 조문, 악인이나 유혹자의 대사, 죽음을 소원하는 탄식, "
-        "게으름 책망. 후보가 한국어가 아닐 수도 있다."
-    )
-    user = (
-        f'사용자 입력: "{mood}"\n\n'
-        f"후보 구절({len(candidates)}개):\n{listed}\n\n"
-        f"위 후보 중 사용자 입력의 감정·상황에 가장 잘 어울리는 {picks}개를 "
-        "가장 잘 맞는 순서대로 골라라. 후보 번호만 JSON으로 출력하라. "
-        '형식: {"picks": [번호, 번호, 번호]}'
-    )
-    try:
-        parsed = json.loads(llm.complete_json(system, user, max_tokens=100, schema=_PICKS_SCHEMA))
-        nums = parsed.get("picks") if isinstance(parsed, dict) else parsed
-        selected: List[dict] = []
-        seen: set[int] = set()
-        for n in (nums or []):
-            idx = int(n) - 1
-            if 0 <= idx < len(candidates) and idx not in seen:
-                seen.add(idx)
-                selected.append(candidates[idx])
-            if len(selected) >= picks:
-                break
-        # LLM이 부족하게 골랐으면 유사도 순으로 채운다.
-        for i, c in enumerate(candidates):
-            if len(selected) >= picks:
-                break
-            if i not in seen:
-                selected.append(c)
-        return selected[:picks] if selected else fallback
-    except Exception:
-        log.exception("verse selection failed; fallback to top-k")
-        return fallback
 
 
 def _prepare_recommendations(
