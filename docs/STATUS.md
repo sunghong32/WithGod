@@ -146,7 +146,7 @@ Play vc28 production·alpha·internal `completed`. **1.6.1(#69 iOS 위젯 현지
 
 ## 최근 변경 이력
 
-- 2026-11-25 feat(instagram): 릴스 마르다(월 11/23 몫)·Mia 2화 「Thanksgiving eve」(실제 앱 녹화) — 검토 통과 후 큐. 앱 추천 오독(겔 21:17·욥 31:34)은 #101/#102 로 고침. 성경 이야기 편 규칙: PD 찬송가 한 곡·같은 빠르기·장면 따라 편성(마르다 = Sweet Hour of Prayer), 0초 「The story of …」 제목(README·REVIEW H3·F-음악), Mia 로파이는 유지
+- 2026-11-25 feat(instagram): 릴스 마르다(월 11/23 몫)·Mia 2화 「Thanksgiving eve」 — 검토 통과, 큐에 넣음. 앱 추천 오독(겔 21:17·욥 31:34)은 #101/#102 로 고침. 성경 이야기 편: PD 찬송가 한 곡·같은 빠르기·장면 따라 편성(예 Sweet Hour of Prayer), 0초 「The story of …」 제목(README·REVIEW H3·F-음악), Mia 로파이 유지
 - 2026-11-25 fix(backend): #101 위로의 말씀 선별 — 부적합 목록 빈 묶음 222개 재분류(Haiku 5.5)·명작 오탐 5개 되살림, 선별은 앞뒤 절을 보고 `excluded` 먼저(`backend/recommend.py` 로 분리), 코멘트는 조건절·화자 규칙. 영어 12개 입력 × 3회 나쁜 카드 7 → 0, 한국어 3개 확인 · 운영 배포 `18bd629`(서버 테스트 292개, 재시작 10초), 운영 확인 뒤 이슈 닫음
 - 2026-11-25 chore: 텔레그램엔 개발 내용 대신 문제·예약 작업 알림만 — 사용자 결정(브릿지 붙은 5개 프로젝트 공통). CLAUDE.md·AGENTS.md 의 「긴 작업은 시작 전에 알린다」 규칙 삭제, 전역 Stop 훅(`~/.local/share/tg-claude-bridge/notify_hook.py`)은 데스크 대화 미러링을 끄고 예약 작업 결과만 보냄, 전역 `~/.claude/CLAUDE.md`·`~/.codex/AGENTS.md` 에도 같은 규칙
 - 그 이전 이력은 git history 로 넘김(`git log --until=2026-11-24`)
