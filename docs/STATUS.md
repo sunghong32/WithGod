@@ -84,7 +84,7 @@ Play vc28 production·alpha·internal `completed`. **1.6.1(#69 iOS 위젯 현지
       도구 `backend/instagram/reels/`(render.py 영상 · music.swift 음악 · finish.py 합치기·표지 · reel_queue.py 예약), 편마다 원본은 `episodes/<slug>/`,
       그림·중간 파일은 `~/.local/share/withgod-ig-reels/work/<slug>/`. 다 만든 편은 `reel_queue.py add <폴더>` → launchd `com.minsunghong.withgod-ig-reels`
       (10분마다: 3시간 전 S3 업로드·컨테이너 → 게시 → 텔레그램 링크). **다음 편이 비면 72·24시간 전에 텔레그램이 알린다**(11/16 월요일 편이 아무도 모르게 빔).
-      `reel_queue.py status` 로 슬롯·차례 확인. 올린 편: 엘리야(11/14) · 한나(11/17) · Mia 1화(11/18) · 탕자(11/20). 월 11/23 마르다는 아무도 안 만들어 빠졌다(24시간 전 알림이 텔레그램 시간 초과로 실패했는데도 '보냄'으로 기록돼 다시 안 감 — `remind_empty` 버그). 큐: Mia 2화 「Thanksgiving eve」(11/25 수 19:00 ET, `episodes/thanksgiving`) · 마르다(`episodes/martha`, 추수감사절 11/26 10:00 ET 로 늦게). **금 11/27 찬송가부터 비어 있다.**
+      `reel_queue.py status` 로 슬롯·차례 확인. 올린 편: 엘리야(11/14) · 한나(11/17) · Mia 1화(11/18) · 탕자(11/20). 월 11/23 마르다는 아무도 안 만들어 빠졌다(24시간 전 알림이 텔레그램 시간 초과로 실패했는데도 '보냄'으로 기록돼 다시 안 감 — `remind_empty` 버그). 마르다(`episodes/martha`)는 11/25 17:31 KST 에 늦게 올림(`/reel/DgKGubjT_Jz/`). 큐: Mia 2화(11/25 수 19:00 ET, `episodes/thanksgiving`). **금 11/27 찬송가부터 비어 있다.**
       **첫 3초 규칙(11/19)**: 평균 시청 6.9~10.5초라 0초 큰 첫 문장(`hook`)·2.5초 안 컷 또는 밀기·첫 8초 자막 빈 틈 없음 — finish.py 가 검사해 막는다. 캡션 해시태그 5개(`#bibleverse` 포함, add 가 검사). README 「첫 3초」「캡션」. 요령은 메모리 `instagram-account`
       **대본 검토(11/20, 사용자 "피드백 없이 완전 자동")**: 메시지 한 줄 → `story.md` → 새 서브에이전트가 `REVIEW.md` 로 검토 → 통과해야 렌더링·큐(`검토: 통과` 줄 없으면 add 거절). 미리보기에 한국어 줄거리. 스킬 `withgod-reel`.
 - [x] **인스타 런칭 게시물 — 끝(11/12, 7개).** 오늘의 말씀과 겹치는 말씀 카드 2개(06·04)는 사용자 결정으로 뺐고, 남은 4개는 11/12 오전에 바로 게시.
