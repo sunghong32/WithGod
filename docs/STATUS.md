@@ -143,10 +143,9 @@ Play vc28 production·alpha·internal `completed`. **1.6.1(#69 iOS 위젯 현지
 
 ## 최근 변경 이력
 
+- 2026-11-25 chore: 텔레그램엔 개발 내용 대신 문제·예약 작업 알림만 — 사용자 결정(브릿지 붙은 5개 프로젝트 공통). CLAUDE.md·AGENTS.md 의 「긴 작업은 시작 전에 알린다」 규칙 삭제, 전역 Stop 훅(`~/.local/share/tg-claude-bridge/notify_hook.py`)은 데스크 대화 미러링을 끄고 예약 작업 결과만 보냄, 전역 `~/.claude/CLAUDE.md`·`~/.codex/AGENTS.md` 에도 같은 규칙
 - 2026-11-23 feat(instagram): Daily Verse 표지를 말씀 중심으로 — 큰 한 단어 때문에 대충 넘기면 성경 게시글인지 안 보인다는 사용자 지적. 「Daily Bible Verse」+수평 감정 스티커+말씀 한 줄(카피 `line`, 검사 `find_line_problems`)+굵은 장절, 한 단어는 아래 배경으로, 말씀은 늘 위쪽(아래는 배경 단어와 겹침). 표지가 절 전체면 말씀 장을 뺌. 시안 6차(스티커·단어 위·말씀 카드 등), 틀 5 로 30개 다시 렌더
 - 2026-11-19 feat(instagram): Daily Verse 표지를 「오늘의 한 단어」로(그림·사진 없이) — 성경 시대 그림이 월요일 릴스와 겹친다는 사용자 지적, 사진풍·액자 시안은 "대충·굳이"로 거절. 분위기 5개로 세 장 색·배경을 맞추고 배경 설명 장을 뺌, 16일치 다시 렌더(틀 4)
 - 2026-11-19 feat(instagram): 조회수 점검 — 태그 개수(3·5)는 도달과 무관, 비팔로워 도달 213/222 는 릴스, 릴스 평균 시청 7~10초. 릴스 첫 3초 규칙 + 자동 검사(`render.opening_problems`, finish.py 가 막음, 한나·Mia 전후 시안) · 해시태그 5개(인스타 상한, `#bibleverse` 포함, 사용자 요청) + Daily Verse 캡션 검색어 줄 · 운영 서버 git pull(API 재시작 없음 — instagram 은 타이머가 매번 새로 실행)
 - 2026-11-18 fix/release: #92 iOS 안내 모달이 겹치면 홈 먹통 — 차례표 `useModalTurn`(PR #93, 시뮬레이터 4조합·에뮬레이터 확인). OTA 1.6.1·1.6.0 iOS·Android(수정만) + min_supported 1.6.0(1.5.0 은 11/11 뒤 실행 0대라 OTA 대신 강제 업데이트, 사용자 결정)
-- 2026-11-17 feat(instagram): 수요일 앱 시연을 시리즈 「Mia」로 — 첫 편이 인물 이야기와 똑같아 보이고 다시 만든 시안은 광고 같다는 사용자 피드백으로, 3D 애니 인물 Mia 가 고민을 안고 WithGod 앱을 쓰는 이야기(실제 앱 녹화, 로파이 음악, 속마음 자막). 1화 「3:07 a.m.」 11/18 큐(2차: 실제로 한 글자씩 치는 장면·자막 여유 있게, 60초, 시편 4:8). render.py 앱 화면 장면·자막별 CSS, music.swift GM 128 악기·드럼
-- 2026-11-17 feat(instagram): 릴스 월·수·금 예약 큐(`backend/instagram/reels/reel_queue.py` + launchd) — 주기만 정하고 예약·미리 만든 편이 없어 11/16 월요일 편이 비었다. 빈 슬롯 텔레그램 알림 · 금요일 형식 순번 기록 · 렌더러를 워크트리 임시 폴더에서 레포로. 한나 편(사무엘상 1장) 제작·게시
-- 그 이전 이력은 git history 로 넘김(`git log --until=2026-11-17`)
+- 그 이전 이력은 git history 로 넘김(`git log --until=2026-11-18`)
