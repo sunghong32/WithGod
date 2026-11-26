@@ -84,7 +84,7 @@ Play vc28 production·alpha·internal `completed`. **1.6.1(#69 iOS 위젯 현지
       도구 `backend/instagram/reels/`(render.py 영상 · music.swift 음악 · finish.py 합치기·표지 · reel_queue.py 예약), 편마다 원본은 `episodes/<slug>/`,
       그림·중간 파일은 `~/.local/share/withgod-ig-reels/work/<slug>/`. 다 만든 편은 `reel_queue.py add <폴더>` → launchd `com.minsunghong.withgod-ig-reels`
       (10분마다: 3시간 전 S3 업로드·컨테이너 → 게시 → 텔레그램 링크). **다음 편이 비면 72·24시간 전에 텔레그램이 알린다**(11/16 월요일 편이 아무도 모르게 빔).
-      `reel_queue.py status` 로 슬롯·차례 확인. 올린 편: 엘리야 · 한나 · Mia 1화 · 탕자 · 마르다(월 11/23 몫, 아무도 안 만들어 11/25 늦게 — 24시간 전 알림이 텔레그램 시간 초과로 실패했는데도 '보냄'으로 기록됨, `remind_empty` 버그) · Mia 2화(11/26 09:02 KST). **금 11/27 찬송가부터 비어 있다.**
+      `reel_queue.py status` 로 슬롯·차례 확인. 올린 편: 엘리야 · 한나 · Mia 1화 · 탕자 · 마르다(월 11/23 몫, 아무도 안 만들어 11/25 늦게 — 24시간 전 알림이 텔레그램 시간 초과로 실패했는데도 '보냄'으로 기록됨, `remind_empty` 버그) · Mia 2화(11/26 09:02 KST) · 찬송가 링카르트(금 11/27 큐, 11/26 제작). **월 11/30 사가랴·엘리사벳부터 비어 있다.**
       **첫 3초 규칙(11/19)**: 평균 시청 6.9~10.5초라 0초 큰 첫 문장(`hook`)·2.5초 안 컷 또는 밀기·첫 8초 자막 빈 틈 없음 — finish.py 가 검사해 막는다. 캡션 해시태그 5개(`#bibleverse` 포함, add 가 검사). README 「첫 3초」「캡션」. 요령은 메모리 `instagram-account`
       **대본 검토(11/20, 사용자 "피드백 없이 완전 자동")**: 메시지 한 줄 → `story.md` → 새 서브에이전트가 `REVIEW.md` 로 검토 → 통과해야 렌더링·큐(`검토: 통과` 줄 없으면 add 거절). 미리보기에 한국어 줄거리. 스킬 `withgod-reel`.
 - [x] **인스타 런칭 게시물 — 끝(11/12, 7개).** 오늘의 말씀과 겹치는 말씀 카드 2개(06·04)는 사용자 결정으로 뺐고, 남은 4개는 11/12 오전에 바로 게시.
@@ -146,8 +146,8 @@ Play vc28 production·alpha·internal `completed`. **1.6.1(#69 iOS 위젯 현지
 
 ## 최근 변경 이력
 
+- 2026-11-26 feat(instagram): 릴스 찬송가 링카르트(금 11/27 큐) — 바흐 BWV 386 화음, 가사 자막을 그 줄 선율에, 사실은 NDB·연대기로(찬송은 역병 전), 검토 3회째 통과. 사용자 「너무 어두침침」 → REVIEW S4
 - 2026-11-26 feat(instagram): 릴스 음악 악기를 편마다 이야기에 맞춰 고른다(사용자 "그때그때 어울리는 악기 조합") — music.swift 에 소리 뱅크(`"bank": "gu"` = GeneralUser GS, 받는 곳 README 5)·드럼 세트(`drums40`) 고르기, 크기 맞춤 `music_levels.py`. 기존 편 렌더는 그대로
 - 2026-11-25 feat(instagram): 릴스 마르다·Mia 2화 — 성경 이야기 편은 PD 찬송가 한 곡·같은 빠르기·장면 따라 편성, 0초 「The story of …」 제목(REVIEW H3)
 - 2026-11-25 fix(backend): #101 위로의 말씀 선별 — 부적합 목록 빈 묶음 222개 재분류(Haiku 5.5)·명작 오탐 5개 되살림, 선별은 앞뒤 절을 보고 `excluded` 먼저(`backend/recommend.py` 로 분리), 코멘트는 조건절·화자 규칙. 영어 12개 입력 × 3회 나쁜 카드 7 → 0, 한국어 3개 확인 · 운영 배포 `18bd629`(서버 테스트 292개, 재시작 10초), 운영 확인 뒤 이슈 닫음
-- 2026-11-25 chore: 텔레그램엔 개발 내용 대신 문제·예약 작업 알림만 — 사용자 결정(브릿지 붙은 5개 프로젝트 공통). CLAUDE.md·AGENTS.md 의 「긴 작업은 시작 전에 알린다」 규칙 삭제, 전역 Stop 훅(`~/.local/share/tg-claude-bridge/notify_hook.py`)은 데스크 대화 미러링을 끄고 예약 작업 결과만 보냄, 전역 `~/.claude/CLAUDE.md`·`~/.codex/AGENTS.md` 에도 같은 규칙
-- 그 이전 이력은 git history 로 넘김(`git log --until=2026-11-24`)
+- 그 이전 이력은 git history 로 넘김(`git log --until=2026-11-25`)
