@@ -29,7 +29,8 @@ description: "@withgod.app 인스타 릴스 한 편을 만들어 예약 큐에 �
 예정된 릴스는 데스크 예약 작업 「릴스 자동 제작」(매일 13:00 KST)이 72시간 안의 빈 슬롯을 맡아 만든다.
 앱이 꺼져 있으면 게시 30시간 전에 launchd 가 `claude -p` 로 대신 띄운다. 그 실행과 텔레그램 피드백 처리는
 [AUTO.md](../../../backend/instagram/reels/AUTO.md) 를 따른다. 작업 폴더는 자동 제작 전용 워크트리 `~/.local/share/withgod-ig-reels/repo`.
-미리보기를 보낸 뒤 사용자가 답장으로 고칠 점을 주면 고쳐서 `reel_queue.py add … --replace` — 답이 없으면 예정대로 올라간다.
+미리보기를 보낸 뒤 사용자가 답장으로 고칠 점을 주면 고쳐서 `reel_queue.py add … --replace`.
+**사용자가 「올려」라고 승인해야 올라간다**(`reel_queue.py approve <날짜>`) — 승인 없이는 게시 시각이 지나도 올리지 않는다(11/26).
 
 ## 사용자가 고쳐 달라고 하면
 

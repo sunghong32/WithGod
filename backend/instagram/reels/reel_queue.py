@@ -6,7 +6,9 @@
 
 자동 제작(사용자 결정 2026-11-26 "예정된 릴스는 다 일정으로 잡아 그 시간에 시작, 놓쳐서 못 올리는 일 없게"):
 데스크 앱 예약 작업이 매일 13:00(KST)에 `next --claim` 으로 72시간 안의 빈 슬롯 하나를 맡아 AUTO.md 대로 만들고 큐에 넣는다
-(미리보기가 텔레그램으로 가고, 사용자가 답장으로 고칠 점을 주면 고쳐 `add --replace` — 답이 없으면 예정대로 올라간다).
+(미리보기가 텔레그램으로 가고, 사용자가 답장으로 고칠 점을 주면 고쳐 `add --replace`).
+**승인해야 올라간다(사용자 11/26 "막 올리긴 싫다")** — 텔레그램 「올려」 → `approve`. 승인 전이면 게시 24·6시간 전에 승인을 청하고,
+게시 시각까지 승인이 없으면 올리지 않고 알린 뒤 기다린다(승인이 늦게 오면 그때 바로 올린다).
 앱이 꺼져 있어 게시 30시간 전에도 비어 있으면 이 launchd 가 `claude -p` 로 직접 제작을 띄우고, 24시간 전에도 비어 있으면 알린다.
 
 주기(사용자 결정 2026-11-13): 월 성경 인물 이야기 · 수 앱 시연 · 금 번갈아(그 시절 생활 → 성화 읽기 →
@@ -77,7 +79,8 @@ WEEKDAY_KO = "월화수목금토일"
 PREPARE_LEAD = timedelta(hours=3)
 CONTAINER_TTL = timedelta(hours=20)   # 만료(24시간) 전에 다시 만든다
 URL_TTL = timedelta(days=6)           # 서명 주소는 7일 — 하루 여유
-REMIND_AT = (timedelta(hours=24),)   # 자동 제작이 72→30시간 전에 돌므로, 24시간 전에도 비면 문제다(11/26)
+REMIND_AT = (timedelta(hours=24),)
+APPROVE_REMIND_AT = (timedelta(hours=24), timedelta(hours=6))   # 승인 전이면 이때 승인을 청한다(+ 게시 시각에 한 번)   # 자동 제작이 72→30시간 전에 돌므로, 24시간 전에도 비면 문제다(11/26)
 AUTO_WINDOW = 72        # 시간 — 데스크 예약 실행(매일 13:00 KST)이 이 안의 빈 슬롯을 맡는다
 CLAIM_TTL = timedelta(hours=4)        # 「제작 중」 표시가 이보다 오래됐는데 큐가 비었으면 그 실행은 죽은 것
 FALLBACK_AT = timedelta(hours=30)     # 이때도 비어 있고 아무도 안 만들고 있으면 launchd 가 직접 제작을 띄운다
@@ -391,8 +394,8 @@ def cmd_add(args) -> int:
         head = "📼 고친 편으로 바꿔 넣음" if replaced else "📼 릴스 큐에 들어감"
         sent = send_video(dst / "reel.mp4", f"{head}: {args.title or slug} ({kind})\n"
                                             f"게시 {et(due)} = 한국 {kst(due)}\n"
-                                            "고칠 점은 이 대화에 답장으로 알려 주세요 — 고쳐서 다시 보내 드립니다. "
-                                            "답이 없으면 예정대로 올라갑니다.")
+                                            "올려도 되면 이 대화에 「올려」라고 답장 주세요. 고칠 점이 있으면 그 내용을 답장으로 — "
+                                            "고쳐서 다시 보내 드립니다. 승인 전에는 올라가지 않습니다.")
         print("텔레그램 미리보기 " + ("보냄" if sent else "못 보냄"))
         send_story(dst)
     return 0
@@ -416,7 +419,8 @@ def cmd_status(_args) -> int:
     for s in upcoming_slots(now_utc() - timedelta(hours=1), 8):
         d, j = by_due.get(s, (None, None))
         c = None if j else active_claim(state, s)
-        mark = (f"✅ {j['title']} ({j.get('container_id') and '컨테이너 준비됨' or '대기'})" if j else
+        mark = (f"✅ {j['title']} ({'승인됨' if j.get('approved_at') else '승인 대기'}"
+                f"{', 컨테이너 준비됨' if j.get('container_id') else ''})" if j else
                 f"🛠 제작 중({kst(datetime.fromisoformat(c['at']))}~, {c.get('by', '')})" if c else "⬜ 비어 있음")
         fmt = FORMATS[j["format"]] if j else plan_text(s)
         print(f"  {et(s):<20} 한국 {kst(s):<16} {mark:<24} {fmt}")
@@ -516,6 +520,8 @@ def process(c: InstagramClient, d: Path, job: dict) -> None:
             return
     if now_utc() < due:
         return
+    if not job.get("approved_at"):  # 사용자가 텔레그램으로 승인해야 올린다(11/26) — 컨테이너는 위에서 미리 준비해 둔다
+        return
     try:
         mid = c.publish(job["container_id"])
     except Exception as exc:
@@ -529,7 +535,9 @@ def process(c: InstagramClient, d: Path, job: dict) -> None:
         job["permalink"] = ""
     save_job(d, job)
     late = now_utc() - due
-    late_note = f"\n(예정보다 {int(late.total_seconds() // 60)}분 늦게 올라감 — 이 맥이 꺼져 있었을 수 있음)" \
+    late_why = ("승인이 게시 시각 뒤에 와서" if datetime.fromisoformat(job["approved_at"]) > due
+                else "이 맥이 꺼져 있었을 수 있음")
+    late_note = f"\n(예정보다 {int(late.total_seconds() // 60)}분 늦게 올라감 — {late_why})" \
         if late > timedelta(minutes=30) else ""
     log(f"{d.name}: published {mid} {job['permalink']}")
     notify(f"🎬 릴스 게시 완료: {job['title']} ({job['kind']})\n{job['permalink']}{late_note}\n"
@@ -562,6 +570,82 @@ def remind_empty(jobs: list[tuple[Path, dict]]) -> None:
             changed = True
         if changed:
             save_state(state)
+
+
+def remind_approval(jobs: list[tuple[Path, dict]]) -> None:
+    """승인 전인 편: 게시 24·6시간 전에 승인을 청하고, 게시 시각이 지나도 승인이 없으면 한 번 알린다(보냈을 때만 기록)."""
+    with state_lock():
+        state = load_state()
+        sent = state.setdefault("approval_reminded", {})
+        changed = False
+        for d, j in jobs:
+            if j.get("approved_at") or j.get("media_id"):
+                continue
+            due = datetime.fromisoformat(j["due"])
+            left = due - now_utc()
+            hours = int(left.total_seconds() // 3600)
+            msgs = []
+            for i, lead in enumerate(APPROVE_REMIND_AT):
+                if left <= lead and (i + 1 == len(APPROVE_REMIND_AT) or left > APPROVE_REMIND_AT[i + 1]) and left > timedelta(0):
+                    msgs.append((f"{d.name}#{i}", f"✋ 승인 기다리는 릴스: {j['title']} ({j['kind']})\n"
+                                 f"게시 {et(due)} = 한국 {kst(due)} (약 {hours}시간 남음)\n"
+                                 "올려도 되면 이 대화에 「올려」라고 답장 주세요(미리보기는 앞서 보낸 영상). "
+                                 "승인 전에는 올라가지 않습니다."))
+            if left <= timedelta(0):
+                msgs.append((f"{d.name}#due", f"⏸ 승인이 없어 {j['title']} 을(를) 올리지 않았습니다(예정 한국 {kst(due)}).\n"
+                             "「올려」라고 답장 주시면 바로 올립니다. 올리지 않으려면 「취소」."))
+            for key, text in msgs[-1:]:  # 여러 단계가 한꺼번에 걸리면(맥이 꺼져 있었다 등) 가장 최근 것만
+                if key not in sent and notify(text):
+                    sent[key] = now_utc().isoformat(timespec="seconds")
+                    changed = True
+        live = {d.name for d, _ in jobs}
+        for k in [k for k in sent if k.split("#")[0] not in live]:
+            del sent[k]
+            changed = True
+        if changed:
+            save_state(state)
+
+
+def find_job(slot: str | None, unapproved: bool = False) -> tuple[Path, dict] | None:
+    """ET 날짜(YYYY-MM-DD)로 큐의 편을, 날짜가 없으면 가장 이른(승인 전) 편을."""
+    for d, j in queued():
+        if j.get("media_id"):
+            continue
+        if slot and f"{datetime.fromisoformat(j['due']).astimezone(ET):%Y-%m-%d}" != slot:
+            continue
+        if not slot and unapproved and j.get("approved_at"):
+            continue
+        return d, j
+    return None
+
+
+def cmd_approve(args) -> int:
+    """사용자가 텔레그램 등으로 「올려」라고 했을 때 — 그 편을 승인해 예정 시각(지났으면 다음 run)에 올리게 한다."""
+    hit = find_job(args.slot, unapproved=True)
+    if not hit:
+        print("승인할 편이 없다")
+        return 1
+    d, j = hit
+    j.update(approved_at=now_utc().isoformat(timespec="seconds"), approved_note=args.note or "")
+    save_job(d, j)
+    due = datetime.fromisoformat(j["due"])
+    when = "다음 run(10분 안)에 바로" if due <= now_utc() else f"{et(due)} = 한국 {kst(due)} 에"
+    print(f"승인: {d.name} — {when} 올라간다")
+    return 0
+
+
+def cmd_cancel(args) -> int:
+    """「올리지 마」 — 아직 안 올라간 편을 queue/replaced/ 로 치운다(지우지 않는다)."""
+    hit = find_job(args.slot)
+    if not hit:
+        print("그 날짜의 큐가 없다")
+        return 1
+    d, _ = hit
+    old = QUEUE / "replaced" / f"{d.name}-cancel-{now_utc().astimezone(KST):%m%d%H%M}"
+    old.parent.mkdir(parents=True, exist_ok=True)
+    shutil.move(str(d), str(old))
+    print(f"취소: {old}")
+    return 0
 
 
 def auto_start(dry: bool = False) -> None:
@@ -657,6 +741,7 @@ def cmd_run(_args) -> int:
     except Exception as exc:  # 대비 실행이 게시·알림을 막지 않게
         log(f"auto_start failed: {type(exc).__name__}: {exc}")
     remind_empty(queued())
+    remind_approval(queued())
     return 0
 
 
@@ -708,11 +793,16 @@ def main() -> int:
     rl = sub.add_parser("release", help="「제작 중」 표시 지우기")
     rl.add_argument("slot", help="ET 날짜 YYYY-MM-DD")
     sub.add_parser("auto-check", help="대비 실행이 지금 무엇을 띄울지(dry)")
+    ap_ = sub.add_parser("approve", help="사용자 승인(「올려」) — 그 편을 예정 시각에 올린다")
+    ap_.add_argument("slot", nargs="?", help="ET 날짜 YYYY-MM-DD(없으면 가장 이른 승인 전 편)")
+    ap_.add_argument("--note", help="누가·어디서 승인했는지")
+    cn = sub.add_parser("cancel", help="「올리지 마」 — 큐에서 치운다(queue/replaced/)")
+    cn.add_argument("slot", help="ET 날짜 YYYY-MM-DD")
     sub.add_parser("run")
     sub.add_parser("install")
     args = ap.parse_args()
     return {"add": cmd_add, "status": cmd_status, "preview": cmd_preview, "run": cmd_run, "install": cmd_install,
-            "next": cmd_next, "release": cmd_release,
+            "next": cmd_next, "release": cmd_release, "approve": cmd_approve, "cancel": cmd_cancel,
             "auto-check": lambda _a: auto_start(dry=True) or 0}[args.cmd](args)
 
 
