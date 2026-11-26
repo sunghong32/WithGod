@@ -4,7 +4,7 @@
 > **작업을 완료하면 「지금 상태」와 「최근 변경 이력」을 갱신할 것.** 낡으면 신뢰가 무너진다.
 > ⚠️ 이 파일은 세션 시작 시 통째로 주입된다. **20KB 아래로 유지할 것** —
 > 완료 이력은 `CHANGELOG.md` 나 git history 로 넘긴다.
-> 최종 갱신: 2026-11-25 · 브랜치: `app-develop`
+> 최종 갱신: 2026-11-26 · 브랜치: `app-develop`
 
 ## 한 줄
 
@@ -83,9 +83,14 @@ Play vc28 production·alpha·internal `completed`. **1.6.1(#69 iOS 위젯 현지
       금 번갈아(그 시절 생활 → 성화 읽기 → 찬송가 이야기 → 오래된 기도문), 대림절(11/29~12/24) 특집 · 오늘의 말씀 재탕 없음(사용자 결정 11/13).
       도구 `backend/instagram/reels/`(render.py 영상 · music.swift 음악 · finish.py 합치기·표지 · reel_queue.py 예약), 편마다 원본은 `episodes/<slug>/`,
       그림·중간 파일은 `~/.local/share/withgod-ig-reels/work/<slug>/`. 다 만든 편은 `reel_queue.py add <폴더>` → launchd `com.minsunghong.withgod-ig-reels`
-      (10분마다: 3시간 전 S3 업로드·컨테이너 → 게시 → 텔레그램 링크). **다음 편이 비면 72·24시간 전에 텔레그램이 알린다**(11/16 월요일 편이 아무도 모르게 빔).
-      `reel_queue.py status` 로 슬롯·차례 확인. 올린 편: 엘리야(11/14) · 한나(11/17, 월요일 몫) · Mia 1화 「3:07 a.m.」(11/18). **11/19 기준 큐가 비어 있다 — 금 11/20 편 없음.**
-      **첫 3초 규칙(11/19)**: 평균 시청 6.9~10.5초라 0초 큰 첫 문장(`hook`)·2.5초 안 컷 또는 밀기·첫 8초 자막 빈 틈 없음 — finish.py 가 검사해 막는다. 캡션 해시태그 5개(`#bibleverse` 포함, add 가 검사). README 「첫 3초」「캡션」. 요령은 메모리 `instagram-account`
+      (10분마다: 3시간 전 S3 업로드·컨테이너 → 게시 → 텔레그램 링크).
+      **제작도 일정으로 돈다(사용자 결정 11/26 — 놓치지 않게)**: 데스크 예약 작업 `withgod-reel-auto-make`(매일 13:00 KST)이 72시간 안 빈 슬롯을 맡아(`next --claim`)
+      `AUTO.md` 대로 만들어 큐에 넣는다(월 슬롯=토, 수=월, 금=수). 작업 폴더 `~/.local/share/withgod-ig-reels/repo`(브랜치 `feat/ig-reels-auto`).
+      앱이 꺼져 30시간 전에도 비면 launchd 가 `claude -p` 로 대신 띄우고, 24시간 전에도 비면 알림. 텔레그램 답장 피드백 → 고쳐 `add --replace`, 사용자가 「올려」(`approve`)해야 게시.
+      예약 작업 권한 모드는 「모든 승인 건너뛰기」(11/26 사용자 설정 — 편집 → 지침 칸 아래 🛡).
+      `reel_queue.py status` 로 슬롯·차례 확인. 올린 편: 엘리야 · 한나 · Mia 1화 · 탕자 · 마르다(11/23 몫, 11/25 늦게 — 알림 버그는 11/26 고침) · Mia 2화(11/26 09:02 KST) · 찬송가 링카르트(금 11/27 큐, 11/26 제작). **월 11/30 사가랴·엘리사벳부터 비어 있다.**
+      **첫 3초 규칙(11/19)**: 0초 큰 첫 문장(`hook`)·2.5초 안 컷 또는 밀기·첫 8초 자막 빈 틈 없음(finish.py 검사). 해시태그 5개(`#bibleverse` 포함, add 검사). README 「첫 3초」「캡션」
+      **대본 검토(11/20, 사용자 "피드백 없이 완전 자동")**: 메시지 한 줄 → `story.md` → 새 서브에이전트가 `REVIEW.md` 로 검토 → 통과해야 렌더링·큐(`검토: 통과` 줄 없으면 add 거절). 미리보기에 한국어 줄거리. 스킬 `withgod-reel`.
 - [x] **인스타 런칭 게시물 — 끝(11/12, 7개).** 오늘의 말씀과 겹치는 말씀 카드 2개(06·04)는 사용자 결정으로 뺐고, 남은 4개는 11/12 오전에 바로 게시.
       결과물·생성기 `docs/instagram/launch/`·`tools/make_launch_posts.py`, 게시 기록 `launch/posted.json`. 상단 고정(소개·사용법·잠 못 드는 밤) 완료(11/12, 앱에서 사용자가). launchd plist 는 지워도 된다
 - [x] `data/langs/unsuitable_refs.json` 명작 오탐(마 6:34·시 71:20·잠 18:21) — #101 에서 `languages._CURATED_SUITABLE` 로 되살림.
@@ -145,7 +150,8 @@ Play vc28 production·alpha·internal `completed`. **1.6.1(#69 iOS 위젯 현지
 
 ## 최근 변경 이력
 
-- 2026-11-25 fix(backend): #101 위로의 말씀 선별 — 부적합 목록 빈 묶음 222개 재분류(Haiku 5.5)·명작 오탐 5개 되살림, 선별은 앞뒤 절을 보고 `excluded` 먼저(`backend/recommend.py` 로 분리), 코멘트는 조건절·화자 규칙. 영어 12개 입력 × 3회 나쁜 카드 7 → 0, 한국어 3개 확인 · 운영 배포 `18bd629`(서버 테스트 292개, 재시작 10초), 운영 확인 뒤 이슈 닫음
-- 2026-11-25 chore: 텔레그램엔 개발 내용 대신 문제·예약 작업 알림만 — 사용자 결정(브릿지 붙은 5개 프로젝트 공통). CLAUDE.md·AGENTS.md 의 「긴 작업은 시작 전에 알린다」 규칙 삭제, 전역 Stop 훅(`~/.local/share/tg-claude-bridge/notify_hook.py`)은 데스크 대화 미러링을 끄고 예약 작업 결과만 보냄, 전역 `~/.claude/CLAUDE.md`·`~/.codex/AGENTS.md` 에도 같은 규칙
-- 2026-11-23 feat(instagram): Daily Verse 표지를 말씀 중심으로 — 큰 한 단어 때문에 대충 넘기면 성경 게시글인지 안 보인다는 사용자 지적. 「Daily Bible Verse」+수평 감정 스티커+말씀 한 줄(카피 `line`, 검사 `find_line_problems`)+굵은 장절, 한 단어는 아래 배경으로, 말씀은 늘 위쪽(아래는 배경 단어와 겹침). 표지가 절 전체면 말씀 장을 뺌. 시안 6차(스티커·단어 위·말씀 카드 등), 틀 5 로 30개 다시 렌더
-- 그 이전 이력은 git history 로 넘김(`git log --until=2026-11-20`)
+- 2026-11-26 feat(instagram): 릴스 자동 제작 — 매일 13:00 예약 작업 + 30시간 전 launchd 대비, 텔레그램 피드백 → `add --replace`, 「올려」 승인해야 게시(`AUTO.md`), 빈 슬롯 알림 오기록 버그 수정
+- 2026-11-26 feat(instagram): 릴스 찬송가 링카르트(금 11/27 큐) — 바흐 BWV 386 화음, 가사 자막을 그 줄 선율에, 사실은 NDB·연대기로(찬송은 역병 전), 검토 3회째 통과. 사용자 「너무 어두침침」 → REVIEW S4
+- 2026-11-26 feat(instagram): 릴스 음악 악기를 편마다 이야기에 맞춰 고른다(사용자 "그때그때 어울리는 악기 조합") — GeneralUser GS 뱅크·드럼 세트, `music_levels.py`
+- 2026-11-25 feat(instagram): 릴스 마르다·Mia 2화 — 성경 이야기 편은 PD 찬송가 한 곡·같은 빠르기·장면 따라 편성, 0초 「The story of …」 제목(REVIEW H3)
+- 그 이전 이력은 git history 로 넘김(`git log --until=2026-11-25`, #101 은 「지금 상태」 첫 문단)
