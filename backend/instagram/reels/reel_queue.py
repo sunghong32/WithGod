@@ -2,8 +2,12 @@
 """인스타 릴스 월·수·금 예약 게시 — 이 맥 launchd 가 10분마다 부른다.
 
 릴스는 이 맥에서 한 편씩 만든다(그림은 로컬 모델, 영상은 render.py, 음악은 music.swift). 다 만든 편을
-큐에 넣어 두면 정해진 시각에 공식 Graph API 로 올리고 텔레그램으로 링크를 보낸다. 다음 편이 비어 있으면
-게시 사흘 전과 하루 전에 텔레그램으로 미리 알린다(11/16 월요일 편이 아무도 모르게 비었던 일 때문).
+큐에 넣어 두면 정해진 시각에 공식 Graph API 로 올리고 텔레그램으로 링크를 보낸다.
+
+자동 제작(사용자 결정 2026-11-26 "예정된 릴스는 다 일정으로 잡아 그 시간에 시작, 놓쳐서 못 올리는 일 없게"):
+데스크 앱 예약 작업이 매일 13:00(KST)에 `next --claim` 으로 72시간 안의 빈 슬롯 하나를 맡아 AUTO.md 대로 만들고 큐에 넣는다
+(미리보기가 텔레그램으로 가고, 사용자가 답장으로 고칠 점을 주면 고쳐 `add --replace` — 답이 없으면 예정대로 올라간다).
+앱이 꺼져 있어 게시 30시간 전에도 비어 있으면 이 launchd 가 `claude -p` 로 직접 제작을 띄우고, 24시간 전에도 비어 있으면 알린다.
 
 주기(사용자 결정 2026-11-13): 월 성경 인물 이야기 · 수 앱 시연 · 금 번갈아(그 시절 생활 → 성화 읽기 →
 찬송가 이야기 → 오래된 기도), 11/29~12/24 는 대림절 특집을 끼워 넣는다. 오늘의 말씀 재탕은 하지 않는다.
@@ -51,7 +55,6 @@ from graph import GraphError, InstagramClient  # noqa: E402
 
 REPO = Path(os.environ.get("WITHGOD_REPO", Path.home() / "WithGod"))
 SECRET = REPO / "backend/secrets/instagram.json"
-NOTIFY = REPO / "scripts/tg-notify.sh"
 ROOT = Path(os.environ.get("WITHGOD_REELS_ROOT", Path.home() / ".local/share/withgod-ig-reels"))
 QUEUE, DONE, STATE = ROOT / "queue", ROOT / "queue/done", ROOT / "state.json"
 LABEL = "com.minsunghong.withgod-ig-reels"
@@ -74,14 +77,22 @@ WEEKDAY_KO = "월화수목금토일"
 PREPARE_LEAD = timedelta(hours=3)
 CONTAINER_TTL = timedelta(hours=20)   # 만료(24시간) 전에 다시 만든다
 URL_TTL = timedelta(days=6)           # 서명 주소는 7일 — 하루 여유
-REMIND_AT = (timedelta(hours=72), timedelta(hours=24))
+REMIND_AT = (timedelta(hours=24),)   # 자동 제작이 72→30시간 전에 돌므로, 24시간 전에도 비면 문제다(11/26)
+AUTO_WINDOW = 72        # 시간 — 데스크 예약 실행(매일 13:00 KST)이 이 안의 빈 슬롯을 맡는다
+CLAIM_TTL = timedelta(hours=4)        # 「제작 중」 표시가 이보다 오래됐는데 큐가 비었으면 그 실행은 죽은 것
+FALLBACK_AT = timedelta(hours=30)     # 이때도 비어 있고 아무도 안 만들고 있으면 launchd 가 직접 제작을 띄운다
+FALLBACK_MIN = timedelta(hours=3)     # 이보다 촉박하면 만들 시간이 없다 — 알림만
+AUTO_DIR = Path(os.environ.get("WITHGOD_REELS_WT", ROOT / "repo"))   # 자동 제작 전용 git 워크트리(앱이 정리하지 않는 곳)
+AUTO_DOC = "backend/instagram/reels/AUTO.md"
+CLAUDE = os.environ.get("CLAUDE_BIN") or shutil.which("claude") or str(Path.home() / ".local/bin/claude")
+MAKE_LOG = Path.home() / "Library/Logs/withgod-ig-reel-make.log"
 FAIL_NOTIFY_EVERY = timedelta(hours=1)
 REQUIRED = ("reel.mp4", "cover.jpg", "caption.txt")
 # 메시지 한 줄 + 한국어 줄거리 + 대본(REVIEW.md 틀). 새 서브에이전트 검토를 통과해야 「검토: 통과 …」 줄을 적고 큐에 넣는다.
 # 텔레그램 미리보기 뒤에 「## 대본」 앞까지를 보낸다 — 사용자가 스토리를 알고 보도록(11/20).
 STORY = "story.md"
 HASHTAG_MAX = 5
-MAKE_HINT = "세션(텔레그램도 됨)에 「다음 릴스 만들어줘」라고 하면 backend/instagram/reels/README.md 대로 만들어 큐에 넣습니다."
+MAKE_HINT = "자동 제작이 결과를 못 냈습니다(로그 ~/Library/Logs/withgod-ig-reel-make.log). 답장으로 「다음 릴스 만들어줘」라고 하면 backend/instagram/reels/AUTO.md 대로 만듭니다."
 
 
 def now_utc() -> datetime:
@@ -92,11 +103,26 @@ def log(msg: str) -> None:
     print(datetime.now().astimezone().isoformat(timespec="seconds"), msg, flush=True)
 
 
-def notify(text: str) -> None:
-    try:  # 알림 실패가 게시를 막지 않는다
-        subprocess.run([str(NOTIFY), text], timeout=30, capture_output=True)
+def notify(text: str) -> bool:
+    """텔레그램 sendMessage — 보냈으면 True. 알림 실패가 게시를 막지 않는다.
+    tg-notify.sh 는 실패해도 0 으로 끝나서 빈 슬롯 알림이 못 갔는데도 '보냄'으로 적혔다(11/25) — 응답을 직접 본다."""
+    try:
+        token, chats = tg_env()
+        if not token or not chats:
+            return False
+        ok = True
+        for chat in chats:
+            cfg = f'url = "https://api.telegram.org/bot{token}/sendMessage"\n'
+            r = subprocess.run(["curl", "-sS", "-K", "-", "--data-urlencode", f"chat_id={chat}",
+                                "--data-urlencode", f"text={text[:4000]}"],
+                               input=cfg, capture_output=True, text=True, timeout=30)
+            ok = ok and '"ok":true' in r.stdout
+        if not ok:
+            log("notify failed: telegram not ok")
+        return ok
     except Exception as exc:
         log(f"notify failed: {type(exc).__name__}")
+        return False
 
 
 def tg_env() -> tuple[str, list[str]]:
@@ -219,6 +245,39 @@ def plan_text(slot: datetime) -> str:
     return f"{FORMATS[expected_format(slot)]}" + (f" — {topic}" if topic else "")
 
 
+# ── 상태(알림 기록 · 제작 중 표시) ───────────────────────────────────
+
+def load_state() -> dict:
+    return json.loads(STATE.read_text()) if STATE.exists() else {}
+
+
+def save_state(state: dict) -> None:
+    STATE.parent.mkdir(parents=True, exist_ok=True)
+    tmp = STATE.with_suffix(".tmp")
+    tmp.write_text(json.dumps(state, ensure_ascii=False, indent=1))
+    tmp.replace(STATE)
+
+
+def state_lock():
+    """state.json 을 읽고 고치는 동안 잡는 잠금(launchd run · 데스크 예약 실행 · 손 실행이 겹쳐도 같은 슬롯을 두 번 맡지 않게)."""
+    ROOT.mkdir(parents=True, exist_ok=True)
+    f = open(ROOT / "state.lock", "w")
+    fcntl.flock(f, fcntl.LOCK_EX)
+    return f
+
+
+def active_claim(state: dict, slot: datetime) -> dict | None:
+    c = state.get("making", {}).get(slot.isoformat())
+    if c and now_utc() - datetime.fromisoformat(c["at"]) < CLAIM_TTL:
+        return c
+    return None
+
+
+def empty_slots(within: timedelta) -> list[datetime]:
+    have = {datetime.fromisoformat(j["due"]) for _, j in queued()}
+    return [s for s in upcoming_slots(now_utc(), 8) if s not in have and s - now_utc() <= within]
+
+
 # ── 큐 ────────────────────────────────────────────────────────────────
 
 def load_job(d: Path) -> dict:
@@ -293,9 +352,22 @@ def cmd_add(args) -> int:
         due = slot_at(day)
     else:
         due = next(s for s in upcoming_slots(now_utc(), 60) if s not in taken)
+    replaced = False
     if due in taken:
-        print(f"{et(due)} 슬롯에 이미 다른 편이 있다")
-        return 1
+        if not args.replace:
+            print(f"{et(due)} 슬롯에 이미 다른 편이 있다(고친 편으로 바꾸려면 --replace)")
+            return 1
+        for d, j in queued():
+            if datetime.fromisoformat(j["due"]) != due:
+                continue
+            if j.get("media_id"):
+                print(f"{d.name} 은 이미 올라갔다 — 바꿀 수 없다")
+                return 1
+            old = QUEUE / "replaced" / f"{d.name}-{now_utc().astimezone(KST):%m%d%H%M}"
+            old.parent.mkdir(parents=True, exist_ok=True)
+            shutil.move(str(d), str(old))
+            print(f"앞 편을 치움: {old}")
+            replaced = True
     slug = args.slug or src.name
     dst = QUEUE / f"{due.astimezone(ET):%Y-%m-%d}-{slug}"
     if dst.exists():
@@ -311,9 +383,16 @@ def cmd_add(args) -> int:
     save_job(dst, {"slug": slug, "title": args.title or slug, "kind": kind, "format": fmt,
                    "due": due.isoformat(timespec="seconds"), "added_at": now_utc().isoformat(timespec="seconds")})
     print(f"큐에 넣음: {dst.name} — {et(due)} = 한국 {kst(due)} [{kind}]")
+    with state_lock():
+        state = load_state()
+        if state.get("making", {}).pop(due.isoformat(), None) is not None:
+            save_state(state)
     if not args.no_preview:
-        sent = send_video(dst / "reel.mp4", f"📼 릴스 큐에 들어감: {args.title or slug} ({kind})\n"
-                                            f"게시 {et(due)} = 한국 {kst(due)}\n고칠 점이 있으면 그 전에 알려 주세요.")
+        head = "📼 고친 편으로 바꿔 넣음" if replaced else "📼 릴스 큐에 들어감"
+        sent = send_video(dst / "reel.mp4", f"{head}: {args.title or slug} ({kind})\n"
+                                            f"게시 {et(due)} = 한국 {kst(due)}\n"
+                                            "고칠 점은 이 대화에 답장으로 알려 주세요 — 고쳐서 다시 보내 드립니다. "
+                                            "답이 없으면 예정대로 올라갑니다.")
         print("텔레그램 미리보기 " + ("보냄" if sent else "못 보냄"))
         send_story(dst)
     return 0
@@ -330,12 +409,15 @@ def cmd_preview(args) -> int:
 
 def cmd_status(_args) -> int:
     jobs = queued()
+    state = load_state()
     by_due = {datetime.fromisoformat(j["due"]): (d, j) for d, j in jobs}
     print(f"지금 {kst(now_utc())} KST / {et(now_utc())}")
     print("\n앞으로의 슬롯:")
     for s in upcoming_slots(now_utc() - timedelta(hours=1), 8):
         d, j = by_due.get(s, (None, None))
-        mark = f"✅ {j['title']} ({j.get('container_id') and '컨테이너 준비됨' or '대기'})" if j else "⬜ 비어 있음"
+        c = None if j else active_claim(state, s)
+        mark = (f"✅ {j['title']} ({j.get('container_id') and '컨테이너 준비됨' or '대기'})" if j else
+                f"🛠 제작 중({kst(datetime.fromisoformat(c['at']))}~, {c.get('by', '')})" if c else "⬜ 비어 있음")
         fmt = FORMATS[j["format"]] if j else plan_text(s)
         print(f"  {et(s):<20} 한국 {kst(s):<16} {mark:<24} {fmt}")
     extra = [(d, j) for d, j in jobs if datetime.fromisoformat(j["due"]) not in
@@ -457,28 +539,104 @@ def process(c: InstagramClient, d: Path, job: dict) -> None:
 
 
 def remind_empty(jobs: list[tuple[Path, dict]]) -> None:
-    state = json.loads(STATE.read_text()) if STATE.exists() else {}
-    sent = state.setdefault("reminded", {})
-    have = {datetime.fromisoformat(j["due"]) for _, j in jobs}
-    changed = False
-    for s in upcoming_slots(now_utc(), 2):
-        if s in have:
-            continue
-        left = s - now_utc()
-        for i, lead in enumerate(REMIND_AT):
-            key = f"{s.isoformat()}#{i}"
-            if left <= lead and key not in sent and (i + 1 == len(REMIND_AT) or left > REMIND_AT[i + 1]):
-                hours = int(left.total_seconds() // 3600)
-                notify(f"📭 다음 릴스가 아직 없습니다\n{plan_text(s)}\n"
-                       f"게시 {et(s)} = 한국 {kst(s)} (약 {hours}시간 남음)\n{MAKE_HINT}")
-                sent[key] = now_utc().isoformat(timespec="seconds")
-                changed = True
-    cutoff = now_utc() - timedelta(days=14)
-    for k in [k for k in sent if datetime.fromisoformat(k.split("#")[0]) < cutoff]:
-        del sent[k]
-        changed = True
-    if changed:
-        STATE.write_text(json.dumps(state, indent=1))
+    with state_lock():
+        state = load_state()
+        sent = state.setdefault("reminded", {})
+        have = {datetime.fromisoformat(j["due"]) for _, j in jobs}
+        changed = False
+        for s in upcoming_slots(now_utc(), 2):
+            if s in have or active_claim(state, s):
+                continue
+            left = s - now_utc()
+            for i, lead in enumerate(REMIND_AT):
+                key = f"{s.isoformat()}#{i}"
+                if left <= lead and key not in sent and (i + 1 == len(REMIND_AT) or left > REMIND_AT[i + 1]):
+                    hours = int(left.total_seconds() // 3600)
+                    if notify(f"📭 다음 릴스가 아직 없습니다\n{plan_text(s)}\n"
+                              f"게시 {et(s)} = 한국 {kst(s)} (약 {hours}시간 남음)\n{MAKE_HINT}"):
+                        sent[key] = now_utc().isoformat(timespec="seconds")  # 보냈을 때만 — 못 보냈으면 다음 run 에서 다시
+                        changed = True
+        cutoff = now_utc() - timedelta(days=14)
+        for k in [k for k in sent if datetime.fromisoformat(k.split("#")[0]) < cutoff]:
+            del sent[k]
+            changed = True
+        if changed:
+            save_state(state)
+
+
+def auto_start(dry: bool = False) -> None:
+    """데스크 예약 실행이 돌지 않았을 때(앱이 꺼져 있었다 등)의 대비 — 게시 30시간 전에도 비어 있고 아무도 만들고 있지 않으면
+    자동 제작 워크트리에서 `claude -p` 로 AUTO.md 를 직접 실행한다. 슬롯마다 한 번만."""
+    with state_lock():
+        state = load_state()
+        for s in empty_slots(FALLBACK_AT):
+            left, key = s - now_utc(), s.isoformat()
+            if left < FALLBACK_MIN or active_claim(state, s) or key in state.get("fallback", {}):
+                continue
+            day = f"{s.astimezone(ET):%Y-%m-%d}"
+            if dry:
+                print(f"(dry) {day} 자동 제작을 띄울 차례 — {plan_text(s)}")
+                continue
+            if not (AUTO_DIR / AUTO_DOC).exists() or not Path(CLAUDE).exists():
+                state.setdefault("fallback", {})[key] = now_utc().isoformat(timespec="seconds")
+                notify(f"⚠️ 릴스 자동 제작을 띄우지 못했습니다(워크트리 {AUTO_DIR} 또는 claude 없음)\n{plan_text(s)}\n"
+                       f"게시 {et(s)} = 한국 {kst(s)}")
+                continue
+            env = {k: v for k, v in os.environ.items() if not k.startswith("ANTHROPIC_")}  # 구독(OAuth)으로
+            env["PATH"] = f"{Path(CLAUDE).parent}:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
+            prompt = (f"{AUTO_DOC} 를 처음부터 끝까지 읽고 그대로 해라. 대상 슬롯은 {day}(ET) 이다 — "
+                      "launchd 가 이미 「제작 중」으로 표시해 두었으니 `next --claim` 대신 이 슬롯으로 만든다.")
+            MAKE_LOG.parent.mkdir(parents=True, exist_ok=True)
+            out = open(MAKE_LOG, "a")
+            out.write(f"\n=== {datetime.now().astimezone().isoformat(timespec='seconds')} launchd 대비 실행 {day}\n")
+            out.flush()
+            subprocess.Popen([CLAUDE, "-p", "--permission-mode", "bypassPermissions", prompt], cwd=str(AUTO_DIR),
+                             stdout=out, stderr=out, env=env, start_new_session=True)
+            now = now_utc().isoformat(timespec="seconds")
+            state.setdefault("making", {})[key] = {"at": now, "by": "launchd 대비"}
+            state.setdefault("fallback", {})[key] = now
+            log(f"auto_start {day}")
+            notify(f"⚠️ 릴스가 게시 {int(left.total_seconds() // 3600)}시간 전인데 아직 없어 직접 만들기 시작했습니다"
+                   f"(데스크 예약 실행이 돌지 않았습니다 — 앱이 꺼져 있었을 수 있음).\n{plan_text(s)}\n"
+                   f"게시 {et(s)} = 한국 {kst(s)}. 다 되면 미리보기를 보냅니다.")
+        cutoff = now_utc() - timedelta(days=14)
+        for bucket in ("making", "fallback"):
+            for k in [k for k in state.get(bucket, {}) if datetime.fromisoformat(k) < cutoff]:
+                del state[bucket][k]
+        save_state(state)
+
+
+def cmd_next(args) -> int:
+    """자동 제작의 첫 단계 — 앞으로 within 시간 안의 빈 슬롯 중 아무도 만들고 있지 않은 첫 슬롯을 JSON 한 줄로.
+    --claim 이면 그 슬롯을 「제작 중」으로 표시한다(4시간 뒤 풀림, add 하면 지워짐). 없으면 {"slot": null}."""
+    with state_lock():
+        state = load_state()
+        for s in empty_slots(timedelta(hours=args.within)):
+            if s - now_utc() < timedelta(hours=1) or active_claim(state, s):
+                continue
+            plan = planned(s)
+            out = {"slot": f"{s.astimezone(ET):%Y-%m-%d}", "due_et": et(s), "due_kst": kst(s),
+                   "hours_left": int((s - now_utc()).total_seconds() // 3600), "format": expected_format(s),
+                   "kind": FORMATS[expected_format(s)], "topic": plan.get("topic"), "note": plan.get("note")}
+            if args.claim:
+                state.setdefault("making", {})[s.isoformat()] = {"at": now_utc().isoformat(timespec="seconds"),
+                                                                 "by": args.by}
+                save_state(state)
+            print(json.dumps(out, ensure_ascii=False))
+            return 0
+    print(json.dumps({"slot": None}))
+    return 0
+
+
+def cmd_release(args) -> int:
+    """제작을 그만둘 때(실패 등) 「제작 중」 표시를 지운다 — 다음 예약 실행·대비 실행이 다시 맡을 수 있게."""
+    s = slot_at(date.fromisoformat(args.slot))
+    with state_lock():
+        state = load_state()
+        gone = state.get("making", {}).pop(s.isoformat(), None)
+        save_state(state)
+    print("지움" if gone else "표시가 없었다")
+    return 0
 
 
 def cmd_run(_args) -> int:
@@ -494,6 +652,10 @@ def cmd_run(_args) -> int:
         c = client()
         for d, job in jobs:
             process(c, d, job)
+    try:
+        auto_start()
+    except Exception as exc:  # 대비 실행이 게시·알림을 막지 않게
+        log(f"auto_start failed: {type(exc).__name__}: {exc}")
     remind_empty(queued())
     return 0
 
@@ -534,15 +696,24 @@ def main() -> int:
     g.add_argument("--at", help="시각을 직접(ISO, 시간대 포함)")
     g.add_argument("--now", action="store_true", help="지금 바로(다음 run 에서 게시)")
     a.add_argument("--no-preview", action="store_true", help="텔레그램 미리보기를 보내지 않는다")
+    a.add_argument("--replace", action="store_true", help="그 슬롯의 아직 안 올라간 편을 고친 편으로 바꾼다(피드백 반영)")
     pv = sub.add_parser("preview", help="텔레그램으로 영상 미리보기")
     pv.add_argument("folder")
     pv.add_argument("--caption")
     sub.add_parser("status")
+    nx = sub.add_parser("next", help="자동 제작: 앞으로 N시간 안의 아직 아무도 안 만드는 빈 슬롯(JSON)")
+    nx.add_argument("--within", type=int, default=AUTO_WINDOW)
+    nx.add_argument("--claim", action="store_true", help="그 슬롯을 「제작 중」으로 표시")
+    nx.add_argument("--by", default="손 실행", help="누가 맡았는지(상태 표시용)")
+    rl = sub.add_parser("release", help="「제작 중」 표시 지우기")
+    rl.add_argument("slot", help="ET 날짜 YYYY-MM-DD")
+    sub.add_parser("auto-check", help="대비 실행이 지금 무엇을 띄울지(dry)")
     sub.add_parser("run")
     sub.add_parser("install")
     args = ap.parse_args()
-    return {"add": cmd_add, "status": cmd_status, "preview": cmd_preview, "run": cmd_run,
-            "install": cmd_install}[args.cmd](args)
+    return {"add": cmd_add, "status": cmd_status, "preview": cmd_preview, "run": cmd_run, "install": cmd_install,
+            "next": cmd_next, "release": cmd_release,
+            "auto-check": lambda _a: auto_start(dry=True) or 0}[args.cmd](args)
 
 
 if __name__ == "__main__":
