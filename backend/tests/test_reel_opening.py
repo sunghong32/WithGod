@@ -66,14 +66,34 @@ class QueueCaptionTest(unittest.TestCase):
         import reel_queue
         self.rq = reel_queue
 
-    def check(self, caption):
+    STORY = "# 편\n메시지: 한 줄\n검토: 통과 — 11/20 1회\n\n## 한국어 줄거리\n1. 첫 문장\n\n## 대본\n1. [화면] Hook. / 첫 문장\n"
+
+    def check(self, caption, story=STORY):
         import tempfile
         with tempfile.TemporaryDirectory() as d:
             d = Path(d)
             (d / "caption.txt").write_text(caption)
             for n in ("reel.mp4", "cover.jpg"):
                 (d / n).write_bytes(b"")
+            if story is not None:
+                (d / "story.md").write_text(story)
             return " ".join(self.rq.check_folder(d))
+
+    def test_story_review_gate(self):
+        ok = "Hook.\n\n#bibleverse #prayer #hannah #biblestory #christianencouragement"
+        self.assertNotIn("story.md", self.check(ok))
+        self.assertIn("story.md 없음", self.check(ok, story=None))
+        self.assertIn("검토: 통과", self.check(ok, story=self.STORY.replace("검토: 통과 — 11/20 1회\n", "")))
+
+    def test_story_summary_stops_before_script(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / "story.md").write_text(self.STORY)
+            text = self.rq.story_summary(Path(d))
+        self.assertIn("메시지: 한 줄", text)
+        self.assertIn("1. 첫 문장", text)
+        self.assertNotIn("## 대본", text)
+        self.assertNotIn("Hook.", text)
 
     def test_hashtag_rules(self):
         self.assertNotIn("해시태그", self.check("Hook.\n\n#bibleverse #prayer #hannah #biblestory #christianencouragement"))
